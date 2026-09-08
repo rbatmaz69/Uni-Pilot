@@ -1,0 +1,13 @@
+export { AiAssistantPage } from './AiAssistantPage';
+export { CalendarPage } from './CalendarPage';
+export { CommunitiesPage } from './CommunitiesPage';
+export { CoursesPage } from './CoursesPage';
+export { DashboardPage } from './DashboardPage';
+export { DocumentsPage } from './DocumentsPage';
+export { EventsPage } from './EventsPage';
+export { ExamsPage } from './ExamsPage';
+export { FocusPage } from './FocusPage';
+export { GradesPage } from './GradesPage';
+export { SettingsPage } from './SettingsPage';
+export { StudiesPage } from './StudiesPage';
+export { TasksPage } from './TasksPage';

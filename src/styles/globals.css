@@ -1,0 +1,239 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------
+   Design tokens
+   One theme is shipped today ("light"). Every value below is a
+   semantic token, so a future theme only has to redeclare this block
+   under another [data-theme] selector.
+   ------------------------------------------------------------------ */
+:root,
+[data-theme='light'] {
+  --app-background: oklch(0.962 0.014 84);
+  --surface: oklch(0.998 0.004 86);
+  --surface-secondary: oklch(0.949 0.016 84);
+  --surface-hover: oklch(0.938 0.018 84);
+
+  --sidebar: oklch(0.243 0.012 70);
+  --sidebar-elevated: oklch(0.285 0.013 70);
+  --sidebar-hover: oklch(0.315 0.014 70);
+  --sidebar-active: oklch(0.365 0.016 72);
+  --sidebar-border: oklch(0.33 0.012 70);
+  --sidebar-foreground: oklch(0.9 0.008 80);
+  --sidebar-muted: oklch(0.655 0.012 75);
+
+  --text-primary: oklch(0.255 0.017 65);
+  --text-secondary: oklch(0.475 0.015 65);
+  --text-muted: oklch(0.64 0.013 70);
+  --text-inverted: oklch(0.985 0.004 85);
+
+  --border: oklch(0.888 0.016 80);
+  --border-soft: oklch(0.926 0.013 80);
+  --border-strong: oklch(0.836 0.021 78);
+
+  --accent-primary: oklch(0.55 0.142 275);
+  --accent-primary-hover: oklch(0.5 0.148 275);
+  --accent-primary-soft: oklch(0.947 0.032 275);
+  --accent-primary-foreground: oklch(0.99 0.003 275);
+
+  --accent-pink: oklch(0.78 0.105 6);
+  --accent-pink-soft: oklch(0.947 0.036 6);
+  --accent-yellow: oklch(0.84 0.115 88);
+  --accent-yellow-soft: oklch(0.956 0.048 90);
+  --accent-blue: oklch(0.735 0.094 236);
+  --accent-blue-soft: oklch(0.948 0.032 236);
+  --accent-green: oklch(0.73 0.068 152);
+  --accent-green-soft: oklch(0.948 0.028 152);
+  --accent-lavender: oklch(0.765 0.075 302);
+  --accent-lavender-soft: oklch(0.949 0.03 302);
+
+  --focus-ring: oklch(0.55 0.142 275);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+
+  --shadow-soft: 0 1px 2px oklch(0.3 0.02 70 / 0.05), 0 10px 26px -18px oklch(0.3 0.03 70 / 0.22);
+  --shadow-raised: 0 2px 4px oklch(0.3 0.02 70 / 0.06), 0 20px 44px -24px oklch(0.3 0.03 70 / 0.3);
+  --shadow-sidebar: 0 2px 6px oklch(0.2 0.02 70 / 0.14), 0 24px 48px -26px oklch(0.2 0.03 70 / 0.4);
+}
+
+/* ------------------------------------------------------------------
+   Tailwind theme bridge — tokens above become utilities
+   (bg-surface, text-muted, border-soft, rounded-xl, …)
+   ------------------------------------------------------------------ */
+@theme inline {
+  --color-app: var(--app-background);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-elevated: var(--sidebar-elevated);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-inverted: var(--text-inverted);
+
+  --color-line: var(--border);
+  --color-line-soft: var(--border-soft);
+  --color-line-strong: var(--border-strong);
+
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-primary-hover);
+  --color-accent-soft: var(--accent-primary-soft);
+  --color-accent-foreground: var(--accent-primary-foreground);
+  --color-pink: var(--accent-pink);
+  --color-pink-soft: var(--accent-pink-soft);
+  --color-yellow: var(--accent-yellow);
+  --color-yellow-soft: var(--accent-yellow-soft);
+  --color-blue: var(--accent-blue);
+  --color-blue-soft: var(--accent-blue-soft);
+  --color-green: var(--accent-green);
+  --color-green-soft: var(--accent-green-soft);
+  --color-lavender: var(--accent-lavender);
+  --color-lavender-soft: var(--accent-lavender-soft);
+
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-sidebar: var(--shadow-sidebar);
+
+  --ease-shell: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--app-background);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background: var(--accent-primary-soft);
+    color: var(--accent-primary);
+  }
+}
+
+@layer components {
+  .scroll-area {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  .scroll-area::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .scroll-area::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  .scroll-area::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+    background-clip: content-box;
+  }
+
+  .scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scroll-area-dark {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sidebar-hover) transparent;
+  }
+
+  .scroll-area-dark::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scroll-area-dark::-webkit-scrollbar-thumb {
+    background: var(--sidebar-hover);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+}
+
+@layer utilities {
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes tooltip-enter {
+    from {
+      opacity: 0;
+      transform: translateY(3px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-page-enter {
+    animation: page-enter 0.26s var(--ease-shell) both;
+  }
+
+  .animate-tooltip-enter {
+    animation: tooltip-enter 0.12s ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
