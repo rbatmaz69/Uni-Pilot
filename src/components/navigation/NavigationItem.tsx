@@ -15,6 +15,7 @@ export function NavigationItem({ item, collapsed }: NavigationItemProps) {
     <Tooltip label={item.label} disabled={!collapsed} className="w-full">
       <NavLink
         to={item.path}
+        aria-label={item.label}
         className={({ isActive }) =>
           cn(
             'group relative flex h-[34px] w-full items-center rounded-md outline-offset-2',

@@ -39,14 +39,12 @@ export function Tooltip({
 
   const hide = useCallback(() => setPosition(null), []);
 
-  const open = position !== null;
+  // Derived rather than stored: a tooltip that becomes disabled while open
+  // closes without an effect having to push state back into React.
+  const open = position !== null && !disabled;
 
   useEffect(() => {
     if (!open) return;
-    if (disabled) {
-      hide();
-      return;
-    }
 
     window.addEventListener('scroll', hide, true);
     window.addEventListener('resize', hide);
@@ -56,7 +54,7 @@ export function Tooltip({
       window.removeEventListener('resize', hide);
       window.removeEventListener('blur', hide);
     };
-  }, [open, disabled, hide]);
+  }, [open, hide]);
 
   return (
     <>

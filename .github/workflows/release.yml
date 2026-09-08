@@ -10,8 +10,13 @@ permissions:
   contents: write
 
 jobs:
+  # A tag with failing tests must not produce a release.
+  quality:
+    uses: ./.github/workflows/quality.yml
+
   build:
     name: ${{ matrix.label }}
+    needs: quality
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false

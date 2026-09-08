@@ -10,22 +10,23 @@ Ein persönliches Betriebssystem für das Studium — Desktop-App auf Basis von 
 
 **[→ Neueste Version herunterladen](https://github.com/rbatmaz69/Uni-Pilot/releases/latest)**
 
-| System | Datei | Hinweis |
-| --- | --- | --- |
-| macOS | `…_universal.dmg` | Läuft auf Apple Silicon und Intel |
-| Windows | `…-setup.exe` | Empfohlen. Alternativ `.msi` für verwaltete Rechner |
-| Linux (Debian/Ubuntu) | `…_amd64.deb` | `sudo apt install ./datei.deb` |
-| Linux (Fedora/RHEL) | `…_x86_64.rpm` | `sudo dnf install ./datei.rpm` |
-| Linux (universell) | `…_amd64.AppImage` | `chmod +x` nicht vergessen |
+| System                | Datei              | Hinweis                                             |
+| --------------------- | ------------------ | --------------------------------------------------- |
+| macOS                 | `…_universal.dmg`  | Läuft auf Apple Silicon und Intel                   |
+| Windows               | `…-setup.exe`      | Empfohlen. Alternativ `.msi` für verwaltete Rechner |
+| Linux (Debian/Ubuntu) | `…_amd64.deb`      | `sudo apt install ./datei.deb`                      |
+| Linux (Fedora/RHEL)   | `…_x86_64.rpm`     | `sudo dnf install ./datei.rpm`                      |
+| Linux (universell)    | `…_amd64.AppImage` | `chmod +x` nicht vergessen                          |
 
 ### Beim ersten Start
 
 Die App ist derzeit **nicht signiert** — dafür braucht es eine kostenpflichtige Apple-Developer-Mitgliedschaft bzw. ein Windows-Code-Signing-Zertifikat. Betriebssysteme warnen deshalb beim ersten Öffnen. Das ist erwartbar und einmalig:
 
 **macOS**
+
 1. DMG öffnen, „Uni Pilot" in den Programme-Ordner ziehen.
 2. Rechtsklick auf die App → **Öffnen** → im Dialog nochmals **Öffnen**.
-3. Falls das unter macOS 15 (Sequoia) oder neuer nicht greift: *Systemeinstellungen → Datenschutz & Sicherheit* → ganz unten **„Trotzdem öffnen"**.
+3. Falls das unter macOS 15 (Sequoia) oder neuer nicht greift: _Systemeinstellungen → Datenschutz & Sicherheit_ → ganz unten **„Trotzdem öffnen"**.
 
 Alternativ im Terminal:
 
@@ -63,13 +64,28 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ### Skripte
 
-| Skript | Zweck |
-| --- | --- |
-| `npm run dev` | Vite-Dev-Server |
-| `npm run build` | Typecheck, dann Produktions-Build nach `dist/` |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run tauri:dev` | Desktop-App gegen den Dev-Server |
-| `npm run tauri:build` | Desktop-App lokal bündeln |
+| Skript                | Zweck                                          |
+| --------------------- | ---------------------------------------------- |
+| `npm run dev`         | Vite-Dev-Server                                |
+| `npm run build`       | Typecheck, dann Produktions-Build nach `dist/` |
+| `npm run typecheck`   | `tsc --noEmit`                                 |
+| `npm run tauri:dev`   | Desktop-App gegen den Dev-Server               |
+| `npm run tauri:build` | Desktop-App lokal bündeln                      |
+
+### Tests und Codequalität
+
+```bash
+npm run check          # Typecheck + Lint + Format + Tests (das prüft auch CI)
+npm run test           # Tests einmalig
+npm run test:watch     # Tests im Watch-Modus
+npm run test:coverage  # mit Abdeckungsbericht
+npm run lint:fix       # behebbare Lint-Fehler beheben
+npm run format         # Formatierung anwenden
+```
+
+Tests liegen neben ihrer Quelldatei. Der wichtigste ist `src/app/routes.test.tsx`: er iteriert über
+`NAV_ITEMS` und stellt sicher, dass jeder Navigationseintrag auch wirklich eine Route hat — neue
+Einträge sind damit automatisch abgedeckt.
 
 ### Struktur
 
@@ -114,6 +130,6 @@ npm version patch          # erzeugt Commit + Tag, z. B. v0.1.1
 git push origin main --follow-tags
 ```
 
-Der Tag startet den Workflow [`release.yml`](.github/workflows/release.yml): macOS, Linux und Windows werden parallel gebaut und in **denselben Entwurf** eines GitHub-Releases gelegt. Danach unter *Releases* die Dateien prüfen und auf **Publish release** klicken.
+Der Tag startet den Workflow [`release.yml`](.github/workflows/release.yml): macOS, Linux und Windows werden parallel gebaut und in **denselben Entwurf** eines GitHub-Releases gelegt. Danach unter _Releases_ die Dateien prüfen und auf **Publish release** klicken.
 
-Zum Testen ohne Veröffentlichung: *Actions → Release → Run workflow*. Dann entsteht kein Release, die Installer landen als Job-Artefakte.
+Zum Testen ohne Veröffentlichung: _Actions → Release → Run workflow_. Dann entsteht kein Release, die Installer landen als Job-Artefakte.

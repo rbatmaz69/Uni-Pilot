@@ -13,8 +13,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Type check & compile
+  # Fast feedback: no Rust toolchain, no apt packages.
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  compile:
+    name: Compile the desktop shell
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +50,12 @@ jobs:
       - run: npm ci
 
       # Also produces dist/ — tauri-build fails if frontendDist is missing,
-      # so this has to run before cargo check.
-      - name: Type check and build the web app
+      # so this has to run before anything touches cargo.
+      - name: Build the web app
         run: npm run build
 
       - name: Check the Rust shell
         run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Test the Rust shell
+        run: cargo test --manifest-path src-tauri/Cargo.toml

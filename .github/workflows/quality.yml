@@ -1,0 +1,53 @@
+name: Quality
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Types, lint, format & tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      # Reported, never enforced — the number stays visible without blocking a fix.
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "No coverage report was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## Test coverage"
+            echo
+            echo "| Metric | Covered | Count |"
+            echo "| --- | --- | --- |"
+            jq -r '.total
+                   | to_entries[]
+                   | select(.key | IN("statements", "branches", "functions", "lines"))
+                   | "| \(.key) | \(.value.pct)% | \(.value.covered)/\(.value.total) |"' \
+              coverage/coverage-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"

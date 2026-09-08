@@ -27,10 +27,7 @@ export function Sidebar() {
       )}
     >
       <div
-        className={cn(
-          'flex items-center gap-3 px-4 pb-4 pt-5',
-          collapsed && 'justify-center px-0',
-        )}
+        className={cn('flex items-center gap-3 px-4 pb-4 pt-5', collapsed && 'justify-center px-0')}
       >
         <AppLogo />
 
@@ -58,7 +55,10 @@ export function Sidebar() {
 
       <nav
         aria-label="Sections"
-        className={cn('scroll-area-dark min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2', collapsed ? 'px-3.5' : 'px-3')}
+        className={cn(
+          'scroll-area-dark min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2',
+          collapsed ? 'px-3.5' : 'px-3',
+        )}
       >
         {NAV_SECTIONS.map((section) => (
           <NavigationSection key={section.id} section={section} collapsed={collapsed} />
