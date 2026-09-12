@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type ThemeName = 'light';
+export type ThemeName = 'light' | 'dark';
 
 interface UiState {
   sidebarCollapsed: boolean;
@@ -9,6 +9,7 @@ interface UiState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: ThemeName) => void;
+  toggleTheme: () => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -19,6 +20,7 @@ export const useUiStore = create<UiState>()(
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setTheme: (theme) => set({ theme }),
+      toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
     }),
     { name: 'uni-pilot.ui' },
   ),

@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Base permissions for the main application window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://*" }, { "url": "http://*" }]
+    }
+  ]
 }

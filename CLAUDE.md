@@ -1,7 +1,8 @@
 # Uni Pilot — Arbeitshinweise
 
 Desktop-App für das Studium: Tauri 2 + React 19 + TypeScript + Vite + Tailwind v4.
-Stand: App-Shell mit Navigation, Routing und Design-System. **Noch keine fachlichen Features.**
+Stand: App-Shell mit Navigation und Routing, erste fachliche Features (Kalender, Dashboard,
+Reminders) in Arbeit.
 
 ## Vor jedem Push
 
@@ -29,6 +30,14 @@ Bei Formatierungsfehlern: `npm run format`. Bei Lint-Fehlern: `npm run lint:fix`
 - **TypeScript bleibt bei 5.9.** TypeScript 7 (nativer Compiler) exportiert die klassische
   Compiler-API nicht mehr, `typescript-eslint` verlangt aber `<6.1.0`. Erst hochziehen, wenn
   typescript-eslint TS 7 unterstützt.
+- **Fachliche Features leben unter `src/features/<name>/`**, nicht unter `src/components/`.
+  `src/components/` bleibt reserviert für generische, feature-übergreifende UI-Bausteine
+  (`ui/`, `layout/`, `navigation/`). Jedes Feature gliedert sich intern nach Art des Codes:
+  `components/` (UI), `store/` (Zustand-Stores des Features), `lib/` (Domänenlogik, Typen).
+  Barrel-Exports (`index.ts`) und feature-weite Integrationstests (die `renderApp` nutzen und
+  mehrere Units zusammen prüfen) liegen direkt in der Feature-Wurzel. Cross-Referenzen — auch
+  innerhalb desselben Features über Unterordner hinweg — laufen über den `@/`-Alias
+  (`@/features/calendar/store/eventStore`), nicht über relative `../`-Pfade.
 
 ## Struktur
 
@@ -37,9 +46,13 @@ src/app/          Root, Provider, Routen-Tabelle
 src/components/   ui/ (Button, IconButton, Tooltip, PageHeader)
                   layout/ (AppLayout, Sidebar, Header, MainContent, Page)
                   navigation/ (NavigationItem, NavigationSection)
+src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
+                  calendar/  {components,store,lib}/ + index.ts
+                  dashboard/ {components,lib}/ + index.ts
+                  reminders/ {components,store,lib}/
 src/pages/        Eine schlanke Komponente pro Route
-src/lib/          navigation.ts (Quelle der Wahrheit), tone.ts, utils.ts
-src/store/        Zustand-Store, nur UI-State
+src/lib/          navigation.ts (Quelle der Wahrheit), date.ts, ics.ts, tone.ts, utils.ts
+src/store/        Zustand-Store, nur UI-State (App-weit, nicht feature-spezifisch)
 src/test/         setup.ts, render.tsx
 src-tauri/        Desktop-Hülle (Rust)
 ```

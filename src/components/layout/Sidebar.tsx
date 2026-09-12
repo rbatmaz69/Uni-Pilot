@@ -1,4 +1,5 @@
-import { PanelLeftClose } from 'lucide-react';
+import { ArrowUpRight, ChevronsUpDown, Moon, PanelLeft, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { NavigationItem, NavigationSection } from '@/components/navigation';
 import { IconButton, Tooltip } from '@/components/ui';
 import { NAV_ITEMS, NAV_SECTIONS } from '@/lib/navigation';
@@ -6,94 +7,111 @@ import { cn } from '@/lib/utils';
 import { useUiStore } from '@/store/uiStore';
 import { AppLogo } from './AppLogo';
 
-const USER = {
-  name: 'Lena Brandner',
-  detail: 'Computer Science · 4th sem.',
-  initials: 'LB',
-};
-
 export function Sidebar() {
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const theme = useUiStore((state) => state.theme);
+  const toggleTheme = useUiStore((state) => state.toggleTheme);
+  const navigate = useNavigate();
 
   return (
     <aside
       aria-label="Main navigation"
       data-collapsed={collapsed}
       className={cn(
-        'flex h-full flex-col overflow-hidden rounded-2xl bg-sidebar shadow-sidebar',
-        'transition-[width] duration-250 ease-shell',
-        collapsed ? 'w-[72px]' : 'w-[264px]',
+        'sidebar-glass relative flex h-full flex-none flex-col overflow-hidden p-3 transition-[width] duration-250 ease-shell',
+        collapsed && 'px-2',
       )}
     >
       <div
-        className={cn('flex items-center gap-3 px-4 pb-4 pt-5', collapsed && 'justify-center px-0')}
+        className={cn(
+          'sidebar-brand flex h-[64px] flex-none items-center gap-2 px-3 pb-3',
+          collapsed && 'justify-center px-0',
+        )}
       >
         <AppLogo />
-
-        {!collapsed ? (
+        {!collapsed && (
           <>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14.5px] font-semibold leading-tight tracking-[-0.01em] text-sidebar-foreground">
-                Uni Pilot
-              </div>
-              <div className="truncate text-[11.5px] leading-tight text-sidebar-muted">
-                Hochschule Wesertal
-              </div>
-            </div>
+            <span className="sidebar-label flex-1 whitespace-nowrap text-[22px] font-bold tracking-[-0.055em] text-accent">
+              Uni Pilot
+            </span>
             <IconButton
               label="Collapse sidebar"
-              surface="sidebar"
               size="sm"
               onClick={toggleSidebar}
+              className="sidebar-expanded-control text-sidebar-muted hover:bg-sidebar-hover"
             >
-              <PanelLeftClose size={17} strokeWidth={1.8} aria-hidden />
+              <PanelLeft size={16} strokeWidth={1.7} aria-hidden />
             </IconButton>
           </>
-        ) : null}
+        )}
       </div>
-
       <nav
         aria-label="Sections"
-        className={cn(
-          'scroll-area-dark min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2',
-          collapsed ? 'px-3.5' : 'px-3',
-        )}
+        className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
       >
         {NAV_SECTIONS.map((section) => (
           <NavigationSection key={section.id} section={section} collapsed={collapsed} />
         ))}
       </nav>
-
-      <div className={cn('border-t border-sidebar-border pt-3', collapsed ? 'px-3.5' : 'px-3')}>
-        <NavigationItem item={NAV_ITEMS.settings} collapsed={collapsed} />
-
-        <Tooltip label={USER.name} disabled={!collapsed} className="w-full">
+      {!collapsed && (
+        <div className="sidebar-label semester-note mx-2 mb-4 mt-3 rounded-2xl border border-white/60 bg-surface/35 p-3.5 dark:border-white/5">
+          <div className="flex items-center justify-between text-[11px] font-medium text-sidebar-muted">
+            <span>Your semester</span>
+            <ArrowUpRight size={14} aria-hidden />
+          </div>
+          <p className="mt-1.5 text-[12px] font-semibold text-sidebar-foreground">
+            A little progress, every day.
+          </p>
+          <p className="mt-1 text-[11px] text-sidebar-muted">You&apos;ve got this, Alex.</p>
+        </div>
+      )}
+      <div className="flex-none pt-2">
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <NavigationItem item={NAV_ITEMS.settings} collapsed={collapsed} />
+          </div>
+          {!collapsed && (
+            <IconButton
+              label="Toggle color theme"
+              size="sm"
+              onClick={toggleTheme}
+              className="sidebar-label text-sidebar-muted hover:bg-sidebar-hover"
+            >
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </IconButton>
+          )}
+        </div>
+        <Tooltip label="Alex Morgan" disabled={!collapsed} className="mt-3 w-full">
           <button
             type="button"
-            aria-label={`Open profile for ${USER.name}`}
+            aria-label="Open profile for Alex"
+            onClick={() => {
+              void navigate('/settings');
+            }}
             className={cn(
-              'my-1.5 flex w-full items-center rounded-md py-1.5 transition-colors duration-150 hover:bg-sidebar-hover',
-              collapsed ? 'justify-center px-0' : 'gap-3 px-2',
+              'sidebar-profile flex w-full items-center gap-2.5 border-t border-sidebar-border/60 px-2 py-3 text-left',
+              collapsed && 'justify-center px-0',
             )}
           >
-            <span
-              aria-hidden
-              className="grid h-8 w-8 flex-none place-items-center rounded-full bg-sidebar-elevated text-[12px] font-semibold text-sidebar-foreground ring-1 ring-sidebar-border"
-            >
-              {USER.initials}
+            <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-[#c8dbd7] text-[12px] font-semibold text-[#3f6860] ring-2 ring-white/70">
+              AM
             </span>
-
-            {!collapsed ? (
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-[13px] font-semibold text-sidebar-foreground">
-                  {USER.name}
+            {!collapsed && (
+              <>
+                <span className="sidebar-label min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-sidebar-foreground">
+                    Alex Morgan
+                  </span>
+                  <span className="block text-[11px] text-sidebar-muted">Your personal campus</span>
                 </span>
-                <span className="block truncate text-[11.5px] text-sidebar-muted">
-                  {USER.detail}
-                </span>
-              </span>
-            ) : null}
+                <ChevronsUpDown
+                  size={14}
+                  className="sidebar-label text-sidebar-muted"
+                  aria-hidden
+                />
+              </>
+            )}
           </button>
         </Tooltip>
       </div>

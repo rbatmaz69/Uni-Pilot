@@ -1,63 +1,127 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 /* ------------------------------------------------------------------
    Design tokens
-   One theme is shipped today ("light"). Every value below is a
-   semantic token, so a future theme only has to redeclare this block
-   under another [data-theme] selector.
+   Light and dark appearances share semantic tokens. Components
+   inherit the selected palette through the data-theme selector.
    ------------------------------------------------------------------ */
 :root,
 [data-theme='light'] {
-  --app-background: oklch(0.962 0.014 84);
-  --surface: oklch(0.998 0.004 86);
-  --surface-secondary: oklch(0.949 0.016 84);
-  --surface-hover: oklch(0.938 0.018 84);
+  --app-background: #deedf5;
+  --surface: #ffffff;
+  --surface-secondary: #f5f7fa;
+  --surface-hover: #edf1f7;
 
-  --sidebar: oklch(0.243 0.012 70);
-  --sidebar-elevated: oklch(0.285 0.013 70);
-  --sidebar-hover: oklch(0.315 0.014 70);
-  --sidebar-active: oklch(0.365 0.016 72);
-  --sidebar-border: oklch(0.33 0.012 70);
-  --sidebar-foreground: oklch(0.9 0.008 80);
-  --sidebar-muted: oklch(0.655 0.012 75);
+  --sidebar: #e0eef4;
+  --sidebar-elevated: #f2f8fc;
+  --sidebar-hover: #dbe8ed;
+  --sidebar-active: #d0e0e8;
+  --sidebar-border: #cadde5;
+  --sidebar-foreground: #18252e;
+  --sidebar-muted: #667b87;
 
-  --text-primary: oklch(0.255 0.017 65);
-  --text-secondary: oklch(0.475 0.015 65);
-  --text-muted: oklch(0.64 0.013 70);
+  --text-primary: #20272e;
+  --text-secondary: #67717d;
+  --text-muted: #7b8692;
   --text-inverted: oklch(0.985 0.004 85);
 
-  --border: oklch(0.888 0.016 80);
-  --border-soft: oklch(0.926 0.013 80);
-  --border-strong: oklch(0.836 0.021 78);
+  --border: #e1e7ed;
+  --border-soft: #edf0f4;
+  --border-strong: #c9d3df;
 
-  --accent-primary: oklch(0.55 0.142 275);
-  --accent-primary-hover: oklch(0.5 0.148 275);
-  --accent-primary-soft: oklch(0.947 0.032 275);
+  --accent-primary: #4258f5;
+  --accent-primary-hover: #3045dd;
+  --accent-primary-soft: #f0f2ff;
   --accent-primary-foreground: oklch(0.99 0.003 275);
 
-  --accent-pink: oklch(0.78 0.105 6);
-  --accent-pink-soft: oklch(0.947 0.036 6);
-  --accent-yellow: oklch(0.84 0.115 88);
-  --accent-yellow-soft: oklch(0.956 0.048 90);
-  --accent-blue: oklch(0.735 0.094 236);
-  --accent-blue-soft: oklch(0.948 0.032 236);
-  --accent-green: oklch(0.73 0.068 152);
-  --accent-green-soft: oklch(0.948 0.028 152);
-  --accent-lavender: oklch(0.765 0.075 302);
-  --accent-lavender-soft: oklch(0.949 0.03 302);
+  --accent-pink: oklch(0.62 0.22 355);
+  --accent-pink-soft: oklch(0.95 0.04 355);
+  --accent-yellow: oklch(0.72 0.18 75);
+  --accent-yellow-soft: oklch(0.96 0.05 85);
+  --accent-blue: oklch(0.55 0.22 255);
+  --accent-blue-soft: oklch(0.95 0.04 255);
+  --accent-green: oklch(0.62 0.18 145);
+  --accent-green-soft: oklch(0.95 0.04 145);
+  --accent-lavender: oklch(0.6 0.2 295);
+  --accent-lavender-soft: oklch(0.95 0.04 295);
+  --accent-orange: oklch(0.65 0.2 48);
+  --accent-orange-soft: oklch(0.95 0.05 50);
+  --accent-teal: oklch(0.65 0.16 195);
+  --accent-teal-soft: oklch(0.95 0.04 195);
+  --accent-coral: oklch(0.62 0.2 28);
+  --accent-coral-soft: oklch(0.95 0.04 28);
 
-  --focus-ring: oklch(0.55 0.142 275);
+  --focus-ring: #4258f5;
+  --overlay: oklch(0.32 0.03 255 / 0.32);
+  --text-danger: oklch(0.46 0.17 28);
 
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-2xl: 24px;
 
-  --shadow-soft: 0 1px 2px oklch(0.3 0.02 70 / 0.05), 0 10px 26px -18px oklch(0.3 0.03 70 / 0.22);
+  --shadow-soft: 0 2px 8px #294d7410;
   --shadow-raised: 0 2px 4px oklch(0.3 0.02 70 / 0.06), 0 20px 44px -24px oklch(0.3 0.03 70 / 0.3);
   --shadow-sidebar: 0 2px 6px oklch(0.2 0.02 70 / 0.14), 0 24px 48px -26px oklch(0.2 0.03 70 / 0.4);
+}
+
+[data-theme='dark'] {
+  --app-background: oklch(0.18 0.012 255);
+  --surface: oklch(0.22 0.012 255);
+  --surface-secondary: oklch(0.26 0.014 255);
+  --surface-hover: oklch(0.3 0.015 255);
+
+  --sidebar: oklch(0.14 0.01 255);
+  --sidebar-elevated: oklch(0.18 0.012 255);
+  --sidebar-hover: oklch(0.22 0.014 255);
+  --sidebar-active: oklch(0.28 0.016 255);
+  --sidebar-border: oklch(0.25 0.012 255);
+  --sidebar-foreground: oklch(0.92 0.008 255);
+  --sidebar-muted: oklch(0.62 0.012 255);
+
+  --text-primary: oklch(0.94 0.006 255);
+  --text-secondary: oklch(0.74 0.012 255);
+  --text-muted: oklch(0.55 0.012 255);
+  --text-inverted: oklch(0.18 0.012 255);
+
+  --border: oklch(0.28 0.012 255);
+  --border-soft: oklch(0.24 0.01 255);
+  --border-strong: oklch(0.36 0.014 255);
+
+  --accent-primary: oklch(0.68 0.142 275);
+  --accent-primary-hover: oklch(0.72 0.148 275);
+  --accent-primary-soft: oklch(0.3 0.05 275);
+  --accent-primary-foreground: oklch(0.99 0.003 275);
+
+  --accent-pink: oklch(0.78 0.105 6);
+  --accent-pink-soft: oklch(0.3 0.04 6);
+  --accent-yellow: oklch(0.84 0.115 88);
+  --accent-yellow-soft: oklch(0.32 0.05 88);
+  --accent-blue: oklch(0.735 0.094 236);
+  --accent-blue-soft: oklch(0.3 0.04 236);
+  --accent-green: oklch(0.73 0.068 152);
+  --accent-green-soft: oklch(0.3 0.04 152);
+  --accent-lavender: oklch(0.765 0.075 302);
+  --accent-lavender-soft: oklch(0.3 0.04 302);
+  --accent-orange: oklch(0.75 0.12 55);
+  --accent-orange-soft: oklch(0.32 0.05 55);
+  --accent-teal: oklch(0.76 0.08 190);
+  --accent-teal-soft: oklch(0.3 0.04 190);
+  --accent-coral: oklch(0.7 0.14 30);
+  --accent-coral-soft: oklch(0.3 0.04 30);
+
+  --focus-ring: oklch(0.68 0.142 275);
+  --overlay: oklch(0.1 0.015 255 / 0.6);
+  --text-danger: oklch(0.78 0.13 28);
+
+  --shadow-soft: 0 1px 3px oklch(0.08 0.01 255 / 0.3), 0 8px 20px -8px oklch(0.05 0.01 255 / 0.5);
+  --shadow-raised:
+    0 2px 6px oklch(0.08 0.01 255 / 0.4), 0 18px 36px -16px oklch(0.05 0.01 255 / 0.6);
+  --shadow-sidebar: 0 2px 8px oklch(0.05 0.01 255 / 0.5);
 }
 
 /* ------------------------------------------------------------------
@@ -83,6 +147,9 @@
   --color-muted: var(--text-muted);
   --color-inverted: var(--text-inverted);
 
+  --color-overlay: var(--overlay);
+  --color-danger: var(--text-danger);
+
   --color-line: var(--border);
   --color-line-soft: var(--border-soft);
   --color-line-strong: var(--border-strong);
@@ -101,6 +168,12 @@
   --color-green-soft: var(--accent-green-soft);
   --color-lavender: var(--accent-lavender);
   --color-lavender-soft: var(--accent-lavender-soft);
+  --color-orange: var(--accent-orange);
+  --color-orange-soft: var(--accent-orange-soft);
+  --color-teal: var(--accent-teal);
+  --color-teal-soft: var(--accent-teal-soft);
+  --color-coral: var(--accent-coral);
+  --color-coral-soft: var(--accent-coral-soft);
 
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
@@ -153,6 +226,15 @@
 }
 
 @layer components {
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .scroll-area {
     scrollbar-width: thin;
     scrollbar-color: var(--border-strong) transparent;
@@ -188,11 +270,108 @@
     width: 8px;
   }
 
-  .scroll-area-dark::-webkit-scrollbar-thumb {
-    background: var(--sidebar-hover);
-    border: 2px solid transparent;
-    background-clip: content-box;
-    border-radius: 999px;
+  .app-shell {
+    padding: 18px;
+    background:
+      radial-gradient(ellipse at 10% 0%, #72b9ee80, transparent 55%),
+      radial-gradient(ellipse at 0% 100%, #c8d8b780, transparent 48%),
+      linear-gradient(125deg, #cfe7f5, #e8eff7 68%, #dce8f4);
+  }
+
+  .app-frame {
+    background: linear-gradient(160deg, #e5f4f9a8, #eff7f8a8 65%, #edf1eac4);
+    backdrop-filter: blur(32px) saturate(140%);
+    -webkit-backdrop-filter: blur(32px) saturate(140%);
+  }
+
+  .sidebar-glass {
+    width: 246px;
+  }
+
+  .sidebar-glass[data-collapsed='true'] {
+    width: 72px;
+  }
+
+  .workspace {
+    border: 1px solid #ffffffa6;
+    background: var(--surface);
+    box-shadow: 0 12px 60px -25px #365c8133;
+  }
+
+  /* Quiet, neutral surfaces keep the calendar grid distinct from event colours. */
+  .calendar-grid {
+    --calendar-surface: var(--surface);
+    --calendar-header: var(--surface);
+    --calendar-weekend: var(--surface);
+    --calendar-line: var(--border);
+    --calendar-hour-line: var(--border-soft);
+    --calendar-today: #ef3457;
+    background: var(--calendar-surface);
+  }
+
+  [data-theme='dark'] .calendar-grid {
+    --calendar-surface: var(--surface);
+    --calendar-header: var(--surface);
+    --calendar-weekend: var(--surface);
+    --calendar-line: var(--border-strong);
+    --calendar-hour-line: var(--border);
+  }
+
+  .calendar-grid-header {
+    background: var(--calendar-header);
+  }
+
+  /* One hairline per hour; event placement uses the same --hour-height. */
+  .time-grid-lines {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      var(--calendar-hour-line) 0,
+      var(--calendar-hour-line) 1px,
+      transparent 1px,
+      transparent var(--hour-height)
+    );
+  }
+
+  .nav-icon {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nav-link[aria-current='page'] .nav-icon {
+    fill: currentColor;
+    fill-opacity: 0.12;
+  }
+
+  .welcome-card {
+    background: linear-gradient(
+      105deg,
+      var(--accent-primary-soft),
+      color-mix(in srgb, var(--accent-blue-soft) 40%, var(--surface))
+    );
+  }
+
+  [data-theme='dark'] .app-shell {
+    background: radial-gradient(ellipse at 0% 0%, #263755, transparent 70%), #131a25;
+  }
+  [data-theme='dark'] .app-frame {
+    background: linear-gradient(160deg, #1f3043ce, #1b2530d9);
+  }
+  [data-theme='dark'] .workspace {
+    border-color: #ffffff0a;
+  }
+
+  @media (max-height: 880px) {
+    .semester-note {
+      display: none;
+    }
+  }
+
+  @media (max-width: 1100px) {
+    .sidebar-glass {
+      width: 214px;
+    }
+    .app-shell {
+      padding: 10px;
+    }
   }
 }
 
@@ -205,6 +384,15 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  @keyframes overlay-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
     }
   }
 
@@ -223,6 +411,10 @@
     animation: page-enter 0.26s var(--ease-shell) both;
   }
 
+  .animate-overlay-enter {
+    animation: overlay-enter 0.16s var(--ease-shell) both;
+  }
+
   .animate-tooltip-enter {
     animation: tooltip-enter 0.12s ease-out both;
   }
@@ -235,5 +427,122 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    padding: 0;
+  }
+  .sidebar-glass,
+  .sidebar-glass[data-collapsed='true'] {
+    width: 62px;
+    padding-inline: 7px;
+  }
+  .sidebar-label,
+  .sidebar-expanded-control {
+    display: none;
+  }
+  .sidebar-brand,
+  .nav-link {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .sidebar-section-label {
+    height: 10px;
+    overflow: hidden;
+    font-size: 0;
+    padding: 0;
+  }
+  .sidebar-profile {
+    justify-content: center;
+    padding: 6px 0;
+  }
+  .workspace {
+    border-radius: 22px 0 0 22px;
+  }
+}
+
+/* A brief, click-through flyby. Controls live in the notification history. */
+.reminder-overlay {
+  pointer-events: none;
+  position: fixed;
+  top: 38px;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #264c49;
+  filter: drop-shadow(0 8px 18px #1c424322);
+}
+.reminder-flight {
+  left: 0;
+  animation: reminder-flyby 8s linear both;
+}
+.reminder-quiet {
+  right: 30px;
+  animation: reminder-card 8s ease both;
+}
+.reminder-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: min(380px, 60vw);
+  border: 1px solid #a8c9bc;
+  border-radius: 18px 5px 5px 18px;
+  padding: 17px 24px;
+  background: #ecf6ed;
+}
+.reminder-banner strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+}
+.reminder-banner > span:last-child {
+  font-size: 12px;
+  color: #53716a;
+}
+.reminder-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.reminder-plane {
+  height: 125px;
+  width: 125px;
+  object-fit: contain;
+}
+@keyframes reminder-flyby {
+  from {
+    transform: translateX(-105%);
+  }
+  to {
+    transform: translateX(100vw);
+  }
+}
+@keyframes reminder-card {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  8%,
+  90% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reminder-flight {
+    left: auto;
+    right: 30px;
+    animation: reminder-card 8s ease both;
+  }
+  .reminder-plane {
+    display: none;
   }
 }
