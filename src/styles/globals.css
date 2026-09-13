@@ -63,6 +63,7 @@
   --focus-foreground: #f4f8f5;
   --focus-button-ink: #264b55;
   --focus-image-shade: #14273588;
+  --focus-cat-shade: #061118f2;
   --overlay: oklch(0.32 0.03 255 / 0.32);
   --text-danger: oklch(0.46 0.17 28);
   --special-event-fallback: #184e42;
@@ -204,6 +205,7 @@
   --focus-sky: #182d39;
   --focus-horizon: #45636a;
   --focus-image-shade: #09111a99;
+  --focus-cat-shade: #040b10f5;
   --app-background: oklch(0.18 0.012 255);
   --surface: oklch(0.22 0.012 255);
   --surface-secondary: oklch(0.26 0.014 255);
@@ -593,6 +595,21 @@
   .focus-clock {
     max-width: clamp(280px, 44dvh, 400px);
   }
+  /* The clip's own walk starts at the left edge facing left, so entering from
+     the right keeps the cat moving the way it is already walking. */
+  .focus-break-cat-arriving {
+    animation: focus-cat-arrive 2.4s var(--ease-shell) both;
+  }
+  /* Screen blending only keeps the fur vivid while the backdrop it blends
+     against is dark, so the scene is dimmed where the cat lies and left alone
+     up by the clock. */
+  .focus-break-cat-shade {
+    background: radial-gradient(
+      ellipse 92% 88% at 78% 104%,
+      var(--focus-cat-shade) 52%,
+      transparent 86%
+    );
+  }
   .focus-control {
     opacity: 1;
     visibility: visible;
@@ -801,6 +818,15 @@
     }
     to {
       opacity: 1;
+    }
+  }
+
+  @keyframes focus-cat-arrive {
+    from {
+      transform: translateX(70%);
+    }
+    to {
+      transform: none;
     }
   }
 

@@ -22,6 +22,10 @@ import { useFocusStore } from '@/features/focus/store/focusStore';
 // Tests provide their own calendar fixtures, including on the first run.
 beforeEach(() => useEventStore.setState({ events: [] }));
 
+/** jsdom ships no media playback at all, so autoplaying video would only log errors. */
+HTMLMediaElement.prototype.play = () => Promise.resolve();
+HTMLMediaElement.prototype.load = () => {};
+
 afterEach(() => {
   cleanup();
   useFocusStore.setState(useFocusStore.getInitialState(), true);

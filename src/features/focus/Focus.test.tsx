@@ -4,6 +4,7 @@ import { renderApp } from '@/test/render';
 import { useFocusStore } from '@/features/focus/store/focusStore';
 import { playFocusSound, prepareFocusSound } from '@/features/focus/lib/sound';
 import type { FocusBackground } from '@/features/focus/lib/backgrounds';
+import { BREAK_CAT_LABEL } from '@/features/focus/lib/breakCats';
 
 const backgroundMocks = vi.hoisted(() => {
   const rows: FocusBackground[] = [];
@@ -168,6 +169,27 @@ describe('Focus workspace', () => {
     expect(useFocusStore.getState().sessions).toHaveLength(1);
     await act(() => vi.advanceTimersByTime(5 * 60_000));
     expect(screen.getByRole('timer')).toHaveTextContent('25:00');
+  });
+
+  it('brings the cat out for the break and sends it away when work comes back', async () => {
+    renderApp('/focus');
+    fireEvent.click(screen.getByRole('button', { name: 'Set Pomodoro times' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Pomodoro minutes' }), {
+      target: { value: '1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save times' }));
+    expect(screen.queryByRole('img', { name: BREAK_CAT_LABEL })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    await act(() => vi.advanceTimersByTime(60_000));
+    expect(useFocusStore.getState()).toMatchObject({ phase: 'break', status: 'running' });
+    const cat = screen.getByRole('img', { name: BREAK_CAT_LABEL });
+    expect(cat.querySelector('video')).toHaveClass('mix-blend-screen');
+    expect(screen.getByRole('timer')).toHaveTextContent('05:00');
+
+    await act(() => vi.advanceTimersByTime(5 * 60_000));
+    expect(useFocusStore.getState()).toMatchObject({ phase: 'work', status: 'idle' });
+    expect(screen.queryByRole('img', { name: BREAK_CAT_LABEL })).toBeNull();
   });
 
   it('starts at 25/5 and edits both durations in the compact settings dialog', () => {
