@@ -12,6 +12,7 @@ import {
 import { TONE_EVENT } from '@/lib/tone';
 import { cn } from '@/lib/utils';
 import { EVENT_KINDS, EVENT_STATUS_LABEL, type CalendarEvent } from '@/features/calendar/lib/types';
+import { SpecialEventCard } from './SpecialEventCard';
 
 interface EventDetailsDialogProps {
   event: CalendarEvent | null;
@@ -75,6 +76,11 @@ export function EventDetailsDialog({
         </>
       }
     >
+      {event.feature ? (
+        <div className="mb-4">
+          <SpecialEventCard event={event} />
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
@@ -104,8 +110,14 @@ export function EventDetailsDialog({
           {relativeDay ? <span className="text-muted"> · {relativeDay}</span> : null}
         </DetailRow>
         <DetailRow icon={<Clock size={15} strokeWidth={1.7} aria-hidden />} label="Time">
-          {event.allDay ? (
-            `Due at ${event.startTime}`
+          {event.feature?.timeUnannounced ? (
+            'Time to be announced'
+          ) : event.allDay ? (
+            event.kind === 'deadline' ? (
+              `Due at ${event.startTime}`
+            ) : (
+              'All day'
+            )
           ) : (
             <>
               <span className="tabular-nums">
@@ -135,7 +147,7 @@ export function EventDetailsDialog({
           {event.note}
         </p>
       ) : null}
-      <EventReminders event={event} />
+      {!event.feature?.timeUnannounced && <EventReminders event={event} />}
     </Modal>
   );
 }
@@ -158,6 +170,7 @@ function DetailRow({ icon, label, children }: DetailRowProps) {
 
 /** "Starts in 2h 10m", "Running now · 25m left", "Finished". */
 function describeTiming(event: CalendarEvent, now: Date): string {
+  if (event.feature?.timeUnannounced) return 'Date saved · time to be announced';
   const date = parseDateKey(event.date);
   const start = new Date(date);
   start.setMinutes(minutesOfDay(event.startTime));

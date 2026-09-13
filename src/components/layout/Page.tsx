@@ -9,15 +9,23 @@ interface PageProps {
   item: NavItem;
   children?: ReactNode;
   hideHeader?: boolean;
+  /**
+   * The page is exactly as tall as the window and scrolls inside itself.
+   *
+   * Opt-in, because it works by dropping the automatic minimum height a flex
+   * item takes from its content: a page that grows past the fold instead needs
+   * that minimum, or `main` would have nothing left to scroll to.
+   */
+  fill?: boolean;
 }
 
 /**
  * Shared page frame. Title and subtitle come from the navigation config so the
  * sidebar, header and page can never drift apart.
  */
-export function Page({ item, children, hideHeader = false }: PageProps) {
+export function Page({ item, children, hideHeader = false, fill = false }: PageProps) {
   return (
-    <div className={cn('flex flex-1 flex-col', !hideHeader && 'gap-7')}>
+    <div className={cn('flex flex-1 flex-col', !hideHeader && 'gap-7', fill && 'min-h-0')}>
       {!hideHeader ? (
         <PageHeader title={item.label} subtitle={item.subtitle} icon={item.icon} tone={item.tone} />
       ) : null}

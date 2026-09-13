@@ -139,6 +139,35 @@ describe('a StarPlan-shaped feed', () => {
     expect(hhn()?.title).toBe('Ausgewählte Kapitel des Software Engineering');
   });
 
+  it('collapses the name StarPlan repeats once per study group', () => {
+    const shared = mapOne(
+      'UID:1420199217854450092',
+      String.raw`SUMMARY:ML & ME (262198)\, ML & ME (262198)\, ML & ME (262198)`,
+      'LOCATION:A210 (T-Systems Hörsaal)',
+      String.raw`DESCRIPTION:Maschinelles Lernen und Mustererkennung (262198)\, Maschinelles Lernen und Mustererkennung (262198)\, Maschinelles Lernen und Mustererkennung (262198)\nProf. Dr.-Ing. Daniel Pfeifer\nAI7 SPO2\, SEB6\, SEB7`,
+      'DTSTART;TZID=Europe/Berlin:20261007T113000',
+      'DTEND;TZID=Europe/Berlin:20261007T130000',
+    );
+
+    expect(shared).toMatchObject({
+      title: 'Maschinelles Lernen und Mustererkennung',
+      courseCode: '262198',
+      instructor: 'Prof. Dr.-Ing. Daniel Pfeifer',
+      note: 'AI7 SPO2, SEB6, SEB7',
+    });
+  });
+
+  it('keeps a title that genuinely carries a comma', () => {
+    const twoNames = mapOne(
+      'UID:4',
+      String.raw`SUMMARY:Recht IT (262074)\, Ethik (262075)`,
+      'DTSTART:20260929T080000',
+      'DTEND:20260929T093000',
+    );
+
+    expect(twoNames?.title).toBe('Recht IT (262074), Ethik');
+  });
+
   it('takes the module number as the course code', () => {
     expect(hhn()?.courseCode).toBe('262164');
   });

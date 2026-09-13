@@ -3,8 +3,11 @@ import {
   DEFAULT_DAY_END,
   DEFAULT_DAY_START,
   eventColumnGeometry,
+  fitBounds,
+  fitHourHeight,
   gridBounds,
   layoutDayEvents,
+  MAX_HOUR_HEIGHT,
 } from './layout';
 
 const span = (startTime: string, endTime: string) => ({ startTime, endTime });
@@ -155,5 +158,62 @@ describe('gridBounds', () => {
 
   it('runs later for a late finish, on the hour', () => {
     expect(gridBounds([span('19:00', '21:30')]).endMinute).toBe(22 * 60);
+  });
+});
+
+/** The default 08:00–20:00 window, in minutes. */
+const DEFAULT_SPAN = DEFAULT_DAY_END - DEFAULT_DAY_START;
+
+describe('fitHourHeight', () => {
+  it('keeps the base height until the axis has been measured', () => {
+    expect(fitHourHeight(64, 0, DEFAULT_SPAN)).toBe(64);
+  });
+
+  it('leaves a laptop-sized window on the base height and lets it scroll', () => {
+    expect(fitHourHeight(64, 600, DEFAULT_SPAN)).toBe(64);
+  });
+
+  it('stretches the hours to fill the height a monitor adds', () => {
+    expect(fitHourHeight(64, 1188, DEFAULT_SPAN)).toBe(99);
+  });
+
+  it('never renders taller than the room it was given', () => {
+    const room = 1000;
+    const height = fitHourHeight(64, room, DEFAULT_SPAN);
+
+    expect((DEFAULT_SPAN * height) / 60).toBeLessThanOrEqual(room);
+  });
+
+  it('stops growing once an hour is mostly padding', () => {
+    expect(fitHourHeight(64, 9000, DEFAULT_SPAN)).toBe(MAX_HOUR_HEIGHT);
+  });
+});
+
+describe('fitBounds', () => {
+  const defaults = { startMinute: DEFAULT_DAY_START, endMinute: DEFAULT_DAY_END };
+
+  it('leaves the window alone when the height is already spoken for', () => {
+    expect(fitBounds(defaults, 1188)).toEqual(defaults);
+  });
+
+  it('shows an earlier hour first when height is going spare', () => {
+    expect(fitBounds(defaults, 13 * MAX_HOUR_HEIGHT)).toEqual({
+      startMinute: DEFAULT_DAY_START - 60,
+      endMinute: DEFAULT_DAY_END,
+    });
+  });
+
+  it('then widens the window at both ends', () => {
+    expect(fitBounds(defaults, 14 * MAX_HOUR_HEIGHT)).toEqual({
+      startMinute: DEFAULT_DAY_START - 60,
+      endMinute: DEFAULT_DAY_END + 60,
+    });
+  });
+
+  it('runs out at midnight rather than past it', () => {
+    expect(fitBounds(defaults, 40 * MAX_HOUR_HEIGHT)).toEqual({
+      startMinute: 0,
+      endMinute: 24 * 60,
+    });
   });
 });

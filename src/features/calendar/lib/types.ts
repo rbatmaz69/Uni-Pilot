@@ -7,11 +7,12 @@ import {
   FlaskConical,
   User,
   Users,
+  Sparkles,
 } from 'lucide-react';
 import type { EventTone } from '@/lib/tone';
 
 export type CalendarEventKind =
-  'lecture' | 'lab' | 'seminar' | 'exam' | 'deadline' | 'study' | 'personal';
+  'lecture' | 'lab' | 'seminar' | 'exam' | 'deadline' | 'study' | 'personal' | 'event';
 
 export type CalendarEventStatus = 'confirmed' | 'tentative' | 'cancelled';
 
@@ -39,6 +40,14 @@ export interface CalendarEvent {
   room?: string;
   instructor?: string;
   note?: string;
+  /** Image-led treatment for student events, independent of their duration. */
+  feature?: {
+    image: string;
+    category: string;
+    /** Fraction of the source image to display, measured from the top. */
+    imageHeight?: number;
+    timeUnannounced?: boolean;
+  };
 }
 
 interface EventKindMeta {
@@ -56,6 +65,7 @@ export const EVENT_KINDS: Record<CalendarEventKind, EventKindMeta> = {
   deadline: { label: 'Deadline', plural: 'Deadlines', icon: AlarmClock },
   study: { label: 'Study session', plural: 'Study', icon: Coffee },
   personal: { label: 'Personal', plural: 'Personal', icon: User },
+  event: { label: 'Special event', plural: 'Events', icon: Sparkles },
 };
 
 /** Filter chips follow this order so the row never reshuffles between weeks. */
@@ -67,6 +77,7 @@ export const EVENT_KIND_ORDER: readonly CalendarEventKind[] = [
   'deadline',
   'study',
   'personal',
+  'event',
 ];
 
 export const EVENT_STATUS_LABEL: Record<CalendarEventStatus, string> = {

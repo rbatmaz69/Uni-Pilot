@@ -5,6 +5,7 @@ import { TONE_EVENT } from '@/lib/tone';
 import { cn } from '@/lib/utils';
 import { EVENT_KINDS, EVENT_STATUS_LABEL, type CalendarEvent } from '@/features/calendar/lib/types';
 import { eventColumnGeometry } from '@/features/calendar/lib/layout';
+import { SpecialEventCard } from './SpecialEventCard';
 
 interface CalendarEventCardProps {
   event: CalendarEvent;
@@ -62,6 +63,24 @@ export function CalendarEventCard({
   ]
     .filter(Boolean)
     .join(', ');
+
+  if (event.feature && height >= 180) {
+    return (
+      <SpecialEventCard
+        event={event}
+        onSelect={onSelect}
+        compact={!detailed}
+        className="absolute overflow-auto"
+        style={{
+          top: (startMinute - gridStart) * pxPerMinute + 2,
+          height: height - 3,
+          left: `calc(${leftPercent}% + 5px)`,
+          width: `calc(${widthPercent}% - 8px)`,
+          zIndex: column + 1,
+        }}
+      />
+    );
+  }
 
   return (
     <button
@@ -150,6 +169,8 @@ export function AllDayEventChip({ event, onSelect }: AllDayEventChipProps) {
   const tone = TONE_EVENT[event.tone];
   const kind = EVENT_KINDS[event.kind];
   const Icon = kind.icon;
+
+  if (event.feature) return <SpecialEventCard event={event} onSelect={onSelect} compact />;
 
   return (
     <button

@@ -31,6 +31,7 @@ import {
   type CalendarView,
 } from '@/features/calendar/lib/types';
 import { WeekGrid } from './WeekGrid';
+import { SpecialEventsSection } from './SpecialEventsSection';
 
 const MINUTE = 60_000;
 const DEFAULT_NEW_EVENT_TIME = '09:00';
@@ -186,6 +187,11 @@ export function CalendarWorkspace() {
   };
 
   const dialogOpen = selected !== null || draft !== null || sourcesOpen;
+  const selectSpecialEvent = (event: CalendarEvent) => {
+    setFocusDay(startOfDay(parseDateKey(event.date)));
+    setActiveKinds(new Set());
+    setSelected(event);
+  };
 
   useEffect(() => {
     if (dialogOpen) return;
@@ -221,7 +227,7 @@ export function CalendarWorkspace() {
   }, [dialogOpen, step, focusDay]);
 
   return (
-    <div className="flex flex-1 gap-0 min-h-0 mr-0 lg:-mr-5 xl:-mr-6">
+    <div className="flex flex-1 flex-col lg:flex-row gap-0 min-h-0 mr-0 lg:-mr-5 xl:-mr-6">
       {/* Left box: Wochenansicht-Box mit eigenem border-radius */}
       <div className="flex flex-1 flex-col overflow-hidden rounded-[22px] border border-line bg-surface min-w-0 min-h-0">
         <CalendarToolbar
@@ -269,6 +275,9 @@ export function CalendarWorkspace() {
       </div>
 
       {/* Right box: Monatsansicht + To-Dos mit rounded-l und rechts KEINE border line */}
+      <div className="lg:hidden shrink-0">
+        <SpecialEventsSection events={events} now={now} onSelect={selectSpecialEvent} />
+      </div>
       <div className="w-[290px] 2xl:w-[320px] flex-none hidden lg:flex flex-col min-h-0">
         <CalendarRightPanel
           focusDay={focusDay}
@@ -277,6 +286,7 @@ export function CalendarWorkspace() {
           }}
           events={events}
           now={now}
+          onSelectEvent={selectSpecialEvent}
         />
       </div>
 

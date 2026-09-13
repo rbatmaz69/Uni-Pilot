@@ -63,6 +63,31 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
   const [room, setRoom] = useState('');
   const [courseCode, setCourseCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [eventImage, setEventImage] = useState('');
+  const [category, setCategory] = useState('Student event');
+  const [timeUnannounced, setTimeUnannounced] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const unknownTime = kind === 'event' && timeUnannounced;
+
+  const loadImage = (file: File | undefined) => {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 1_000_000) {
+      setError('Choose a PNG, JPEG or WebP image smaller than 1 MB.');
+      return;
+    }
+    setImageLoading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEventImage(typeof reader.result === 'string' ? reader.result : '');
+      setError(null);
+      setImageLoading(false);
+    };
+    reader.onerror = () => {
+      setError('The image could not be read. Try another file.');
+      setImageLoading(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Moving the start drags the end along, which is what anyone rescheduling a
   // 90-minute lecture expects instead of a silently invalid pair of times.
@@ -79,7 +104,8 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
       setError('Give the event a name so you can recognise it later.');
       return;
     }
-    if (!isMoment(kind) && minutesOfDay(endTime) <= minutesOfDay(startTime)) {
+    if (imageLoading) return;
+    if (!unknownTime && !isMoment(kind) && minutesOfDay(endTime) <= minutesOfDay(startTime)) {
       setError('The end time has to come after the start time.');
       return;
     }
@@ -92,10 +118,19 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
       kind,
       tone,
       date,
-      startTime,
-      endTime: isMoment(kind) ? startTime : endTime,
+      startTime: unknownTime ? '00:00' : startTime,
+      endTime: unknownTime ? '23:59' : isMoment(kind) ? startTime : endTime,
       status: 'confirmed',
-      ...(isMoment(kind) ? { allDay: true } : {}),
+      ...(isMoment(kind) || unknownTime ? { allDay: true } : {}),
+      ...(kind === 'event'
+        ? {
+            feature: {
+              image: eventImage,
+              category: category.trim() || 'Student event',
+              timeUnannounced: unknownTime,
+            },
+          }
+        : {}),
       ...(room.trim() ? { room: room.trim() } : {}),
       ...(courseCode.trim() ? { courseCode: courseCode.trim().toUpperCase() } : {}),
     });
@@ -113,7 +148,7 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" type="submit" form={formId}>
+          <Button variant="primary" size="sm" type="submit" form={formId} disabled={imageLoading}>
             Add to calendar
           </Button>
         </>
@@ -167,7 +202,61 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
           </Field>
         </div>
 
-        <div className={cn('grid gap-3', isMoment(kind) ? 'grid-cols-2' : 'grid-cols-3')}>
+        {kind === 'event' && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Event category">
+                {(id) => (
+                  <input
+                    id={id}
+                    value={category}
+                    onChange={(event) => setCategory(event.target.value)}
+                    placeholder="Hackathon, workshop, meetup…"
+                    className={FIELD}
+                  />
+                )}
+              </Field>
+              <Field label="Cover image">
+                {(id) => (
+                  <input
+                    id={id}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => loadImage(event.target.files?.[0])}
+                    className={FIELD}
+                  />
+                )}
+              </Field>
+            </div>
+            <p className="text-[11px] text-muted">
+              The card colour is picked from your image. PNG, JPEG or WebP, up to 1 MB.
+            </p>
+            {eventImage && (
+              <button
+                type="button"
+                onClick={() => setEventImage('')}
+                className="self-start text-[11px] text-secondary underline"
+              >
+                Remove cover image
+              </button>
+            )}
+            <label className="flex items-center gap-2 text-[12px] text-secondary">
+              <input
+                type="checkbox"
+                checked={timeUnannounced}
+                onChange={(event) => setTimeUnannounced(event.target.checked)}
+              />
+              Time to be announced
+            </label>
+          </>
+        )}
+
+        <div
+          className={cn(
+            'grid gap-3',
+            unknownTime ? 'grid-cols-1' : isMoment(kind) ? 'grid-cols-2' : 'grid-cols-3',
+          )}
+        >
           <Field label="Date">
             {(id) => (
               <input
@@ -179,18 +268,20 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
               />
             )}
           </Field>
-          <Field label={isMoment(kind) ? 'Due at' : 'Starts'}>
-            {(id) => (
-              <input
-                id={id}
-                type="time"
-                value={startTime}
-                onChange={(changeEvent) => handleStartChange(changeEvent.target.value)}
-                className={FIELD}
-              />
-            )}
-          </Field>
-          {isMoment(kind) ? null : (
+          {!unknownTime && (
+            <Field label={isMoment(kind) ? 'Due at' : 'Starts'}>
+              {(id) => (
+                <input
+                  id={id}
+                  type="time"
+                  value={startTime}
+                  onChange={(changeEvent) => handleStartChange(changeEvent.target.value)}
+                  className={FIELD}
+                />
+              )}
+            </Field>
+          )}
+          {isMoment(kind) || unknownTime ? null : (
             <Field label="Ends">
               {(id) => (
                 <input
@@ -248,25 +339,27 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
           </div>
         </fieldset>
 
-        <ReminderControls
-          value={rule}
-          onChange={setReminders}
-          onPreview={() =>
-            previewEvent(
-              {
-                id: 'preview',
-                title: title.trim() || 'Your next exam',
-                kind,
-                tone,
-                date,
-                startTime,
-                endTime,
-                status: 'confirmed',
-              },
-              rule,
-            )
-          }
-        />
+        {!unknownTime && (
+          <ReminderControls
+            value={rule}
+            onChange={setReminders}
+            onPreview={() =>
+              previewEvent(
+                {
+                  id: 'preview',
+                  title: title.trim() || 'Your next exam',
+                  kind,
+                  tone,
+                  date,
+                  startTime,
+                  endTime,
+                  status: 'confirmed',
+                },
+                rule,
+              )
+            }
+          />
+        )}
 
         {error ? (
           <p role="alert" className="text-[12px] font-medium text-coral">

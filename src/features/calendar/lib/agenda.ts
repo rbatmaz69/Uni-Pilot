@@ -157,11 +157,12 @@ export function buildAgenda(
 }
 
 /** Why a day is worth marking in the mini month. Exams outrank the rest. */
-export type DayMarker = 'exam' | 'due';
+export type DayMarker = 'exam' | 'due' | 'event';
 
 export const DAY_MARKER_LABELS: Record<DayMarker, string> = {
   exam: 'exam',
   due: 'something due',
+  event: 'special event',
 };
 
 /**
@@ -180,13 +181,16 @@ export function markedDays(
 
   const mark = (date: string, marker: DayMarker) => {
     // An exam already on a day is never downgraded by a task beside it.
-    if (marker === 'exam' || !marks.has(date)) marks.set(date, marker);
+    const rank = { exam: 3, due: 2, event: 1 };
+    if (rank[marker] > (rank[marks.get(date) ?? 'event'] ?? 0) || !marks.has(date))
+      marks.set(date, marker);
   };
 
   for (const event of events) {
     if (event.status === 'cancelled') continue;
     if (event.kind === 'exam') mark(event.date, 'exam');
     else if (event.kind === 'deadline') mark(event.date, 'due');
+    else if (event.feature || event.kind === 'event') mark(event.date, 'event');
   }
 
   for (const task of tasks) {

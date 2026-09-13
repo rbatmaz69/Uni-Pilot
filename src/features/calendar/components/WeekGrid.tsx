@@ -1,4 +1,11 @@
-import { useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
 import { CalendarOff, Plus, Rss } from 'lucide-react';
 import { Button, IconButton } from '@/components/ui';
 import {
@@ -12,7 +19,12 @@ import {
 } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { AllDayEventChip, CalendarEventCard } from './CalendarEventCard';
-import { gridBounds, layoutDayEvents } from '@/features/calendar/lib/layout';
+import {
+  fitBounds,
+  fitHourHeight,
+  gridBounds,
+  layoutDayEvents,
+} from '@/features/calendar/lib/layout';
 import { TASK_SLOT_MINUTES, TaskChip, TimedTaskCard } from './TaskCard';
 import type { StudyTask } from '@/features/calendar/lib/agenda';
 import type { CalendarEvent, CalendarView } from '@/features/calendar/lib/types';
@@ -41,6 +53,8 @@ type Placement =
   | { kind: 'task'; task: StudyTask; date: string; startTime: string; endTime: string };
 
 const GUTTER_WIDTH = 50;
+/** The shortest an hour row ever gets; a taller window only grows it. */
+const BASE_HOUR_HEIGHT = { week: 64, day: 80 } as const;
 /** Below this a day column stops being readable, so the grid scrolls instead. */
 const MIN_COLUMN_WIDTH = 84;
 const SNAP_MINUTES = 30;
@@ -61,8 +75,8 @@ export function WeekGrid({
   onToggleTask,
 }: WeekGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const hourHeight = view === 'week' ? 64 : 80;
-  const pxPerMinute = hourHeight / 60;
+  const headerRef = useRef<HTMLDivElement>(null);
+  const room = useAxisRoom(scrollRef, headerRef);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timeZoneLabel = timeZone.split('/').pop()?.replaceAll('_', ' ') ?? 'Local';
 
@@ -93,8 +107,12 @@ export function WeekGrid({
   ];
 
   // Bounds cover the tasks too, so an 07:00 reminder opens the axis for it.
-  const bounds = gridBounds(placements);
+  // Measured height is then spent on the axis rather than left at the bottom:
+  // taller hours first, and once those hit their ceiling, more of the day.
+  const bounds = fitBounds(gridBounds(placements), room);
   const totalMinutes = bounds.endMinute - bounds.startMinute;
+  const hourHeight = fitHourHeight(BASE_HOUR_HEIGHT[view], room, totalMinutes);
+  const pxPerMinute = hourHeight / 60;
   const bodyHeight = totalMinutes * pxPerMinute;
 
   const hours: number[] = [];
@@ -122,7 +140,7 @@ export function WeekGrid({
     const container = scrollRef.current;
     if (!container) return;
     const target = Math.min(earliest, nowVisible ? nowMinutes : earliest) - SCROLL_LEAD_MINUTES;
-    const headerHeight = (container.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+    const headerHeight = headerRef.current?.offsetHeight ?? 0;
     container.scrollTop = Math.max(0, (target - bounds.startMinute) * pxPerMinute - headerHeight);
     // Deliberately keyed to the view only: re-running on every data change would
     // yank the grid back while someone is scrolling through their day.
@@ -154,10 +172,11 @@ export function WeekGrid({
     >
       <div
         ref={scrollRef}
-        className="no-scrollbar relative min-h-[588px] max-h-[calc(100vh-182px)] flex-1 overflow-auto"
+        className="no-scrollbar relative min-h-[588px] flex-1 overflow-auto"
         style={{ '--hour-height': `${hourHeight}px` } as CSSProperties}
       >
         <div
+          ref={headerRef}
           className="calendar-grid-header sticky top-0 z-40 border-b border-[var(--calendar-line)]"
           style={{ minWidth: gridStyle.minWidth }}
         >
@@ -370,4 +389,35 @@ export function WeekGrid({
       ) : null}
     </section>
   );
+}
+
+/**
+ * The height the time axis is free to occupy: the scroller minus its sticky
+ * header. Taken from the DOM because nothing else knows it — the card is sized
+ * by a flex chain that reaches all the way up to the window.
+ *
+ * Returns 0 until it has measured, which `fitHourHeight` reads as "no
+ * information" and answers with the base row height. That is also the answer
+ * in jsdom, where nothing has a layout.
+ */
+function useAxisRoom(
+  scrollRef: RefObject<HTMLDivElement | null>,
+  headerRef: RefObject<HTMLDivElement | null>,
+): number {
+  const [room, setRoom] = useState(0);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+
+    const measure = () =>
+      setRoom(Math.max(0, container.clientHeight - (headerRef.current?.offsetHeight ?? 0)));
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [scrollRef, headerRef]);
+
+  return room;
 }

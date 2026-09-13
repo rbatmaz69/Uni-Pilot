@@ -56,6 +56,9 @@
   --focus-ring: #4258f5;
   --overlay: oklch(0.32 0.03 255 / 0.32);
   --text-danger: oklch(0.46 0.17 28);
+  --special-event-fallback: #184e42;
+  --special-event-foreground: #ffffff;
+  --special-event-paper: #f0f7e9;
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -67,6 +70,101 @@
   --shadow-soft: 0 2px 8px #294d7410;
   --shadow-raised: 0 2px 4px oklch(0.3 0.02 70 / 0.06), 0 20px 44px -24px oklch(0.3 0.03 70 / 0.3);
   --shadow-sidebar: 0 2px 6px oklch(0.2 0.02 70 / 0.14), 0 24px 48px -26px oklch(0.2 0.03 70 / 0.4);
+}
+
+/* Image-derived colour stays dark enough for the same foreground in both themes. */
+.special-event-card {
+  background: var(--event-color, var(--special-event-fallback));
+  color: var(--special-event-foreground);
+}
+.special-event-art {
+  aspect-ratio: 1.72;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+.special-event-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 45%,
+    var(--event-color, var(--special-event-fallback)) 100%
+  );
+}
+.special-event-content {
+  margin-top: -8px;
+}
+.special-event-action {
+  background: var(--special-event-paper);
+  color: var(--event-color, var(--special-event-fallback));
+}
+.special-event-ribbon {
+  top: -1px;
+  right: 16px;
+  width: 44px;
+  transform: scale(0.85);
+  transform-origin: top right;
+  filter: drop-shadow(
+    0 2px 1px color-mix(in srgb, var(--event-color, var(--special-event-fallback)) 30%, transparent)
+  );
+}
+/* The small return peeks out behind the top edge; the front hangs over the image. */
+.special-event-ribbon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: 4px;
+  height: 2px;
+  border-radius: var(--radius-xs) 0 0 0;
+  background: color-mix(
+    in srgb,
+    var(--event-color, var(--special-event-fallback)) 65%,
+    var(--special-event-paper)
+  );
+}
+/* A curved SVG mask rounds the two tips and the inward bookmark notch. */
+.special-event-date {
+  min-height: 61px;
+  padding: 10px 4px 13px;
+  color: var(--event-color, var(--special-event-fallback));
+  background: linear-gradient(
+    to bottom,
+    var(--special-event-paper),
+    color-mix(
+      in srgb,
+      var(--special-event-paper) 96%,
+      var(--event-color, var(--special-event-fallback))
+    )
+  );
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 65'%3E%3Cpath fill='white' d='M0 3Q0 0 3 0H41Q44 0 44 3V61Q44 65 40.5 63.5L23.5 56Q22 55.3 20.5 56L3.5 63.5Q0 65 0 61Z'/%3E%3C/svg%3E");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+.special-event-card--compact {
+  border-radius: var(--radius-md);
+}
+.special-event-card--compact .special-event-art {
+  height: 44px;
+  aspect-ratio: auto;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.special-event-card--compact .special-event-content {
+  margin-top: -4px;
+  padding: 0 8px 7px;
+}
+.special-event-card--condensed .special-event-art {
+  aspect-ratio: 2.8;
+}
+.special-event-card--condensed .special-event-content {
+  padding: 0 12px 12px;
+}
+.special-event-card--condensed .special-event-date {
+  min-height: 52px;
+  padding: 8px 4px 12px;
+}
+.special-event-card--condensed .special-event-ribbon {
+  width: 38px;
 }
 
 [data-theme='dark'] {

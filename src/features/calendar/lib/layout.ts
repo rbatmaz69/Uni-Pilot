@@ -22,6 +22,9 @@ const MIN_SPAN_MINUTES = 15;
 export const DEFAULT_DAY_START = 8 * 60;
 export const DEFAULT_DAY_END = 20 * 60;
 
+/** Past this an hour row is mostly padding, however much screen is going spare. */
+export const MAX_HOUR_HEIGHT = 132;
+
 const HOUR = 60;
 const DAY = 24 * HOUR;
 
@@ -120,4 +123,48 @@ export function gridBounds(events: readonly TimeSpan[]): {
     startMinute: Math.max(0, startMinute),
     endMinute: Math.min(DAY, Math.max(endMinute, startMinute + HOUR)),
   };
+}
+
+/**
+ * How tall an hour row has to be for the visible day to fill the height it was
+ * given.
+ *
+ * `base` is the floor, so a laptop window keeps the compact rows and scrolls
+ * exactly as before; only the room an external monitor adds is spent on taller
+ * hours. Flooring keeps the rendered body a whole pixel inside `room`, so
+ * growing to fit can never be what introduces a scrollbar.
+ */
+export function fitHourHeight(base: number, room: number, minutes: number): number {
+  if (room <= 0 || minutes <= 0) return base;
+  return Math.min(MAX_HOUR_HEIGHT, Math.max(base, Math.floor((room * HOUR) / minutes)));
+}
+
+/**
+ * Widens the visible window when the axis has more height than
+ * MAX_HOUR_HEIGHT can usefully spend on the hours already in it.
+ *
+ * Spare room buys whole hours on either side, earliest first — a 07:00 row is
+ * read more often than a 21:00 one — until the day runs out at midnight. This
+ * is what a tall window gets instead of ever-taller rows: more day, not more
+ * padding.
+ */
+export function fitBounds(
+  bounds: { startMinute: number; endMinute: number },
+  room: number,
+): { startMinute: number; endMinute: number } {
+  let { startMinute, endMinute } = bounds;
+  let spare = Math.floor(room / MAX_HOUR_HEIGHT) - (endMinute - startMinute) / HOUR;
+
+  while (spare >= 1 && (startMinute > 0 || endMinute < DAY)) {
+    if (startMinute > 0) {
+      startMinute -= HOUR;
+      spare -= 1;
+    }
+    if (spare >= 1 && endMinute < DAY) {
+      endMinute += HOUR;
+      spare -= 1;
+    }
+  }
+
+  return { startMinute, endMinute };
 }

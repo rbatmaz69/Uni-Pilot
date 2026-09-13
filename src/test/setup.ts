@@ -1,12 +1,15 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
 import { useSourceStore } from '@/features/calendar/store/sourceStore';
 import { useTaskStore } from '@/features/calendar/store/taskStore';
 import { useEventStore } from '@/features/calendar/store/eventStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
+
+// Tests provide their own calendar fixtures, including on the first run.
+beforeEach(() => useEventStore.setState({ events: [] }));
 
 afterEach(() => {
   cleanup();
@@ -19,7 +22,7 @@ afterEach(() => {
     error: null,
     settings: DEFAULT_SETTINGS,
   });
-  useUiStore.setState({ sidebarCollapsed: false, theme: 'light' });
+  useUiStore.setState({ sidebarCollapsed: false, studentEventsCollapsed: false, theme: 'light' });
   useSourceStore.setState({ sources: [], syncingIds: [] });
   useTaskStore.setState({ tasks: [] });
 });

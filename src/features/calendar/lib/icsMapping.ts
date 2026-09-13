@@ -78,6 +78,28 @@ export function extractCourseCode(event: IcsEvent): string | null {
   return match?.[1]?.replace(/\s/g, '-') ?? null;
 }
 
+/**
+ * StarPlan repeats a name once per study group an entry belongs to:
+ * `ML & ME (262198), ML & ME (262198), ML & ME (262198)` for three groups. The
+ * groups are already spelled out in the description, so the repeats say
+ * nothing and only push the real title off the card. Segments that genuinely
+ * differ are kept, in their original order.
+ */
+export function collapseRepeats(value: string): string {
+  const segments = value
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (segments.length < 2) return value.trim();
+
+  const byName = new Map<string, string>();
+  for (const segment of segments) {
+    const key = segment.replace(MODULE_NUMBER, '').trim().toLowerCase();
+    if (!byName.has(key)) byName.set(key, segment);
+  }
+  return [...byName.values()].join(', ');
+}
+
 export interface EntryDetails {
   title: string;
   instructor: string | null;
@@ -94,7 +116,8 @@ export interface EntryDetails {
  * other way falls back to its summary and keeps the description as a note.
  */
 export function describeEntry(event: IcsEvent, courseCode: string | null): EntryDetails {
-  const summaryTitle = event.summary.replace(MODULE_NUMBER, '').trim() || event.summary;
+  const summaryTitle =
+    collapseRepeats(event.summary).replace(MODULE_NUMBER, '').trim() || event.summary;
   const lines = (event.description ?? '')
     .split('\n')
     .map((line) => line.trim())
@@ -111,7 +134,9 @@ export function describeEntry(event: IcsEvent, courseCode: string | null): Entry
     };
   }
 
-  const fullTitle = (first ?? '').replace(MODULE_NUMBER, '').trim();
+  const fullTitle = collapseRepeats(first ?? '')
+    .replace(MODULE_NUMBER, '')
+    .trim();
   return {
     title: fullTitle.length > summaryTitle.length ? fullTitle : summaryTitle,
     instructor: second ?? null,
