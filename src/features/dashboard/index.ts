@@ -6,7 +6,6 @@ export * from '@/features/dashboard/components/AssignmentsCard';
 export * from '@/features/dashboard/components/CoursesGrid';
 export * from '@/features/dashboard/components/DashboardHero';
 export * from '@/features/dashboard/components/DeadlinesCard';
-export * from '@/features/dashboard/components/FocusSessionModal';
 export * from '@/features/dashboard/components/MensaWidget';
 export * from '@/features/dashboard/components/PublicTransitWidget';
 export * from '@/features/dashboard/components/QuickAiModal';

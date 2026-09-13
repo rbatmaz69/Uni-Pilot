@@ -7,9 +7,11 @@ import { useEventStore } from '@/features/calendar/store/eventStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
+import { useFocusStore } from '@/features/focus/store/focusStore';
 
 afterEach(() => {
   cleanup();
+  useFocusStore.setState(useFocusStore.getInitialState(), true);
   localStorage.clear();
   useEventStore.setState({ events: [] });
   useReminderStore.setState({

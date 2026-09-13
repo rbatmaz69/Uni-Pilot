@@ -1,12 +1,19 @@
 import { ReminderService } from '@/features/reminders/components/ReminderService';
+import { FocusService } from '@/features/focus/components/FocusService';
+import { useFocusStore } from '@/features/focus/store/focusStore';
+import { useLocation } from 'react-router-dom';
+import { NAV_ITEMS } from '@/lib/navigation';
 import { Header } from './Header';
 import { MainContent } from './MainContent';
 import { Sidebar } from './Sidebar';
 
 export function AppLayout() {
+  const { pathname } = useLocation();
+  const focusMode = useFocusStore((state) => state.focusMode) && pathname === NAV_ITEMS.focus.path;
   return (
     <div className="app-shell relative flex h-full w-full overflow-hidden">
       <ReminderService />
+      <FocusService />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-raised"
@@ -14,9 +21,9 @@ export function AppLayout() {
         Skip to content
       </a>
       <div className="app-frame flex min-w-0 flex-1 overflow-hidden rounded-[30px] max-[700px]:rounded-none">
-        <Sidebar />
+        {!focusMode && <Sidebar />}
         <div className="workspace relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[26px]">
-          <Header />
+          {!focusMode && <Header />}
           <MainContent />
         </div>
       </div>
