@@ -54,6 +54,11 @@
   --accent-coral-soft: oklch(0.95 0.04 28);
 
   --focus-ring: #4258f5;
+  --focus-sky: #294b58;
+  --focus-horizon: #6b8c8b;
+  --focus-foreground: #f4f8f5;
+  --focus-button-ink: #264b55;
+  --focus-image-shade: #14273588;
   --overlay: oklch(0.32 0.03 255 / 0.32);
   --text-danger: oklch(0.46 0.17 28);
   --special-event-fallback: #184e42;
@@ -168,6 +173,9 @@
 }
 
 [data-theme='dark'] {
+  --focus-sky: #182d39;
+  --focus-horizon: #45636a;
+  --focus-image-shade: #09111a99;
   --app-background: oklch(0.18 0.012 255);
   --surface: oklch(0.22 0.012 255);
   --surface-secondary: oklch(0.26 0.014 255);
@@ -324,6 +332,57 @@
 }
 
 @layer components {
+  .focus-scene {
+    background:
+      radial-gradient(ellipse at 75% 8%, var(--focus-horizon), transparent 65%), var(--focus-sky);
+    color: var(--focus-foreground);
+  }
+  .focus-clock {
+    max-width: clamp(280px, 44dvh, 400px);
+  }
+  .focus-control {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 120ms linear,
+      visibility 0s;
+  }
+  .focus-controls-fading .focus-control {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 5s linear,
+      visibility 0s linear 5s;
+  }
+  .focus-scene :focus-visible {
+    outline-color: var(--focus-foreground);
+  }
+  .focus-scene [role='dialog']:focus-visible,
+  .focus-scene [role='dialog'] :focus-visible {
+    outline-color: var(--focus-ring);
+  }
+  .focus-scene-button {
+    background: color-mix(in srgb, var(--focus-foreground) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--focus-foreground) 22%, transparent);
+  }
+  .focus-scene-button:hover {
+    background: color-mix(in srgb, var(--focus-foreground) 18%, transparent);
+  }
+  .focus-transport-side {
+    background: transparent;
+    border: 0;
+    color: var(--focus-foreground);
+  }
+  .focus-transport-side:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--focus-foreground) 10%, transparent);
+  }
+  .focus-transport-main {
+    background: var(--focus-foreground);
+    color: var(--focus-button-ink);
+  }
+  .focus-transport-main:hover {
+    background: color-mix(in srgb, var(--focus-foreground) 88%, var(--focus-horizon));
+  }
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
