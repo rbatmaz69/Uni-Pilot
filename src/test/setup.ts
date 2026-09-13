@@ -9,6 +9,10 @@ import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
 import { useFocusStore } from '@/features/focus/store/focusStore';
 
+/** jsdom ships no media playback at all, so autoplaying video would only log errors. */
+HTMLMediaElement.prototype.play = () => Promise.resolve();
+HTMLMediaElement.prototype.load = () => {};
+
 afterEach(() => {
   cleanup();
   useFocusStore.setState(useFocusStore.getInitialState(), true);

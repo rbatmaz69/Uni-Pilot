@@ -17,6 +17,7 @@ import { localDateKey } from '@/lib/date';
 import { useFocusStore } from '@/features/focus/store/focusStore';
 import { prepareFocusSound } from '@/features/focus/lib/sound';
 import { FocusProgressRing } from '@/features/focus/components/FocusProgressRing';
+import { FocusBreakCat } from '@/features/focus/components/FocusBreakCat';
 import { FocusDurationPanel } from '@/features/focus/components/FocusDurationPanel';
 import { FocusStatisticsPanel } from '@/features/focus/components/FocusStatisticsPanel';
 import {
@@ -172,6 +173,7 @@ export function FocusWorkspace() {
         }
       }}
     >
+      {state.phase === 'break' && <FocusBreakCat />}
       <h1 className="sr-only">{NAV_ITEMS.focus.label}</h1>
       <p className="sr-only">{NAV_ITEMS.focus.subtitle}</p>
       <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto">
