@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import { NAV_ITEMS } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/store/uiStore';
 
@@ -17,6 +18,8 @@ export function MainContent() {
   const immersive = useUiStore((state) => state.immersive);
   // The document explorer lays out its own panes and scrolls them itself.
   const documents = pathname === '/documents';
+  // The focus timer fills the window and never scrolls.
+  const isFocus = pathname === NAV_ITEMS.focus.path;
 
   return (
     <main
@@ -24,7 +27,7 @@ export function MainContent() {
       tabIndex={-1}
       className={cn(
         'min-h-0 flex-1',
-        immersive || documents ? 'overflow-hidden' : 'scroll-area overflow-y-auto',
+        immersive || documents || isFocus ? 'overflow-hidden' : 'scroll-area overflow-y-auto',
       )}
     >
       <div
@@ -42,9 +45,11 @@ export function MainContent() {
             ? 'h-full max-w-none'
             : documents
               ? 'h-full max-w-none !p-0'
-              : fullBleed
-                ? 'h-full max-w-none pt-1'
-                : 'min-h-full max-w-[1600px] pt-3.5',
+              : isFocus
+                ? 'h-full min-h-0 max-w-none pt-3.5'
+                : fullBleed
+                  ? 'h-full max-w-none pt-1'
+                  : 'min-h-full max-w-[1600px] pt-3.5',
         )}
       >
         <Outlet />
