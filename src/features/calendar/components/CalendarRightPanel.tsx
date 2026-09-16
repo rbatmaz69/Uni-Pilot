@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { AgendaList } from './AgendaList';
 import { DAY_MARKER_LABELS, markedDays } from '@/features/calendar/lib/agenda';
 import { useTaskStore } from '@/features/calendar/store/taskStore';
+import { playDayHoverSound } from '@/features/calendar/lib/calendarSound';
 import type { CalendarEvent } from '@/features/calendar/lib/types';
 import { SpecialEventsSection } from './SpecialEventsSection';
 
@@ -50,15 +51,35 @@ export function CalendarRightPanel({
     setMonth((previous) => new Date(previous.getFullYear(), previous.getMonth() + direction, 1));
   };
 
+  // A cover that 404s has to fall back to the numeral, and only the cell knows
+  // how to draw that — so the failure is tracked here, keyed by image source.
+  const [brokenCovers, setBrokenCovers] = useState<ReadonlySet<string>>(() => new Set());
+
   const tasks = useTaskStore((state) => state.tasks);
   const markers = useMemo(() => markedDays(tasks, events), [tasks, events]);
+  const covers = useMemo(() => {
+    const byDate = new Map<string, CalendarEvent>();
+    const priority = (event: CalendarEvent) =>
+      event.kind === 'exam' ? 0 : event.kind === 'deadline' ? 1 : 2;
+    const illustrated = events
+      .filter((event) => (event.coverImage || event.feature?.image) && event.status !== 'cancelled')
+      .sort(
+        (a, b) =>
+          priority(a) - priority(b) ||
+          a.startTime.localeCompare(b.startTime) ||
+          a.id.localeCompare(b.id),
+      );
+    for (const event of illustrated) if (!byDate.has(event.date)) byDate.set(event.date, event);
+    return byDate;
+  }, [events]);
 
   const calendarCells = useMemo(() => {
     const firstDayOfWeek = month.getDay(); // 0 for Sunday
     const leadingCount = firstDayOfWeek;
     const prevMonthLastDate = new Date(month.getFullYear(), month.getMonth(), 0).getDate();
     const daysInMonthCount = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-    const totalSlots = Math.max(35, Math.ceil((leadingCount + daysInMonthCount) / 7) * 7);
+    // Complete rows while always including at least days 1–7 of next month.
+    const totalSlots = Math.ceil((leadingCount + daysInMonthCount + 7) / 7) * 7;
     const trailingCount = totalSlots - (leadingCount + daysInMonthCount);
 
     interface MonthCell {
@@ -123,7 +144,8 @@ export function CalendarRightPanel({
 
           <div className="flex items-center gap-1">
             <h3 className="text-[15px] font-bold tracking-tight text-primary">
-              {MONTH_NAMES[month.getMonth()]} {month.getFullYear()}
+              {MONTH_NAMES[month.getMonth()]}{' '}
+              <span className="font-semibold text-muted/70">&rsquo;{shortYear(month)}</span>
             </h3>
             {/* Folding the month away is what gives the list room once a
                 semester's worth of deadlines is in it. */}
@@ -171,6 +193,10 @@ export function CalendarRightPanel({
                 const isToday = key === todayKey;
                 const isFocused = key === focusKey;
                 const marker = markers.get(key);
+                const cover = covers.get(key);
+                const coverSource = cover?.coverImage || cover?.feature?.image;
+                const coverImage =
+                  coverSource && !brokenCovers.has(coverSource) ? coverSource : undefined;
 
                 return (
                   <button
@@ -180,7 +206,9 @@ export function CalendarRightPanel({
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric',
-                    })}${marker ? `, ${DAY_MARKER_LABELS[marker]}` : ''}`}
+                    })}${cover ? `, ${cover.title}` : ''}${marker ? `, ${DAY_MARKER_LABELS[marker]}` : ''}`}
+                    title={cover?.title}
+                    onMouseEnter={() => playDayHoverSound(cell.dayNumber)}
                     onClick={() => {
                       onSelectDate(cell.date);
                       if (!cell.isCurrentMonth) {
@@ -188,7 +216,11 @@ export function CalendarRightPanel({
                       }
                     }}
                     className={cn(
-                      'relative mx-auto grid h-7 w-7 place-items-center rounded-full text-[11.5px] transition-all duration-150',
+                      'relative isolate mx-auto grid h-8 w-8 place-items-center text-[11.5px] transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                      coverImage ? 'rounded-[10px]' : 'rounded-full',
+                      coverImage &&
+                        isFocused &&
+                        'ring-2 ring-accent ring-offset-2 ring-offset-surface',
                       isFocused &&
                         'bg-[#3e5bf6] dark:bg-[#526cf8] font-bold text-white shadow-sm shadow-[#3e5bf6]/30',
                       !isFocused &&
@@ -201,23 +233,37 @@ export function CalendarRightPanel({
                       !isFocused &&
                         !isToday &&
                         !cell.isCurrentMonth &&
-                        'font-normal text-muted/40 hover:bg-surface-secondary/70 hover:text-secondary active:scale-95',
+                        'font-normal text-muted/70 hover:bg-surface-secondary/70 hover:text-secondary active:scale-95',
                     )}
                   >
-                    <span>{cell.dayNumber}</span>
-                    {marker ? (
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'absolute bottom-0.5 h-1 w-1 rounded-full',
-                          isFocused
-                            ? 'bg-white'
-                            : marker === 'exam'
-                              ? 'bg-coral'
-                              : 'bg-[#3e5bf6] dark:bg-[#526cf8]',
-                        )}
+                    {coverImage ? (
+                      // The artwork stands in for the whole cell: numeral and
+                      // dot would only sit in front of the picture.
+                      <DayCover
+                        image={coverImage}
+                        imageHeight={cover?.feature?.imageHeight}
+                        onFailed={() =>
+                          setBrokenCovers((previous) => new Set(previous).add(coverImage))
+                        }
                       />
-                    ) : null}
+                    ) : (
+                      <>
+                        <span className="relative">{cell.dayNumber}</span>
+                        {marker ? (
+                          <span
+                            aria-hidden
+                            className={cn(
+                              'absolute bottom-0.5 h-1 w-1 rounded-full',
+                              isFocused
+                                ? 'bg-white'
+                                : marker === 'exam'
+                                  ? 'bg-coral'
+                                  : 'bg-[#3e5bf6] dark:bg-[#526cf8]',
+                            )}
+                          />
+                        ) : null}
+                      </>
+                    )}
                   </button>
                 );
               })}
@@ -245,5 +291,35 @@ export function CalendarRightPanel({
         <SpecialEventsSection events={events} now={clock} onSelect={onSelectEvent} />
       )}
     </aside>
+  );
+}
+
+/** "2026" is noise beside the month; the calendar never spans more than a year or two. */
+function shortYear(date: Date) {
+  return String(date.getFullYear() % 100).padStart(2, '0');
+}
+
+function DayCover({
+  image,
+  imageHeight,
+  onFailed,
+}: {
+  image: string;
+  imageHeight: number | undefined;
+  onFailed: () => void;
+}) {
+  return (
+    <span
+      aria-hidden
+      className="absolute inset-0 overflow-hidden rounded-[inherit] ring-1 ring-black/10 dark:ring-white/15"
+    >
+      <img
+        src={image}
+        style={imageHeight ? { height: `${100 / imageHeight}%`, objectPosition: 'top' } : undefined}
+        alt=""
+        onError={onFailed}
+        className="h-full w-full object-cover"
+      />
+    </span>
   );
 }

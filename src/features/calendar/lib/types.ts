@@ -40,6 +40,8 @@ export interface CalendarEvent {
   room?: string;
   instructor?: string;
   note?: string;
+  /** Optional cover for regular events; special events reuse feature.image. */
+  coverImage?: string;
   /** Image-led treatment for student events, independent of their duration. */
   feature?: {
     image: string;

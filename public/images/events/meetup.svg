@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#cce7d4"/>
+  <g transform="translate(422 87) rotate(-15 120 120) scale(10)" fill="none" stroke="#38604b" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".38"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="11" ry="5" transform="rotate(-45 12 12)"/><ellipse cx="12" cy="12" rx="11" ry="5" transform="rotate(45 12 12)"/></g>
+  <g fill="#38604b" font-size="66" letter-spacing="-3">
+    <text x="38" y="164" font-family="'Instrument Sans', Arial, sans-serif" font-weight="550">Open</text>
+    <text x="38" y="239" font-family="Georgia, serif" font-style="italic">possibilities.</text>
+  </g>
+</svg>

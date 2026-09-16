@@ -72,7 +72,7 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
   const loadImage = (file: File | undefined) => {
     if (!file) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 1_000_000) {
-      setError('Choose a PNG, JPEG or WebP image smaller than 1 MB.');
+      setError('Choose a PNG, JPEG or WebP image up to 1 MB.');
       return;
     }
     setImageLoading(true);
@@ -133,6 +133,7 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
         : {}),
       ...(room.trim() ? { room: room.trim() } : {}),
       ...(courseCode.trim() ? { courseCode: courseCode.trim().toUpperCase() } : {}),
+      ...(kind !== 'event' && eventImage ? { coverImage: eventImage } : {}),
     });
     onClose();
   };
@@ -204,7 +205,7 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
 
         {kind === 'event' && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div>
               <Field label="Event category">
                 {(id) => (
                   <input
@@ -216,30 +217,7 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
                   />
                 )}
               </Field>
-              <Field label="Cover image">
-                {(id) => (
-                  <input
-                    id={id}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => loadImage(event.target.files?.[0])}
-                    className={FIELD}
-                  />
-                )}
-              </Field>
             </div>
-            <p className="text-[11px] text-muted">
-              The card colour is picked from your image. PNG, JPEG or WebP, up to 1 MB.
-            </p>
-            {eventImage && (
-              <button
-                type="button"
-                onClick={() => setEventImage('')}
-                className="self-start text-[11px] text-secondary underline"
-              >
-                Remove cover image
-              </button>
-            )}
             <label className="flex items-center gap-2 text-[12px] text-secondary">
               <input
                 type="checkbox"
@@ -312,6 +290,41 @@ export function EventComposerDialog({ draft, onClose, onSubmit }: EventComposerD
           )}
         </Field>
 
+        <Field label="Cover image (optional)">
+          {(id) => (
+            <input
+              id={id}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={imageLoading}
+              onChange={(event) => loadImage(event.target.files?.[0])}
+              className={FIELD}
+            />
+          )}
+        </Field>
+        <p className="-mt-2 text-[11px] text-muted">
+          Shown on the event’s date in the calendar. PNG, JPEG or WebP, up to 1 MB.
+        </p>
+        {eventImage && (
+          <div className="flex items-center gap-3">
+            <img
+              src={eventImage}
+              alt="Event cover preview"
+              className="h-12 w-12 rounded-lg object-cover"
+            />
+            <button
+              type="button"
+              disabled={imageLoading}
+              onClick={() => {
+                setEventImage('');
+                setError(null);
+              }}
+              className="text-[12px] text-secondary underline"
+            >
+              Remove cover
+            </button>
+          </div>
+        )}
         <fieldset className="min-w-0">
           <legend className="mb-1.5 text-[12px] font-medium text-secondary">Colour</legend>
           <div className="flex flex-wrap gap-2">
