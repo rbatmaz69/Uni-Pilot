@@ -23,6 +23,11 @@ const backgroundMocks = vi.hoisted(() => {
   };
 });
 
+const mediaMocks = vi.hoisted(() => ({
+  play: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  pause: vi.fn(),
+}));
+
 vi.mock('@/features/focus/lib/backgrounds', () => ({
   ACCEPTED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'],
   listFocusBackgrounds: backgroundMocks.list,
@@ -37,6 +42,14 @@ vi.mock('@/features/focus/lib/sound', () => ({
 
 beforeEach(() => {
   backgroundMocks.rows.length = 0;
+  Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+    configurable: true,
+    value: mediaMocks.play,
+  });
+  Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
+    configurable: true,
+    value: mediaMocks.pause,
+  });
   Object.defineProperty(URL, 'createObjectURL', {
     configurable: true,
     value: vi.fn((file: File) => `blob:${file.name}`),
@@ -365,6 +378,9 @@ describe('Focus workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Choose background' }));
     const panel = screen.getByRole('dialog', { name: 'Choose background' });
     expect(screen.getByRole('region', { name: 'Focus timer' })).toContainElement(panel);
+    expect(within(panel).getByRole('button', { name: 'Wasserfall' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Regen' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Piano' })).toBeInTheDocument();
     expect(within(panel).getByText('No image')).toBeInTheDocument();
     expect(within(panel).getByText('No images added yet.')).toBeInTheDocument();
     expect(within(panel).getByLabelText('Add your images')).toHaveAttribute('type', 'file');
@@ -411,5 +427,110 @@ describe('Focus workspace', () => {
     expect(backgroundMocks.remove).toHaveBeenCalledWith('image-1');
     expect(useFocusStore.getState().backgroundId).toBeNull();
     expect(screen.queryByRole('button', { name: 'library.png' })).not.toBeInTheDocument();
+  });
+
+  it('selects and persists a built-in video with original audio and loop playback', async () => {
+    renderApp('/focus');
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Choose background' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Regen' }));
+
+    expect(useFocusStore.getState().backgroundId).toBe('video:focus-2');
+    expect(JSON.parse(localStorage.getItem('uni-pilot.focus') ?? '{}')).toMatchObject({
+      state: { backgroundId: 'video:focus-2' },
+    });
+    const video = document.querySelector<HTMLVideoElement>('main > .focus-video-backdrop video');
+    expect(video).not.toBeNull();
+    expect(video?.getAttribute('src')).toBe('/focus/videos/focus-2.mp4');
+    expect(video).toHaveAttribute('loop');
+    expect(video?.muted).toBe(false);
+    expect(video).not.toHaveAttribute('controls');
+
+    mediaMocks.play.mockClear();
+    mediaMocks.pause.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    await act(async () => {});
+    expect(mediaMocks.play).toHaveBeenCalledOnce();
+
+    if (video) video.currentTime = 12;
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(mediaMocks.pause).toHaveBeenCalled();
+    expect(video?.currentTime).toBe(12);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+    await act(async () => {});
+    expect(mediaMocks.play).toHaveBeenCalledTimes(2);
+    expect(video?.currentTime).toBe(12);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset timer' }));
+    expect(video?.currentTime).toBe(0);
+  });
+
+  it('keeps one video playing with original audio while navigating away', async () => {
+    renderApp('/focus');
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Choose background' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wasserfall' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    await act(async () => {});
+    const video = document.querySelector<HTMLVideoElement>('main > .focus-video-backdrop video');
+    const backdrop = video?.parentElement;
+    mediaMocks.pause.mockClear();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Tasks' }));
+
+    expect(document.querySelector('main > .focus-video-backdrop video')).toBe(video);
+    expect(backdrop).toHaveClass('invisible', 'opacity-0');
+    expect(video).not.toHaveAttribute('muted');
+    expect(mediaMocks.pause).not.toHaveBeenCalled();
+    expect(useFocusStore.getState()).toMatchObject({ status: 'running', phase: 'work' });
+  });
+
+  it('stops and rewinds video for the break and starts a newly selected video at zero', async () => {
+    renderApp('/focus');
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Set Pomodoro times' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Pomodoro minutes' }), {
+      target: { value: '1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save times' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose background' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wasserfall' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    const video = document.querySelector<HTMLVideoElement>('main > .focus-video-backdrop video');
+    if (video) video.currentTime = 18;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Piano' }));
+    await act(async () => {});
+    expect(video?.currentTime).toBe(0);
+    if (video) video.currentTime = 22;
+
+    await act(() => vi.advanceTimersByTime(60_000));
+    expect(useFocusStore.getState()).toMatchObject({ phase: 'break', status: 'running' });
+    expect(mediaMocks.pause).toHaveBeenCalled();
+    expect(video?.currentTime).toBe(0);
+  });
+
+  it('offers a retry when restored audio playback is blocked and falls back on media errors', async () => {
+    mediaMocks.play.mockRejectedValueOnce(new DOMException('Blocked', 'NotAllowedError'));
+    useFocusStore.setState({
+      backgroundId: 'video:focus-3',
+      phase: 'work',
+      status: 'running',
+      sessionId: 'restored-session',
+      deadline: Date.now() + 60_000,
+      remainingMs: 60_000,
+    });
+    renderApp('/focus');
+    await act(async () => {});
+
+    const retry = screen.getByRole('button', { name: 'Video fortsetzen' });
+    fireEvent.click(retry);
+    await act(async () => {});
+    expect(screen.queryByRole('button', { name: 'Video fortsetzen' })).not.toBeInTheDocument();
+
+    const video = document.querySelector<HTMLVideoElement>('main > .focus-video-backdrop video');
+    fireEvent.error(video!);
+    expect(video).toHaveClass('opacity-0');
+    expect(screen.getByRole('timer')).toBeInTheDocument();
+    expect(useFocusStore.getState().status).toBe('running');
   });
 });

@@ -24,6 +24,7 @@ import {
   type BackgroundOption,
 } from '@/features/focus/components/FocusBackgroundPanel';
 import { listFocusBackgrounds } from '@/features/focus/lib/backgrounds';
+import { findFocusVideo } from '@/features/focus/lib/videos';
 
 export function FocusWorkspace() {
   const state = useFocusStore();
@@ -135,6 +136,7 @@ export function FocusWorkspace() {
   const time = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   const dayKey = localDateKey(new Date(now));
   const backgroundUrl = backgrounds.find((item) => item.id === state.backgroundId)?.url;
+  const backgroundVideo = findFocusVideo(state.backgroundId);
 
   const start = () => {
     if (state.soundEnabled && state.phase === 'work') prepareFocusSound();
@@ -147,6 +149,7 @@ export function FocusWorkspace() {
       aria-label="Focus timer"
       className={cn(
         'focus-scene relative isolate flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl',
+        backgroundVideo && 'focus-scene-video',
         state.status === 'running' &&
           !statisticsOpen &&
           !backgroundsOpen &&

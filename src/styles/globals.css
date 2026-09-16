@@ -337,6 +337,13 @@
       radial-gradient(ellipse at 75% 8%, var(--focus-horizon), transparent 65%), var(--focus-sky);
     color: var(--focus-foreground);
   }
+  .focus-video-backdrop {
+    background:
+      radial-gradient(ellipse at 75% 8%, var(--focus-horizon), transparent 65%), var(--focus-sky);
+  }
+  .focus-scene.focus-scene-video {
+    background: linear-gradient(var(--focus-image-shade), var(--focus-image-shade));
+  }
   .focus-clock {
     max-width: clamp(280px, 44dvh, 400px);
   }
