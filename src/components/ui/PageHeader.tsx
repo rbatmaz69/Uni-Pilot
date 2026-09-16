@@ -26,7 +26,7 @@ export function PageHeader({
           <span
             aria-hidden
             className={cn(
-              'grid h-12 w-12 flex-none place-items-center rounded-[16px_16px_16px_6px]',
+              'grid h-12 w-12 flex-none place-items-center rounded-2xl',
               TONE_SURFACE[tone],
             )}
           >
@@ -35,7 +35,7 @@ export function PageHeader({
         ) : null}
 
         <div className="min-w-0">
-          <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-primary">{title}</h1>
+          <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-primary">{title}</h1>
           {subtitle ? <p className="mt-1 text-[13.5px] text-secondary">{subtitle}</p> : null}
         </div>
       </div>

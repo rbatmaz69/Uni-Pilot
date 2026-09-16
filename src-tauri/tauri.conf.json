@@ -34,7 +34,7 @@
     "publisher": "Uni Pilot",
     "homepage": "https://github.com/rbatmaz69/Uni-Pilot",
     "category": "Education",
-    "copyright": "© 2026 Uni Pilot",
+    "copyright": "\u00a9 2026 Uni Pilot",
     "shortDescription": "A personal operating system for university life",
     "longDescription": "Uni Pilot brings studies, courses, tasks, calendar, documents and campus life together in one calm desktop app.",
     "icon": [
@@ -43,6 +43,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
   }
 }

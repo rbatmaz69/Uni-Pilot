@@ -1,20 +1,34 @@
+import { ArrowLeft, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { NavItem } from '@/types';
 
 interface PageProps {
   item: NavItem;
   children?: ReactNode;
+  hideHeader?: boolean;
+  /**
+   * The page is exactly as tall as the window and scrolls inside itself.
+   *
+   * Opt-in, because it works by dropping the automatic minimum height a flex
+   * item takes from its content: a page that grows past the fold instead needs
+   * that minimum, or `main` would have nothing left to scroll to.
+   */
+  fill?: boolean;
 }
 
 /**
  * Shared page frame. Title and subtitle come from the navigation config so the
  * sidebar, header and page can never drift apart.
  */
-export function Page({ item, children }: PageProps) {
+export function Page({ item, children, hideHeader = false, fill = false }: PageProps) {
   return (
-    <div className="flex flex-col gap-6 px-2">
-      <PageHeader title={item.label} subtitle={item.subtitle} icon={item.icon} tone={item.tone} />
+    <div className={cn('flex flex-1 flex-col', !hideHeader && 'gap-7', fill && 'min-h-0')}>
+      {!hideHeader ? (
+        <PageHeader title={item.label} subtitle={item.subtitle} icon={item.icon} tone={item.tone} />
+      ) : null}
       {children ?? <PagePlaceholder>{item.placeholder}</PagePlaceholder>}
     </div>
   );
@@ -22,8 +36,24 @@ export function Page({ item, children }: PageProps) {
 
 function PagePlaceholder({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-line bg-surface/50 px-6 py-16">
-      <p className="max-w-sm text-center text-[13.5px] text-muted">{children}</p>
+    <div className="flex min-h-[370px] flex-col items-center justify-center rounded-2xl border border-line-soft bg-surface-secondary/50 px-6 py-16 text-center">
+      <span className="grid h-14 w-14 place-items-center rounded-2xl border border-line bg-surface text-accent shadow-soft">
+        <Sparkles size={24} strokeWidth={1.4} />
+      </span>
+      <span className="mt-6 text-[10px] font-medium uppercase tracking-[0.1em] text-muted">
+        Coming together
+      </span>
+      <h2 className="mt-2 text-xl font-semibold tracking-tight">
+        A little space for what&apos;s next.
+      </h2>
+      <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-secondary">{children}</p>
+      <Link
+        to="/dashboard"
+        className="mt-6 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-xs font-medium text-secondary transition-colors hover:border-accent hover:text-accent"
+      >
+        <ArrowLeft size={14} />
+        Back to dashboard
+      </Link>
     </div>
   );
 }
