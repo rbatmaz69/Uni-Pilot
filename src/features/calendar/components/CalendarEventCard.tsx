@@ -70,7 +70,7 @@ export function CalendarEventCard({
         event={event}
         onSelect={onSelect}
         compact={!detailed}
-        className="absolute overflow-auto"
+        className="absolute overflow-auto [&_.special-event-art]:max-h-[40%] [&_.special-event-art_img]:object-center"
         style={{
           top: (startMinute - gridStart) * pxPerMinute + 2,
           height: height - 3,

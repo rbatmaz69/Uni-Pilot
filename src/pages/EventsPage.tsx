@@ -1,6 +1,5 @@
-import { Page } from '@/components/layout';
-import { NAV_ITEMS } from '@/lib/navigation';
+import { EventsExperience } from '@/features/events/components/EventsExperience';
 
 export function EventsPage() {
-  return <Page item={NAV_ITEMS.events} />;
+  return <EventsExperience />;
 }

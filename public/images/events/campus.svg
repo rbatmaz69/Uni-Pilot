@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#f1e5b7"/>
+  <g transform="translate(422 87) rotate(-15 120 120) scale(10)" fill="none" stroke="#6e5d32" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".38"><path d="M18 8h1a4 4 0 0 1 0 8h-1M3 8h15v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4ZM6 1v3M10 1v3M14 1v3"/></g>
+  <g fill="#6e5d32" font-size="78" letter-spacing="-3">
+    <text x="38" y="164" font-family="'Instrument Sans', Arial, sans-serif" font-weight="550">Take a</text>
+    <text x="38" y="239" font-family="Georgia, serif" font-style="italic">breather.</text>
+  </g>
+</svg>

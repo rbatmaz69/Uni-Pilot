@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#e5dbf7"/>
+  <g transform="translate(422 87) rotate(-15 120 120) scale(10)" fill="none" stroke="#594476" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".38"><path d="M9 3H8a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M15 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></g>
+  <g fill="#594476" font-size="78" letter-spacing="-3">
+    <text x="38" y="164" font-family="'Instrument Sans', Arial, sans-serif" font-weight="550">Make it</text>
+    <text x="38" y="239" font-family="Georgia, serif" font-style="italic">happen.</text>
+  </g>
+</svg>

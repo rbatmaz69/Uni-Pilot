@@ -1,10 +1,16 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { addDays, localDateKey } from '@/lib/date';
 import { CalendarRightPanel } from './CalendarRightPanel';
 import { useTaskStore } from '@/features/calendar/store/taskStore';
+import { playDayHoverSound } from '@/features/calendar/lib/calendarSound';
 import type { CalendarEvent } from '@/features/calendar/lib/types';
+
+vi.mock('@/features/calendar/lib/calendarSound', () => ({
+  playDayHoverSound: vi.fn(),
+  prepareCalendarSound: vi.fn(),
+}));
 
 const now = new Date(2026, 8, 28, 9, 0);
 const key = (offset: number) => localDateKey(addDays(now, offset));
@@ -37,9 +43,47 @@ const addTask = async (user: ReturnType<typeof userEvent.setup>, title: string, 
 };
 
 describe('the mini month', () => {
+  it.each([
+    [2026, 0],
+    [2026, 1],
+    [2026, 2],
+    [2026, 3],
+    [2026, 4],
+    [2026, 5],
+    [2026, 6],
+    [2026, 7],
+    [2026, 8],
+    [2026, 9],
+    [2026, 10],
+    [2026, 11],
+    [2028, 1],
+  ])('shows the first seven days of the next month from %i/%i', (year, month) => {
+    const focus = new Date(year, month, 15);
+    render(<CalendarRightPanel focusDay={focus} onSelectDate={vi.fn()} now={focus} />);
+    for (let day = 1; day <= 7; day++) {
+      const date = new Date(year, month + 1, day);
+      expect(
+        screen.getByRole('button', {
+          name: date.toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' }),
+        }),
+      ).toBeVisible();
+    }
+  });
+
+  it('selects a next-month day before switching the displayed month', async () => {
+    const onSelect = vi.fn();
+    render(<CalendarRightPanel focusDay={now} onSelectDate={onSelect} now={now} />);
+    const nextDate = new Date(2026, 9, 7);
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: nextDate.toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' }),
+      }),
+    );
+    expect(onSelect).toHaveBeenCalledWith(nextDate);
+  });
   it('shows the month of the focused day', () => {
     renderPanel();
-    expect(screen.getByText('September 2026')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'September ’26' })).toBeInTheDocument();
   });
 
   it('reports a clicked day back to the calendar', async () => {
@@ -58,10 +102,10 @@ describe('the mini month', () => {
     renderPanel();
 
     await user.click(screen.getByRole('button', { name: 'Next month' }));
-    expect(screen.getByText('October 2026')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'October ’26' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Previous month' }));
-    expect(screen.getByText('September 2026')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'September ’26' })).toBeInTheDocument();
   });
 
   it('folds away to leave the list more room', async () => {
@@ -73,7 +117,19 @@ describe('the mini month', () => {
     expect(
       screen.queryByRole('button', { name: /15 September 2026|September 15, 2026/ }),
     ).toBeNull();
-    expect(screen.getByText('September 2026')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'September ’26' })).toBeInTheDocument();
+  });
+
+  it('plays a sound when hovering over a day', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const dayButton = screen.getByRole('button', {
+      name: /15 September 2026|September 15, 2026/,
+    });
+    await user.hover(dayButton);
+
+    expect(playDayHoverSound).toHaveBeenCalledWith(15);
   });
 });
 
@@ -186,6 +242,58 @@ describe('what the timetable contributes', () => {
 });
 
 describe('dots in the mini month', () => {
+  it('reuses existing special-event artwork for the date cover', () => {
+    renderPanel([
+      {
+        ...exam,
+        kind: 'event',
+        date: '2026-10-07',
+        feature: { image: '/hackathon.png', category: 'Hackathon', imageHeight: 0.58 },
+      },
+    ]);
+    const button = screen.getByRole('button', {
+      name: /October 7, 2026, Klausur Machine Learning/,
+    });
+    expect(button.querySelector('img')).toHaveAttribute('src', '/hackathon.png');
+  });
+  it('lets the artwork stand in for the numeral', () => {
+    renderPanel([{ ...exam, date: '2026-10-07', coverImage: '/exam.png' }]);
+    const button = screen.getByRole('button', {
+      name: /October 7, 2026, Klausur Machine Learning/,
+    });
+    expect(within(button).queryByText('7')).toBeNull();
+    expect(button.querySelector('img')).toHaveAttribute('src', '/exam.png');
+  });
+
+  it('renders cover images on next-month dates, with the event in the accessible name', () => {
+    renderPanel([{ ...exam, date: '2026-10-07', coverImage: '/exam.png' }]);
+    const button = screen.getByRole('button', {
+      name: /October 7, 2026, Klausur Machine Learning, exam/,
+    });
+    expect(button.querySelector('img')).toHaveAttribute('src', '/exam.png');
+    const image = button.querySelector('img')!;
+    fireEvent.error(image);
+    expect(button.querySelector('img')).toBeNull();
+    expect(within(button).getByText('7')).toBeVisible();
+  });
+
+  it('prioritises exam covers and excludes cancelled events on a shared date', () => {
+    renderPanel([
+      {
+        ...exam,
+        id: 'cancelled',
+        date: '2026-10-07',
+        status: 'cancelled',
+        coverImage: '/cancelled.png',
+      },
+      { ...exam, id: 'lecture', date: '2026-10-07', kind: 'lecture', coverImage: '/lecture.png' },
+      { ...exam, date: '2026-10-07', coverImage: '/exam.png' },
+    ]);
+    const button = screen.getByRole('button', {
+      name: /October 7, 2026, Klausur Machine Learning, exam/,
+    });
+    expect(button.querySelector('img')).toHaveAttribute('src', '/exam.png');
+  });
   const dayButton = (offset: number) => {
     const date = addDays(now, offset);
     const label = date.toLocaleDateString('en', {
@@ -206,6 +314,36 @@ describe('dots in the mini month', () => {
     renderPanel([{ ...exam, date: key(1) }]);
 
     expect(dayButton(1)).toHaveAccessibleName(/, exam$/);
+  });
+
+  it('shows an exam indicator during the first week of next month', () => {
+    renderPanel([{ ...exam, date: '2026-10-07' }]);
+    expect(dayButton(9)).toHaveAccessibleName(/, exam$/);
+    expect(dayButton(9).querySelector('[aria-hidden]')).toBeInTheDocument();
+  });
+
+  it('also marks dates carried over from the previous month', () => {
+    renderPanel([{ ...exam, date: '2026-08-31' }]);
+    expect(dayButton(-28)).toHaveAccessibleName(/, exam$/);
+  });
+
+  it('marks next-month tasks and ignores cancelled exams', () => {
+    useTaskStore.setState({
+      tasks: [
+        {
+          id: 'next-month-task',
+          title: 'Prepare presentation',
+          dueDate: '2026-10-06',
+          dueTime: null,
+          priority: 'med',
+          courseCode: null,
+          done: false,
+        },
+      ],
+    });
+    renderPanel([{ ...exam, date: '2026-10-07', status: 'cancelled' }]);
+    expect(dayButton(8)).toHaveAccessibleName(/, something due$/);
+    expect(dayButton(9)).not.toHaveAccessibleName(/exam/);
   });
 
   it('names a day that carries an open task', () => {

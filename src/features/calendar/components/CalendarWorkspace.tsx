@@ -43,10 +43,15 @@ const DEFAULT_NEW_EVENT_TIME = '09:00';
  * Monday, the day view is the day itself. Keeping one date in state means the
  * two views can never disagree about where the user is.
  */
-export function CalendarWorkspace() {
+export function CalendarWorkspace({
+  initialEvent,
+}: { initialEvent?: CalendarEvent | undefined } = {}) {
   const [now, setNow] = useState(() => new Date());
-  const [focusDay, setFocusDay] = useState(() => startOfDay(new Date()));
-  const [view, setView] = useState<CalendarView>('week');
+  const [focusDay, setFocusDay] = useState(() =>
+    initialEvent ? parseDateKey(initialEvent.date) : startOfDay(new Date()),
+  );
+  // A linked event opens its own day, including weekends outside the Mon–Fri week view.
+  const [view, setView] = useState<CalendarView>(initialEvent ? 'day' : 'week');
   const ownEvents = useEventStore((state) => state.events);
   const [activeKinds, setActiveKinds] = useState<ReadonlySet<CalendarEventKind>>(() => new Set());
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
