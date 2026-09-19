@@ -79,26 +79,28 @@ export const FocusProgressRing = memo(function FocusProgressRing({
       aria-hidden
     >
       <circle
+        className="focus-ring-track"
         cx="180"
         cy="180"
         r="172"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        opacity="0.2"
+        stroke="var(--focus-border)"
+        strokeWidth="2"
       />
       <circle
+        className="focus-ring-progress"
         ref={ringRef}
         cx="180"
         cy="180"
         r="172"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
+        stroke="var(--focus-text)"
+        strokeWidth="2"
         pathLength="1"
         strokeDasharray="1"
         strokeDashoffset={1 - initialProgress}
         strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 1s linear' }}
       />
     </svg>
   );

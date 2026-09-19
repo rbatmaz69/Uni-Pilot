@@ -177,7 +177,12 @@ export function FocusWorkspace() {
     >
       <h1 className="sr-only">{NAV_ITEMS.focus.label}</h1>
       <p className="sr-only">{NAV_ITEMS.focus.subtitle}</p>
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div
+        className={cn(
+          'focus-stage relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto',
+          statisticsOpen && 'focus-stage-obscured',
+        )}
+      >
         <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-3 text-center">
           <div className="focus-clock relative grid aspect-square w-full shrink-0 place-items-center">
             <FocusProgressRing
@@ -193,11 +198,11 @@ export function FocusWorkspace() {
                 role="timer"
                 aria-label="Time remaining"
                 aria-live="off"
-                className="text-[clamp(3.5rem,7vw,5.5rem)] leading-tight font-normal tracking-[-0.065em] tabular-nums"
+                className="text-[64px] leading-tight font-light tracking-[-0.04em] tabular-nums"
               >
                 {time}
               </div>
-              <div className="focus-control mt-6 flex items-center gap-2">
+              <div className="focus-control mt-5 flex items-center gap-5">
                 <button
                   type="button"
                   aria-label="Reset timer"
@@ -257,7 +262,7 @@ export function FocusWorkspace() {
       <div
         role="toolbar"
         aria-label="Focus tools"
-        className="absolute bottom-5 right-5 z-10 flex flex-col items-center gap-2"
+        className="absolute bottom-5 right-5 z-30 flex flex-col items-center gap-2"
       >
         <button
           type="button"
@@ -265,7 +270,10 @@ export function FocusWorkspace() {
           title="Statistics"
           aria-expanded={statisticsOpen}
           aria-controls={statisticsOpen ? 'focus-statistics' : undefined}
-          className="focus-scene-button focus-control grid h-9 w-9 place-items-center rounded-full"
+          className={cn(
+            'focus-scene-button focus-control grid h-10 w-10 place-items-center rounded-full',
+            statisticsOpen && 'focus-scene-button-active',
+          )}
           onClick={() => {
             setSettingsOpen(false);
             setBackgroundsOpen(false);
@@ -280,7 +288,12 @@ export function FocusWorkspace() {
           title="Backgrounds"
           aria-expanded={backgroundsOpen}
           aria-controls={backgroundsOpen ? 'focus-backgrounds' : undefined}
-          className="focus-scene-button focus-control grid h-9 w-9 place-items-center rounded-full"
+          className={cn(
+            'focus-scene-button focus-tool-secondary focus-control grid h-9 w-9 place-items-center rounded-full',
+            statisticsOpen && 'focus-tool-secondary-hidden',
+          )}
+          aria-hidden={statisticsOpen}
+          tabIndex={statisticsOpen ? -1 : undefined}
           onClick={() => {
             setSettingsOpen(false);
             setStatisticsOpen(false);
@@ -293,7 +306,12 @@ export function FocusWorkspace() {
           type="button"
           aria-label={state.soundEnabled ? 'Mute completion sound' : 'Enable completion sound'}
           aria-pressed={state.soundEnabled}
-          className="focus-scene-button focus-control grid h-9 w-9 place-items-center rounded-full"
+          className={cn(
+            'focus-scene-button focus-tool-secondary focus-control grid h-9 w-9 place-items-center rounded-full',
+            statisticsOpen && 'focus-tool-secondary-hidden',
+          )}
+          aria-hidden={statisticsOpen}
+          tabIndex={statisticsOpen ? -1 : undefined}
           onClick={() => {
             if (!state.soundEnabled) prepareFocusSound();
             state.setSoundEnabled(!state.soundEnabled);
@@ -309,7 +327,12 @@ export function FocusWorkspace() {
           type="button"
           aria-label={state.focusMode ? 'Show toolbar' : 'Cover toolbar'}
           title={state.focusMode ? 'Show toolbar' : 'Cover toolbar'}
-          className="focus-scene-button focus-control grid h-9 w-9 place-items-center rounded-full"
+          className={cn(
+            'focus-scene-button focus-tool-secondary focus-control grid h-9 w-9 place-items-center rounded-full',
+            statisticsOpen && 'focus-tool-secondary-hidden',
+          )}
+          aria-hidden={statisticsOpen}
+          tabIndex={statisticsOpen ? -1 : undefined}
           aria-pressed={state.focusMode}
           onClick={() => {
             setControlsFading(false);
@@ -339,13 +362,12 @@ export function FocusWorkspace() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      {statisticsOpen && (
-        <FocusStatisticsPanel
-          sessions={state.sessions}
-          dayKey={dayKey}
-          onClose={() => setStatisticsOpen(false)}
-        />
-      )}
+      <FocusStatisticsPanel
+        open={statisticsOpen}
+        sessions={state.sessions}
+        dayKey={dayKey}
+        onClose={() => setStatisticsOpen(false)}
+      />
       {backgroundsOpen && (
         <FocusBackgroundPanel
           selectedId={state.backgroundId}

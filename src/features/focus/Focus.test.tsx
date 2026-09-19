@@ -340,11 +340,29 @@ describe('Focus workspace', () => {
   it('opens statistics over the cover and returns keyboard focus when closed', () => {
     renderApp('/focus');
     const trigger = screen.getByRole('button', { name: 'Show statistics' });
+    const persistentPanel = document.getElementById('focus-statistics');
+    const statisticsLayer = persistentPanel?.parentElement;
+    const closeButton = persistentPanel?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close statistics"]',
+    );
+    const stage = document.querySelector('.focus-stage');
+    expect(persistentPanel).not.toBeNull();
+    expect(closeButton).not.toBeNull();
+    expect(stage).not.toHaveClass('focus-stage-obscured');
+    expect(statisticsLayer).toHaveAttribute('data-open', 'false');
+    expect(screen.queryByRole('dialog', { name: 'Focus statistics' })).not.toBeInTheDocument();
     trigger.focus();
+    const triggerFocus = vi.spyOn(trigger, 'focus');
+    const closeFocus = vi.spyOn(closeButton as HTMLButtonElement, 'focus');
     fireEvent.click(trigger);
     const panel = screen.getByRole('dialog', { name: 'Focus statistics' });
+    expect(panel).toBe(persistentPanel);
+    expect(document.querySelector('.focus-stage')).toBe(stage);
+    expect(stage).toHaveClass('focus-stage-obscured');
+    expect(statisticsLayer).toHaveAttribute('data-open', 'true');
     expect(screen.getByRole('region', { name: 'Focus timer' })).toContainElement(panel);
-    expect(panel).toHaveFocus();
+    expect(closeButton).toHaveFocus();
+    expect(closeFocus).toHaveBeenCalledWith({ preventScroll: true });
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(within(panel).getByRole('region', { name: 'Focus progress' })).toBeInTheDocument();
     expect(
@@ -352,22 +370,44 @@ describe('Focus workspace', () => {
     ).toBeInTheDocument();
     fireEvent.keyDown(panel, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.getElementById('focus-statistics')).toBe(persistentPanel);
+    expect(statisticsLayer).toHaveAttribute('data-open', 'false');
+    expect(document.querySelector('.focus-stage')).toBe(stage);
+    expect(stage).not.toHaveClass('focus-stage-obscured');
     expect(trigger).toHaveFocus();
+    expect(triggerFocus).toHaveBeenCalledWith({ preventScroll: true });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    fireEvent.mouseDown(document.querySelector('.focus-statistics-backdrop') as HTMLElement);
+    expect(statisticsLayer).toHaveAttribute('data-open', 'false');
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+    expect(statisticsLayer).toHaveAttribute('data-open', 'false');
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('button', { name: 'Close statistics' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    triggerFocus.mockRestore();
+    closeFocus.mockRestore();
   });
 
   it('keeps the timer running while statistics are open and closes them without exiting focus mode', async () => {
     renderApp('/focus');
+    const stage = document.querySelector('.focus-stage');
     fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cover toolbar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Show statistics' }));
+    const statisticsTrigger = screen.getByRole('button', { name: 'Show statistics' });
+    fireEvent.click(statisticsTrigger);
+    expect(stage).toHaveClass('focus-stage-obscured');
+    fireEvent.click(statisticsTrigger);
+    expect(stage).not.toHaveClass('focus-stage-obscured');
+    fireEvent.click(statisticsTrigger);
+    expect(stage).toHaveClass('focus-stage-obscured');
     await act(() => vi.advanceTimersByTime(10_000));
     expect(screen.getByRole('timer')).toHaveTextContent('24:50');
     fireEvent.keyDown(screen.getByRole('dialog', { name: 'Focus statistics' }), { key: 'Escape' });
     expect(useFocusStore.getState()).toMatchObject({ status: 'running', focusMode: true });
+    expect(stage).not.toHaveClass('focus-stage-obscured');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

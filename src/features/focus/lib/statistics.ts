@@ -28,6 +28,10 @@ export function focusStatistics(sessions: FocusSession[], now: Date) {
     const date = addDays(startOfWeek(now), index);
     return { date, ms: daily.get(localDateKey(date)) ?? 0 };
   });
+  const recentDays = Array.from({ length: 28 }, (_, index) => {
+    const date = addDays(now, index - 27);
+    return { date, ms: daily.get(localDateKey(date)) ?? 0 };
+  });
   let streak = 0;
   let cursor = completedDays.has(localDateKey(now)) ? now : addDays(now, -1);
   while (completedDays.has(localDateKey(cursor))) {
@@ -40,5 +44,6 @@ export function focusStatistics(sessions: FocusSession[], now: Date) {
     completed: sessions.filter((session) => session.outcome === 'completed').length,
     streak,
     week,
+    recentDays,
   };
 }

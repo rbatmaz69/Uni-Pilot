@@ -36,6 +36,8 @@ describe('focus statistics in local time', () => {
     expect(stats.todayMs).toBe(15 * 60_000);
     expect(stats.weekMs).toBe(15 * 60_000);
     expect(stats.week[0]?.ms).toBe(15 * 60_000);
+    expect(stats.recentDays).toHaveLength(28);
+    expect(stats.recentDays.at(-1)?.ms).toBe(15 * 60_000);
     expect(stats.completed).toBe(1);
   });
 
