@@ -107,13 +107,25 @@ export interface EntryDetails {
 }
 
 /**
- * Pulls a readable title and a lecturer out of one entry.
+ * A study group line — `SEB6`, or `AI7 SPO2, SEB6, SEB7` where a course is
+ * shared. StarPlan writes these in capitals while every lecturer's name carries
+ * lower case, which is what separates the two: a course with no teaching staff
+ * listed puts its study group where the name would otherwise be, and a course
+ * with two lecturers puts them on a line each.
+ */
+function isStudyGroup(line: string): boolean {
+  return !/\p{Ll}/u.test(line);
+}
+
+/**
+ * Pulls a readable title and the teaching staff out of one entry.
  *
  * German campus systems (StarPlan and its relatives) put an abbreviation in
- * SUMMARY and the useful version in DESCRIPTION: full course name on the first
- * line, teaching staff on the second, study group after that. The richer title
- * is only trusted when both carry the same module number, so a feed shaped any
- * other way falls back to its summary and keeps the description as a note.
+ * SUMMARY and the useful version in DESCRIPTION: full course name first,
+ * teaching staff on the lines after it, then the study group, then any remark.
+ * The richer title is only trusted when both carry the same module number, so
+ * a feed shaped any other way falls back to its summary and keeps the
+ * description as a note.
  */
 export function describeEntry(event: IcsEvent, courseCode: string | null): EntryDetails {
   const summaryTitle =
@@ -137,10 +149,19 @@ export function describeEntry(event: IcsEvent, courseCode: string | null): Entry
   const fullTitle = collapseRepeats(first ?? '')
     .replace(MODULE_NUMBER, '')
     .trim();
+
+  // Everything between the title and the study group is teaching staff, so a
+  // course with two lecturers keeps both and one with none says nothing rather
+  // than showing "SEB6" where a name belongs.
+  const tail = second === undefined ? [] : [second, ...rest];
+  const groupAt = tail.findIndex(isStudyGroup);
+  const staff = groupAt === -1 ? tail.slice(0, 1) : tail.slice(0, groupAt);
+  const note = (groupAt === -1 ? tail.slice(1) : tail.slice(groupAt)).join(' · ');
+
   return {
     title: fullTitle.length > summaryTitle.length ? fullTitle : summaryTitle,
-    instructor: second ?? null,
-    note: rest.join(' · ') || null,
+    instructor: staff.join(', ') || null,
+    note: note || null,
   };
 }
 

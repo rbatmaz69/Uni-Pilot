@@ -27,8 +27,13 @@ Die Recherche hat vier Dinge ergeben, die die Planung verändern:
    das persönliche **iCal-Abo** (`/calendar.php?client_id=…&token=…`) und der **private
    Nachrichten-Feed** (`/privfeed.php`). Beide werden mit einem Token bzw. einem separaten
    Feed-Passwort autorisiert, das Studierende selbst in ILIAS erzeugen. ✅ verifiziert
+5. **Der Stundenplan der HHN kommt gar nicht aus ILIAS**, sondern aus StarPlan
+   (`splan.hs-heilbronn.de`) — öffentlich, ohne Authentifizierung, und durch die bestehende
+   Kalender-Pipeline bereits vollständig verarbeitbar (303/303 Events). ✅ verifiziert, siehe 8.3.
+   Das verschiebt die MVP-Priorität: Der nützlichste Kalender kostet **keine** Entwicklungszeit.
 
-**Empfehlung für den MVP:** Kalender und Ankündigungen über die Token-Kanäle. Das ist keine
+**Empfehlung für den MVP:** Stundenplan über StarPlan (fertig), Ankündigungen und kursbezogene
+Termine über die ILIAS-Token-Kanäle. Das ist keine
 Notlösung — es ist der einzige Weg, der ohne Zutun der Hochschule funktioniert, ohne
 Hochschul-Passwörter auskommt und über beliebig viele Hochschulen hinweg trägt. Für Kurse,
 Materialien und Aufgaben muss die SOAP-Freischaltung mit dem Rechenzentrum geklärt werden,
@@ -467,40 +472,41 @@ existiert [`errors.ts`](../../src/features/integrations/lib/ilias/errors.ts).
 **Auth:** `Pwd` = Benutzername + Passwort · `Token` = nutzererzeugter Token · `Feed-Pwd` =
 separates Feed-Passwort
 
-| #   | Feature                        | Operation  | API/Service                             | Doku | Version | Berechtigung    | Auth     | Hochschul-Konfiguration                 | Komplexität       | PoC                      | Fallback                 | Status               |
-| --- | ------------------------------ | ---------- | --------------------------------------- | ---- | ------- | --------------- | -------- | --------------------------------------- | ----------------- | ------------------------ | ------------------------ | -------------------- |
-| 1   | Verbindung/Instanz-Info        | Read       | SOAP `getInstallationInfoXML`           | ✅   | alle    | keine           | keine    | SOAP erreichbar                         | niedrig           | ✅ getestet              | —                        | ✅                   |
-| 2   | Anmeldung                      | Read       | SOAP `login`/`logout`                   | ✅   | alle    | —               | Pwd      | `soap_user_administration` + Netzzugang | mittel            | ⚠️ nur Fehlerfall        | Browser-Login            | 🏫                   |
-| 3   | Eigene Nutzer-ID               | Read       | SOAP `getUserIdBySid`                   | ✅   | alle    | Session         | Pwd      | wie 2                                   | niedrig           | ❌                       | —                        | 🏫                   |
-| 4   | Eigenes Profil                 | Read       | SOAP `getUserXML`                       | ✅   | alle    | eigenes frei    | Pwd      | wie 2                                   | niedrig           | ❌                       | manuelle Eingabe         | 🏫                   |
-| 5   | Fremdes Profil                 | Read       | SOAP `getUserXML`                       | ✅   | alle    | `read_users`    | Pwd      | Admin-Rolle                             | —                 | ❌                       | —                        | ❌ (unerwünscht)     |
-| 6   | **Eigene Kurse**               | Read       | SOAP `getCoursesForUser`                | ✅   | alle    | `read` (eigene) | Pwd      | wie 2                                   | mittel            | ⚠️ Mapper getestet       | manuelle Kursliste       | 🏫                   |
-| 7   | Kursdetails                    | Read       | SOAP `getCourseXML`                     | ✅   | alle    | `read`          | Pwd      | wie 2                                   | niedrig           | ✅ Mapper gegen Live-XML | WebView                  | 🏫                   |
-| 8   | Kurs anlegen/ändern            | Write      | SOAP `addCourse`/`updateCourse`         | ✅   | alle    | `write`         | Pwd      | Admin                                   | —                 | ❌                       | —                        | ❌ (out of scope)    |
-| 9   | Kursmitgliedschaft             | Write      | SOAP `assignCourseMember`               | ✅   | alle    | `write`         | Pwd      | Admin                                   | —                 | ❌                       | —                        | ❌ (out of scope)    |
-| 10  | Gruppen                        | Read       | SOAP `getGroupsForUser`/`getGroup`      | ✅   | alle    | `read`          | Pwd      | wie 2                                   | mittel            | ❌                       | —                        | 🏫                   |
-| 11  | **Ordner/Materialbaum**        | Read       | SOAP `getTreeChilds`                    | ✅   | alle    | `read`          | Pwd      | wie 2                                   | mittel            | ✅ Mapper gegen Live-XML | WebView                  | 🏫                   |
-| 12  | Dateimetadaten                 | Read       | SOAP `getFileXML` (Modus 0)             | ✅   | alle    | `read`          | Pwd      | wie 2                                   | niedrig           | ⚠️ Mapper offen          | WebView                  | 🏫                   |
-| 13  | **Dateiinhalt**                | Read       | SOAP `getFileXML` (Modus ≠0)            | ✅   | alle    | `read`          | Pwd      | wie 2                                   | hoch¹             | ❌                       | Download-Link im Browser | 🏫                   |
-| 14  | Dateiinhalt                    | Read       | WebDAV                                  | ✅   | ≥5.4    | `read`          | Basic    | WebDAV aktiv                            | mittel            | ❌                       | —                        | 🔴                   |
-| 15  | Datei hochladen                | Write      | SOAP `addFile`/`updateFile`             | ✅   | alle    | `write`         | Pwd      | wie 2                                   | hoch              | ❌                       | WebView                  | ❌ (out of scope)    |
-| 16  | **Aufgaben/Deadlines**         | Read       | SOAP `getExerciseXML`                   | ✅   | alle    | `read`          | Pwd      | wie 2                                   | mittel²           | ✅ Mapper getestet       | WebView                  | 🏫                   |
-| 17  | **Aufgabe abgeben**            | Write      | —                                       | —    | —       | —               | —        | —                                       | —                 | —                        | **WebView/Browser**      | ❌ **nicht möglich** |
-| 18  | Abgabe ändern                  | Write      | —                                       | —    | —       | —               | —        | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
-| 19  | Feedback/Bewertung             | Read       | SOAP `getExerciseXML` (nur mit `write`) | ✅   | alle    | `write`         | Pwd      | Dozentenrolle                           | —                 | ❌                       | WebView                  | ❌ für Studierende   |
-| 20  | **Ankündigungen (kursweit)**   | Read       | RSS `feed.php`                          | ✅   | alle    | öffentlich      | keine    | Feed je Objekt aktiv                    | niedrig           | ⚠️ Endpunkt erreichbar   | WebView                  | ⚠️                   |
-| 21  | **Ankündigungen (persönlich)** | Read       | RSS `privfeed.php`                      | ✅   | alle    | eigene          | Feed-Pwd | `enable_private_feed`                   | niedrig           | ✅ Mapper getestet       | WebView                  | ✅ **MVP**           |
-| 22  | Gelesen-Status setzen          | Write      | —                                       | —    | —       | —               | —        | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
-| 23  | **Kalender/Termine**           | Read       | iCal `calendar.php?token=`              | ✅   | alle    | eigene          | Token    | Kalender aktiv                          | **sehr niedrig**³ | ✅ Endpunkt verifiziert  | manueller ICS-Import     | ✅ **MVP**           |
-| 24  | Termin anlegen                 | Write      | —                                       | —    | —       | —               | —        | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
-| 25  | Tests: Metadaten               | Read       | SOAP `getTestUserData` u.a.             | ✅   | alle    | `read`          | Pwd      | wie 2                                   | hoch              | ❌                       | **WebView**              | 🏫                   |
-| 26  | Test bearbeiten                | Write      | SOAP `saveQuestionSolution`             | ✅   | alle    | `read`          | Pwd      | wie 2                                   | **sehr hoch**     | ❌                       | **WebView**              | ❌ (bewusst nicht)   |
-| 27  | Testergebnisse                 | Read       | SOAP `getTestResults`                   | ✅   | alle    | 🔴              | Pwd      | wie 2                                   | mittel            | ❌                       | WebView                  | 🏫                   |
-| 28  | Lernfortschritt                | Read       | SOAP `getProgressInfo`                  | ✅   | alle    | 🔴              | Pwd      | wie 2                                   | mittel            | ❌                       | eigene Berechnung        | 🏫                   |
-| 29  | Fortschrittsänderungen         | Read       | SOAP `getLearningProgressChanges`       | ✅   | alle    | 🔴              | Pwd      | wie 2                                   | mittel            | ❌                       | —                        | 🏫                   |
-| 30  | Benachrichtigungen             | Read       | — (nur `hasNewMail`)                    | ✅   | alle    | eigene          | Pwd      | wie 2                                   | niedrig           | ❌                       | privfeed (21)            | ⚠️                   |
-| 31  | Foren                          | Read/Write | —                                       | —    | —       | —               | —        | —                                       | —                 | —                        | **WebView**              | ❌ nicht möglich     |
-| 32  | Notizen                        | Read/Write | —                                       | —    | —       | —               | —        | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
+| #   | Feature                        | Operation  | API/Service                             | Doku | Version | Berechtigung    | Auth      | Hochschul-Konfiguration                 | Komplexität       | PoC                      | Fallback                 | Status               |
+| --- | ------------------------------ | ---------- | --------------------------------------- | ---- | ------- | --------------- | --------- | --------------------------------------- | ----------------- | ------------------------ | ------------------------ | -------------------- |
+| 1   | Verbindung/Instanz-Info        | Read       | SOAP `getInstallationInfoXML`           | ✅   | alle    | keine           | keine     | SOAP erreichbar                         | niedrig           | ✅ getestet              | —                        | ✅                   |
+| 2   | Anmeldung                      | Read       | SOAP `login`/`logout`                   | ✅   | alle    | —               | Pwd       | `soap_user_administration` + Netzzugang | mittel            | ⚠️ nur Fehlerfall        | Browser-Login            | 🏫                   |
+| 3   | Eigene Nutzer-ID               | Read       | SOAP `getUserIdBySid`                   | ✅   | alle    | Session         | Pwd       | wie 2                                   | niedrig           | ❌                       | —                        | 🏫                   |
+| 4   | Eigenes Profil                 | Read       | SOAP `getUserXML`                       | ✅   | alle    | eigenes frei    | Pwd       | wie 2                                   | niedrig           | ❌                       | manuelle Eingabe         | 🏫                   |
+| 5   | Fremdes Profil                 | Read       | SOAP `getUserXML`                       | ✅   | alle    | `read_users`    | Pwd       | Admin-Rolle                             | —                 | ❌                       | —                        | ❌ (unerwünscht)     |
+| 6   | **Eigene Kurse**               | Read       | SOAP `getCoursesForUser`                | ✅   | alle    | `read` (eigene) | Pwd       | wie 2                                   | mittel            | ⚠️ Mapper getestet       | manuelle Kursliste       | 🏫                   |
+| 7   | Kursdetails                    | Read       | SOAP `getCourseXML`                     | ✅   | alle    | `read`          | Pwd       | wie 2                                   | niedrig           | ✅ Mapper gegen Live-XML | WebView                  | 🏫                   |
+| 8   | Kurs anlegen/ändern            | Write      | SOAP `addCourse`/`updateCourse`         | ✅   | alle    | `write`         | Pwd       | Admin                                   | —                 | ❌                       | —                        | ❌ (out of scope)    |
+| 9   | Kursmitgliedschaft             | Write      | SOAP `assignCourseMember`               | ✅   | alle    | `write`         | Pwd       | Admin                                   | —                 | ❌                       | —                        | ❌ (out of scope)    |
+| 10  | Gruppen                        | Read       | SOAP `getGroupsForUser`/`getGroup`      | ✅   | alle    | `read`          | Pwd       | wie 2                                   | mittel            | ❌                       | —                        | 🏫                   |
+| 11  | **Ordner/Materialbaum**        | Read       | SOAP `getTreeChilds`                    | ✅   | alle    | `read`          | Pwd       | wie 2                                   | mittel            | ✅ Mapper gegen Live-XML | WebView                  | 🏫                   |
+| 12  | Dateimetadaten                 | Read       | SOAP `getFileXML` (Modus 0)             | ✅   | alle    | `read`          | Pwd       | wie 2                                   | niedrig           | ⚠️ Mapper offen          | WebView                  | 🏫                   |
+| 13  | **Dateiinhalt**                | Read       | SOAP `getFileXML` (Modus ≠0)            | ✅   | alle    | `read`          | Pwd       | wie 2                                   | hoch¹             | ❌                       | Download-Link im Browser | 🏫                   |
+| 14  | Dateiinhalt                    | Read       | WebDAV                                  | ✅   | ≥5.4    | `read`          | Basic     | WebDAV aktiv                            | mittel            | ❌                       | —                        | 🔴                   |
+| 15  | Datei hochladen                | Write      | SOAP `addFile`/`updateFile`             | ✅   | alle    | `write`         | Pwd       | wie 2                                   | hoch              | ❌                       | WebView                  | ❌ (out of scope)    |
+| 16  | **Aufgaben/Deadlines**         | Read       | SOAP `getExerciseXML`                   | ✅   | alle    | `read`          | Pwd       | wie 2                                   | mittel²           | ✅ Mapper getestet       | WebView                  | 🏫                   |
+| 17  | **Aufgabe abgeben**            | Write      | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | **WebView/Browser**      | ❌ **nicht möglich** |
+| 18  | Abgabe ändern                  | Write      | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
+| 19  | Feedback/Bewertung             | Read       | SOAP `getExerciseXML` (nur mit `write`) | ✅   | alle    | `write`         | Pwd       | Dozentenrolle                           | —                 | ❌                       | WebView                  | ❌ für Studierende   |
+| 20  | **Ankündigungen (kursweit)**   | Read       | RSS `feed.php`                          | ✅   | alle    | öffentlich      | keine     | Feed je Objekt aktiv                    | niedrig           | ⚠️ Endpunkt erreichbar   | WebView                  | ⚠️                   |
+| 21  | **Ankündigungen (persönlich)** | Read       | RSS `privfeed.php`                      | ✅   | alle    | eigene          | Feed-Pwd  | `enable_private_feed`                   | niedrig           | ✅ Mapper getestet       | WebView                  | ✅ **MVP**           |
+| 22  | Gelesen-Status setzen          | Write      | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
+| 23  | **Kurstermine/Deadlines**      | Read       | iCal `calendar.php?token=`              | ✅   | alle    | eigene          | Token     | Kalender aktiv                          | **sehr niedrig**³ | ✅ Endpunkt verifiziert  | manueller ICS-Import     | ✅ **MVP**           |
+| 23b | **Vorlesungsplan**             | Read       | iCal StarPlan (**nicht ILIAS**)         | ✅   | —       | öffentlich      | **keine** | keine                                   | **null**          | ✅ 303/303 Events        | manueller ICS-Import     | ✅ **fertig**        |
+| 24  | Termin anlegen                 | Write      | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
+| 25  | Tests: Metadaten               | Read       | SOAP `getTestUserData` u.a.             | ✅   | alle    | `read`          | Pwd       | wie 2                                   | hoch              | ❌                       | **WebView**              | 🏫                   |
+| 26  | Test bearbeiten                | Write      | SOAP `saveQuestionSolution`             | ✅   | alle    | `read`          | Pwd       | wie 2                                   | **sehr hoch**     | ❌                       | **WebView**              | ❌ (bewusst nicht)   |
+| 27  | Testergebnisse                 | Read       | SOAP `getTestResults`                   | ✅   | alle    | 🔴              | Pwd       | wie 2                                   | mittel            | ❌                       | WebView                  | 🏫                   |
+| 28  | Lernfortschritt                | Read       | SOAP `getProgressInfo`                  | ✅   | alle    | 🔴              | Pwd       | wie 2                                   | mittel            | ❌                       | eigene Berechnung        | 🏫                   |
+| 29  | Fortschrittsänderungen         | Read       | SOAP `getLearningProgressChanges`       | ✅   | alle    | 🔴              | Pwd       | wie 2                                   | mittel            | ❌                       | —                        | 🏫                   |
+| 30  | Benachrichtigungen             | Read       | — (nur `hasNewMail`)                    | ✅   | alle    | eigene          | Pwd       | wie 2                                   | niedrig           | ❌                       | privfeed (21)            | ⚠️                   |
+| 31  | Foren                          | Read/Write | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | **WebView**              | ❌ nicht möglich     |
+| 32  | Notizen                        | Read/Write | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
 
 ¹ Dateiinhalte kommen base64-codiert im SOAP-Envelope — für große Dateien ungeeignet.
 ² `getExerciseXML` liefert pro Assignment **keine ID und keinen Titel**, nur Instruction, DueDate
@@ -562,16 +568,88 @@ Damit gibt es für SOAP an der HHN nur drei denkbare Auswege, und alle drei sind
 
 **Option 3 ist die Empfehlung**, bis das Rechenzentrum etwas anderes anbietet.
 
-### 8.3 Was an der HHN ohne Rücksprache sofort geht
+### 8.3 Korrektur: Der Stundenplan der HHN kommt nicht aus ILIAS
+
+Nachgereicht vom Uni-Pilot-Team und anschließend live geprüft: **Die Vorlesungspläne der HHN
+laufen über StarPlan** (`splan.hs-heilbronn.de`, Progotec StarPlan 3.6.3.0), nicht über den
+ILIAS-Kalender. ✅ verifiziert
+
+Das korrigiert eine Annahme, auf der die ursprüngliche Kalender-Empfehlung aufgebaut war.
 
 ```
-Kalender:       https://ilias.hs-heilbronn.de/calendar.php?client_id=iliashhn&token=<token>
+https://splan.hs-heilbronn.de/splan/ical?lan=de&puid=48&type=pg&pgid=31022
+```
+
+| Eigenschaft         | Befund                                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authentifizierung   | **keine** — öffentlich abrufbar, kein Token, kein Login                                                                                                  |
+| Format              | iCal, `Content-Type: text/calendar`, Dateiname `splan__WS_2026_2027_SEB6.ics`                                                                            |
+| Umfang (Stichprobe) | 95 KB, **303 Events** für einen Studiengang und ein Semester                                                                                             |
+| Wiederholungen      | **keine RRULE** — jeder Termin ist ein eigenes `VEVENT`                                                                                                  |
+| Pro Termin          | `SUMMARY` (Kürzel + Modulnummer), `LOCATION` (Raum), `DESCRIPTION` (voller Titel, Lehrende, Kohorte, Hinweise), `DTSTART/DTEND` mit `TZID=Europe/Berlin` |
+| Kalendertypen       | `type=pg` (Studiengang), `room`, `pers`, `conf` — aus `neo.js` ✅                                                                                        |
+
+**Der Feed funktioniert in Uni Pilot heute schon.** Durch die bestehende Pipeline
+(`parseIcs` → `toCalendarEvents`) gingen **alle 303 Events** mit Raum, Modulnummer, Dozent,
+Kohorte und korrekter Einstufung als Vorlesung bzw. Labor. Es ist kein Connector nötig — die URL
+ist eine Kalenderquelle wie jede andere.
+
+Dass das so glatt lief, ist kein Zufall: `icsMapping.ts` wurde offensichtlich bereits gegen genau
+diesen Feed gebaut (die Regex für Modulnummern, die deutschen Kursmuster, der Kommentar „that is
+what a Heilbronn timetable exports").
+
+#### Zwei Fehler, die der Abgleich mit dem echten Feed aufgedeckt hat
+
+Beide betrafen bestehenden, ausgelieferten Code in `icsMapping.ts`:
+
+1. **Kurse ohne Lehrende zeigten die Kohorte als Dozentennamen.** Bei
+   `Weiterführende Programmiersprachen (261426)` steht in der `DESCRIPTION` keine Person, also
+   rutschte `SEB6` an die Stelle, an der ein Name steht.
+2. **Bei zwei Lehrenden auf getrennten Zeilen ging eine Person verloren.** Bei
+   `Funktionale Sicherheit (262197)` wurde nur die erste übernommen, die zweite landete in der Notiz.
+
+Behoben über eine Unterscheidung, die der echte Feed hergibt: **Kohorten-Zeilen enthalten keine
+Kleinbuchstaben** (`SEB6`, `AI7 SPO2, SEB6, SEB7`), Namen von Lehrenden immer. Alles zwischen
+Titel und Kohorte ist damit Lehrpersonal, alles danach Hinweis. Festgeschrieben in
+`src/features/calendar/lib/splanFeed.test.ts` gegen eine anonymisierte Kopie des echten Feeds.
+
+#### Was daraus für die ILIAS-Integration folgt
+
+Der ILIAS-Kalender wird damit **nicht überflüssig, aber anders eingeordnet**:
+
+| Quelle   | Inhalt                                                           | Aufwand                 |
+| -------- | ---------------------------------------------------------------- | ----------------------- |
+| StarPlan | Vorlesungsplan: Termine, Räume, Lehrende, Semester               | **null** (funktioniert) |
+| ILIAS    | Kursbezogene Termine: Abgabefristen, Klausurtermine, Kurs-Events | Token pro Nutzer        |
+
+Die beiden ergänzen sich. Der Stundenplan ist die Grundlast und kommt ohne jede Authentifizierung;
+ILIAS liefert das, was an einzelnen Kursen hängt.
+
+**Damit verschiebt sich die MVP-Priorität:** Story 4 (ILIAS-Kalender) ist nicht mehr der schnellste
+Weg zu einem nützlichen Kalender — StarPlan ist es, und zwar ohne Connector. Der ILIAS-Kalender
+rückt hinter die Ankündigungen.
+
+#### Offen 🔴
+
+- Kann Uni Pilot die Studiengänge auflisten, statt Studierende eine URL einfügen zu lassen? Die
+  `pgid`-Liste steckt vermutlich hinter einem eigenen StarPlan-Endpunkt; nicht weiter verfolgt,
+  weil StarPlan ein eigener Provider und nicht Gegenstand dieser Story ist.
+- Was bedeuten `puid=48` und `pgid=31022` genau, und sind sie über Semester hinweg stabil?
+- Gibt es in StarPlan einen personalisierten Plan (belegte Kurse statt ganzer Studiengang)?
+- StarPlan gehört als eigener Provider recherchiert — siehe Folge-Stories.
+
+### 8.4 Was an der HHN ohne Rücksprache sofort geht
+
+```
+Stundenplan:    https://splan.hs-heilbronn.de/splan/ical?lan=de&type=pg&pgid=<studiengang>
+Kurstermine:    https://ilias.hs-heilbronn.de/calendar.php?client_id=iliashhn&token=<token>
 Ankündigungen:  https://ilias.hs-heilbronn.de/privfeed.php?client_id=iliashhn&user_id=<id>&hash=<hash>
 ```
 
-Studierende erzeugen Token bzw. Feed-Passwort selbst in ILIAS. Beim Kalender ist der Aufwand
-minimal: Der Link ist eine Kalenderquelle wie jede andere und läuft durch das bestehende
-`sourceStore`.
+Der **Stundenplan** braucht gar nichts — kein Token, kein Login — und funktioniert bereits
+(8.3). Für die beiden ILIAS-Kanäle erzeugen Studierende Token bzw. Feed-Passwort selbst in
+ILIAS; auch dort ist der Aufwand gering, weil jeder Link eine Kalender- bzw. Feed-Quelle wie
+jede andere ist und durch das bestehende `sourceStore` läuft.
 
 ---
 
@@ -1037,13 +1115,19 @@ Geheimnis preisgibt.
 
 ### MVP (unabhängig von der Hochschule umsetzbar)
 
-4. **Story: ILIAS-Kalender verbinden.** Geführter Ablauf „Token in ILIAS erzeugen → Link
-   einfügen", danach eine normale Kalenderquelle. Der Großteil existiert bereits.
-5. **Story: ILIAS-Ankündigungen.** Privater Feed, Feed-Passwort im OS-Schlüsselbund,
-   `parseNewsFeed()` steht.
+Reihenfolge nach 8.3 geändert: Der Stundenplan ist der nützlichste Kalender und kostet am
+wenigsten, deshalb steht er vorn — und der ILIAS-Kalender hinter den Ankündigungen.
+
+4. **Story: Stundenplan hinzufügen (StarPlan).** Der Feed funktioniert bereits; die Arbeit ist
+   die Auswahl des Studiengangs statt „URL einfügen". Voraussetzung ist die offene Frage aus 8.3,
+   ob sich `pgid`-Listen abrufen lassen. Bis dahin genügt das vorhandene „Kalender abonnieren".
+5. **Story: ILIAS-Ankündigungen.** Privater Feed, Feed-Passwort und Hash im OS-Schlüsselbund,
+   `fetchAnnouncements()` steht.
 6. **Story: Verbindungsverwaltung.** Eine ILIAS-Instanz konfigurieren (Basis-URL, `client_id`),
-   `ilias-probe.js`-Logik in die App holen, Status und Trennen anbieten.
+   `discoverInstallation()` in die App holen, Status und Trennen anbieten.
 7. **Story: HTTP-Berechtigung einschränken** (11.3). Klein, sicherheitsrelevant, jederzeit machbar.
+8. **Story: ILIAS-Kalender verbinden.** Geführter Ablauf „Token in ILIAS erzeugen → Link
+   einfügen". Ergänzt den Stundenplan um Abgabefristen und Klausurtermine, ersetzt ihn nicht.
 
 ### Nach Antwort der Hochschule
 
@@ -1059,8 +1143,11 @@ Geheimnis preisgibt.
 
 ### Später
 
-12. HISinOne-Recherche als zweiter Provider gegen dieselben Modelle.
-13. Lernfortschritt (`getProgressInfo`), sobald SOAP steht.
+12. **StarPlan-Recherche als eigener Provider.** Der Stundenplan wird bereits gelesen, aber
+    systematisch untersucht ist StarPlan nicht: `pgid`-Listen, Semesterstabilität der IDs, die
+    Kalendertypen `room`/`pers`/`conf`, personalisierte Pläne. Eigene Story, nicht Teil von #14.
+13. HISinOne-Recherche als dritter Provider gegen dieselben Modelle.
+14. Lernfortschritt (`getProgressInfo`), sobald SOAP steht.
 
 ---
 
