@@ -9,3 +9,18 @@ dist-ssr
 src-tauri/target
 src-tauri/gen
 coverage
+
+# Personal Focus media stays local and must never be committed.
+public/focus/**/*.avif
+public/focus/**/*.gif
+public/focus/**/*.jpeg
+public/focus/**/*.jpg
+public/focus/**/*.m4a
+public/focus/**/*.mov
+public/focus/**/*.mp3
+public/focus/**/*.mp4
+public/focus/**/*.ogg
+public/focus/**/*.png
+public/focus/**/*.wav
+public/focus/**/*.webm
+public/focus/**/*.webp

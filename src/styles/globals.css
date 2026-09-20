@@ -54,6 +54,11 @@
   --accent-coral-soft: oklch(0.95 0.04 28);
 
   --focus-ring: #4258f5;
+  --focus-sky: #294b58;
+  --focus-horizon: #6b8c8b;
+  --focus-foreground: #f4f8f5;
+  --focus-button-ink: #264b55;
+  --focus-image-shade: #14273588;
   --overlay: oklch(0.32 0.03 255 / 0.32);
   --text-danger: oklch(0.46 0.17 28);
   --special-event-fallback: #184e42;
@@ -168,6 +173,9 @@
 }
 
 [data-theme='dark'] {
+  --focus-sky: #182d39;
+  --focus-horizon: #45636a;
+  --focus-image-shade: #09111a99;
   --app-background: oklch(0.18 0.012 255);
   --surface: oklch(0.22 0.012 255);
   --surface-secondary: oklch(0.26 0.014 255);
@@ -324,6 +332,411 @@
 }
 
 @layer components {
+  .focus-scene {
+    --focus-panel-duration: 320ms;
+    --focus-panel-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --focus-bg-deep: var(--focus-sky);
+    --focus-surface: color-mix(in srgb, var(--focus-foreground) 8%, var(--focus-bg-deep));
+    --focus-border: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+    --focus-text: var(--focus-foreground);
+    --focus-muted: color-mix(in srgb, var(--focus-foreground) 45%, transparent);
+    --focus-accent: var(--accent-primary);
+    --focus-accent-subtle: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+    --focus-glass: color-mix(in srgb, var(--focus-foreground) 12%, transparent);
+    --focus-glass-hover: color-mix(in srgb, var(--focus-foreground) 18%, transparent);
+    --focus-glass-active: color-mix(in srgb, var(--focus-foreground) 24%, transparent);
+    --focus-glass-border: color-mix(in srgb, var(--focus-foreground) 28%, transparent);
+    --focus-glass-shadow: color-mix(in srgb, var(--focus-bg-deep) 24%, transparent);
+    background:
+      radial-gradient(
+        circle at 50% 50%,
+        color-mix(in srgb, var(--focus-accent) 6%, transparent),
+        transparent 48%
+      ),
+      linear-gradient(
+        145deg,
+        var(--focus-bg-deep),
+        color-mix(in srgb, var(--focus-bg-deep) 88%, var(--focus-horizon))
+      );
+    color: var(--focus-text);
+  }
+  .focus-video-backdrop {
+    background:
+      radial-gradient(ellipse at 75% 8%, var(--focus-horizon), transparent 65%), var(--focus-sky);
+  }
+  .focus-scene.focus-scene-video {
+    background: linear-gradient(var(--focus-image-shade), var(--focus-image-shade));
+  }
+  .focus-clock {
+    backface-visibility: hidden;
+    filter: blur(0);
+    max-width: min(300px, 44dvh);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+    transition:
+      filter var(--focus-panel-duration) var(--focus-panel-ease),
+      opacity var(--focus-panel-duration) var(--focus-panel-ease);
+    will-change: filter;
+  }
+  .focus-stage {
+    backface-visibility: hidden;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition: opacity var(--focus-panel-duration) var(--focus-panel-ease);
+    will-change: opacity;
+  }
+  .focus-stage-obscured {
+    opacity: 0.48;
+  }
+  .focus-stage-obscured .focus-clock {
+    filter: blur(6px);
+  }
+  .focus-stage-settings-obscured {
+    opacity: 0.12;
+  }
+  .focus-stage-settings-obscured .focus-clock {
+    filter: blur(12px);
+  }
+  .focus-control {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 120ms linear,
+      visibility 0s;
+  }
+  .focus-controls-fading .focus-control {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 5s linear,
+      visibility 0s linear 5s;
+  }
+  .focus-scene :focus-visible {
+    outline-color: var(--focus-foreground);
+  }
+  .focus-scene [role='dialog']:focus-visible,
+  .focus-scene [role='dialog'] :focus-visible {
+    outline-color: var(--focus-ring);
+  }
+  .focus-scene-button {
+    border: 1px solid var(--focus-glass-border);
+    background: var(--focus-glass);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 32%, transparent),
+      0 5px 18px -7px var(--focus-glass-shadow);
+    color: color-mix(in srgb, var(--focus-foreground) 78%, transparent);
+    backdrop-filter: blur(14px) saturate(135%);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
+  }
+  .focus-scene-button:hover {
+    border-color: color-mix(in srgb, var(--focus-foreground) 38%, transparent);
+    background: var(--focus-glass-hover);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 42%, transparent),
+      0 7px 22px -7px var(--focus-glass-shadow);
+    color: var(--focus-text);
+  }
+  .focus-scene-button-active,
+  .focus-scene-button-active:hover {
+    background: var(--focus-glass-active);
+    border-color: color-mix(in srgb, var(--focus-foreground) 48%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 48%, transparent),
+      0 7px 22px -7px var(--focus-glass-shadow);
+    color: var(--focus-foreground);
+  }
+  .focus-scene-button-active:focus-visible {
+    outline-color: color-mix(in srgb, var(--focus-foreground) 70%, transparent);
+  }
+  .focus-tool {
+    transition:
+      opacity 160ms ease,
+      transform 180ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      color 160ms ease,
+      visibility 0s linear;
+  }
+  .focus-tool-hidden {
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+    transition:
+      opacity 160ms ease,
+      transform 180ms ease,
+      visibility 0s linear 180ms;
+  }
+  .focus-transport-button {
+    border: 1px solid var(--focus-glass-border);
+    background: var(--focus-glass);
+    color: color-mix(in srgb, var(--focus-foreground) 78%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 30%, transparent),
+      0 6px 18px -9px var(--focus-glass-shadow);
+    backdrop-filter: blur(14px) saturate(135%);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
+    transition:
+      opacity 120ms linear,
+      transform 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      color 160ms ease,
+      visibility 0s;
+  }
+  .focus-transport-button:hover {
+    border-color: color-mix(in srgb, var(--focus-foreground) 40%, transparent);
+    background: var(--focus-glass-hover);
+    color: var(--focus-text);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 40%, transparent),
+      0 8px 22px -10px var(--focus-glass-shadow);
+    transform: translateY(-1px);
+  }
+  .focus-transport-main {
+    border-color: color-mix(in srgb, var(--focus-foreground) 34%, transparent);
+    background: var(--focus-glass-active);
+    color: var(--focus-text);
+  }
+  .focus-transport-main:hover {
+    background: color-mix(in srgb, var(--focus-foreground) 30%, transparent);
+  }
+  .focus-duration-overlay {
+    background: color-mix(in srgb, var(--focus-sky) 16%, transparent);
+    backdrop-filter: blur(5px) saturate(105%) brightness(0.82);
+    -webkit-backdrop-filter: blur(5px) saturate(105%) brightness(0.82);
+  }
+  .focus-duration-positioner {
+    pointer-events: none;
+  }
+  .focus-duration-dialog {
+    pointer-events: auto;
+    border: 1px solid color-mix(in srgb, var(--focus-foreground) 44%, transparent);
+    background:
+      radial-gradient(
+        circle at 18% 0%,
+        color-mix(in srgb, var(--focus-foreground) 22%, transparent),
+        transparent 44%
+      ),
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--focus-foreground) 24%, transparent),
+        color-mix(in srgb, var(--focus-foreground) 13%, transparent)
+      );
+    color: var(--focus-foreground);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 42%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--focus-sky) 18%, transparent),
+      0 24px 60px -24px color-mix(in srgb, var(--focus-sky) 70%, transparent);
+    backdrop-filter: blur(24px) saturate(145%);
+    -webkit-backdrop-filter: blur(24px) saturate(145%);
+  }
+  .focus-duration-label {
+    color: color-mix(in srgb, var(--focus-foreground) 76%, transparent);
+  }
+  .focus-duration-note {
+    color: color-mix(in srgb, var(--focus-foreground) 66%, transparent);
+  }
+  .focus-duration-close,
+  .focus-duration-input {
+    border: 1px solid color-mix(in srgb, var(--focus-foreground) 28%, transparent);
+    background: color-mix(in srgb, var(--focus-foreground) 9%, transparent);
+    color: var(--focus-foreground);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 18%, transparent);
+  }
+  .focus-duration-close:hover,
+  .focus-duration-input:hover {
+    border-color: color-mix(in srgb, var(--focus-foreground) 38%, transparent);
+    background: color-mix(in srgb, var(--focus-foreground) 14%, transparent);
+  }
+  .focus-duration-input {
+    appearance: textfield;
+    caret-color: var(--focus-foreground);
+  }
+  .focus-duration-input::-webkit-inner-spin-button,
+  .focus-duration-input::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+  }
+  .focus-duration-input:focus {
+    border-color: color-mix(in srgb, var(--focus-foreground) 58%, transparent);
+    background: color-mix(in srgb, var(--focus-foreground) 16%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 24%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--focus-foreground) 8%, transparent);
+    outline: none;
+  }
+  .focus-duration-save {
+    border: 1px solid color-mix(in srgb, var(--focus-foreground) 58%, transparent);
+    background: color-mix(in srgb, var(--focus-foreground) 90%, transparent);
+    color: var(--focus-button-ink);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 78%, transparent),
+      0 10px 26px -16px color-mix(in srgb, var(--focus-sky) 70%, transparent);
+    backdrop-filter: blur(12px) saturate(120%);
+    -webkit-backdrop-filter: blur(12px) saturate(120%);
+    transition:
+      background-color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+  .focus-duration-save:hover:not(:disabled) {
+    background: var(--focus-foreground);
+    box-shadow:
+      inset 0 1px 0 var(--focus-foreground),
+      0 12px 28px -16px color-mix(in srgb, var(--focus-sky) 76%, transparent);
+    transform: translateY(-1px);
+  }
+  .focus-side-panel-layer {
+    --focus-side-panel-surface: color-mix(in srgb, var(--focus-foreground) 14%, transparent);
+    --focus-side-panel-card: color-mix(in srgb, var(--focus-foreground) 9%, transparent);
+    --focus-side-panel-card-strong: color-mix(in srgb, var(--focus-foreground) 16%, transparent);
+    --focus-side-panel-border: color-mix(in srgb, var(--focus-foreground) 26%, transparent);
+    --focus-side-panel-shadow: color-mix(in srgb, var(--focus-bg-deep) 42%, transparent);
+    --focus-side-panel-text: var(--focus-text);
+    --focus-side-panel-muted: color-mix(in srgb, var(--focus-foreground) 68%, transparent);
+    --focus-side-panel-accent: color-mix(in srgb, var(--focus-foreground) 88%, transparent);
+    pointer-events: none;
+    visibility: hidden;
+    transition: visibility 0s linear var(--focus-panel-duration);
+  }
+  .focus-side-panel-layer[data-open='true'] {
+    pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  .focus-side-panel-backdrop {
+    border: 0;
+    background: color-mix(in srgb, var(--focus-bg-deep) 18%, transparent);
+    opacity: 0;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    transition: opacity var(--focus-panel-duration) var(--focus-panel-ease);
+  }
+  .focus-side-panel-layer[data-open='true'] .focus-side-panel-backdrop {
+    opacity: 1;
+  }
+  .focus-side-panel {
+    contain: layout paint;
+    border-left: 1px solid color-mix(in srgb, var(--focus-side-panel-text) 32%, transparent);
+    background: var(--focus-side-panel-surface);
+    color: var(--focus-side-panel-text);
+    box-shadow:
+      inset 1px 0 0 color-mix(in srgb, var(--focus-side-panel-text) 14%, transparent),
+      -24px 0 64px -24px var(--focus-side-panel-shadow);
+    backdrop-filter: blur(30px) saturate(130%);
+    -webkit-backdrop-filter: blur(30px) saturate(130%);
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+    transition:
+      transform var(--focus-panel-duration) var(--focus-panel-ease),
+      opacity var(--focus-panel-duration) var(--focus-panel-ease);
+    will-change: transform, opacity;
+  }
+  .focus-side-panel-layer[data-open='true'] .focus-side-panel {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  .focus-side-panel-close,
+  .focus-stat-card {
+    border: 1px solid var(--focus-side-panel-border);
+    background: var(--focus-side-panel-card);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 16%, transparent);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+  }
+  .focus-side-panel-close:hover,
+  .focus-side-panel-item:hover {
+    background: var(--focus-side-panel-card-strong);
+  }
+  .focus-side-panel-item {
+    border: 1px solid var(--focus-side-panel-border);
+    background: var(--focus-side-panel-card);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 14%, transparent);
+  }
+  .focus-media-section + .focus-media-section {
+    border-top: 1px solid var(--focus-side-panel-border);
+    padding-top: 1.25rem;
+  }
+  .focus-media-list {
+    max-height: 13rem;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .focus-media-row {
+    min-height: 4rem;
+    border: 1px solid var(--focus-side-panel-border);
+    background: var(--focus-side-panel-card);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 14%, transparent);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    transition:
+      border-color 150ms ease,
+      background 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .focus-media-row:hover {
+    background: var(--focus-side-panel-card-strong);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 22%, transparent),
+      0 8px 20px -14px var(--focus-side-panel-shadow);
+  }
+  .focus-media-row-selected {
+    border-color: var(--focus-side-panel-accent);
+    background: var(--focus-side-panel-card-strong);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--focus-side-panel-accent) 34%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 28%, transparent),
+      0 8px 20px -14px var(--focus-side-panel-shadow);
+  }
+  .focus-media-empty {
+    border: 1px dashed var(--focus-side-panel-border);
+    background: color-mix(in srgb, var(--focus-foreground) 5%, transparent);
+    backdrop-filter: blur(8px) saturate(115%);
+    -webkit-backdrop-filter: blur(8px) saturate(115%);
+  }
+  .focus-media-add {
+    border: 1px solid var(--focus-side-panel-border);
+    background: var(--focus-side-panel-card);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--focus-foreground) 16%, transparent);
+    color: var(--focus-side-panel-accent);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+  }
+  .focus-media-add:hover {
+    background: var(--focus-side-panel-card-strong);
+  }
+  .focus-side-panel-thumbnail {
+    background: var(--focus-side-panel-card-strong);
+  }
+  .focus-scene .focus-side-panel-layer :focus-visible {
+    outline-color: var(--focus-side-panel-accent);
+  }
+  .focus-week-bar-empty,
+  .focus-habit-empty {
+    border: 1px solid var(--focus-side-panel-border);
+    background: var(--focus-side-panel-card);
+  }
+  .focus-week-bar-active {
+    background: color-mix(in srgb, var(--focus-side-panel-accent) 48%, transparent);
+  }
+  .focus-week-bar-today {
+    background: var(--focus-side-panel-accent);
+  }
+  .focus-habit-low {
+    background: color-mix(in srgb, var(--focus-side-panel-accent) 22%, transparent);
+  }
+  .focus-habit-medium {
+    background: color-mix(in srgb, var(--focus-side-panel-accent) 46%, transparent);
+  }
+  .focus-habit-high {
+    background: color-mix(in srgb, var(--focus-side-panel-accent) 76%, transparent);
+  }
+  .focus-habit-today {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--focus-side-panel-accent) 60%, transparent);
+  }
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
