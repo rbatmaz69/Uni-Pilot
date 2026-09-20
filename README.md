@@ -104,7 +104,16 @@ src/
   types/        Gemeinsame Typen
 src-tauri/      Tauri-2-Desktop-Hülle
 design/         Design-Referenz (Mockup)
+docs/           Technische Dokumentation
+scripts/        Eigenständige Node-Skripte
 ```
+
+### Dokumentation
+
+| Dokument                                                                                             | Inhalt                                                            |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`docs/reminders.md`](docs/reminders.md)                                                             | Kalender-Erinnerungen                                             |
+| [`docs/integrations/ilias-integration-research.md`](docs/integrations/ilias-integration-research.md) | ILIAS: Schnittstellen-Recherche, Feature-Matrix, Architektur, PoC |
 
 ### Design-System
 

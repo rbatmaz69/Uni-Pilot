@@ -50,11 +50,14 @@ src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
                   calendar/  {components,store,lib}/ + index.ts
                   dashboard/ {components,lib}/ + index.ts
                   reminders/ {components,store,lib}/
+                  integrations/ lib/ — Prototyp, siehe docs/integrations/
 src/pages/        Eine schlanke Komponente pro Route
 src/lib/          navigation.ts (Quelle der Wahrheit), date.ts, ics.ts, tone.ts, utils.ts
 src/store/        Zustand-Store, nur UI-State (App-weit, nicht feature-spezifisch)
 src/test/         setup.ts, render.tsx
 src-tauri/        Desktop-Hülle (Rust)
+docs/             Technische Dokumentation, u.a. integrations/
+scripts/          Eigenständige Node-Skripte, nicht Teil des Bundles
 ```
 
 ## Release

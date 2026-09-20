@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Export of ILIAS course 5584 of installation 12895.-->
+<Course exportVersion="8.0" id="il_12895_crs_5584" showMembers="No">
+  <MetaData>
+    <General Structure="Hierarchical">
+      <Identifier Catalog="ILIAS" Entry="il__crs_5584"/>
+      <Title Language="de">
+        Ordner
+      </Title>
+      <Language Language="de"/>
+      <Description Language="de">
+        Beispiel(e) für die Verwendung des Objekttyps &quot;Ordner&quot;
+      </Description>
+      <Keyword Language="de">
+      </Keyword>
+    </General>
+  </MetaData>
+  <AdvancedMetaData>
+  </AdvancedMetaData>
+  <Settings>
+    <Availability>
+      <Unlimited/>
+    </Availability>
+    <Syllabus>
+    </Syllabus>
+    <ImportantInformation>
+    </ImportantInformation>
+    <TargetGroup/>
+    <Contact>
+      <Name>
+      </Name>
+      <Responsibility>
+      </Responsibility>
+      <Phone>
+      </Phone>
+      <Email>
+      </Email>
+      <Consultation>
+      </Consultation>
+    </Contact>
+    <Registration registrationType="Direct" maxMembers="0" notification="Yes" waitingList="Yes">
+      <Unlimited/>
+    </Registration>
+    <Period withTime="1">
+      <Start/>
+      <End/>
+    </Period>
+    <WaitingListAutoFill>
+      0
+    </WaitingListAutoFill>
+    <CancellationEnd/>
+    <MinMembers>
+      0
+    </MinMembers>
+    <ViewMode>
+      0
+    </ViewMode>
+    <AboStatus>
+      1
+    </AboStatus>
+    <TutorialSupportBlock active="0"/>
+    <SessionLimit active="0" previous="-1" next="-1"/>
+    <WelcomeMail status="0"/>
+    <StatusDetermination>
+      2
+    </StatusDetermination>
+    <MailToMembersType>
+      2
+    </MailToMembersType>
+    <CourseMap enabled="0" latitude="" longitude="" location_zoom="0"/>
+  </Settings>
+  <Sort direction="ASC" type="Title"/>
+  <ContainerSettings>
+    <ContainerSetting id="cont_activation_calendar">
+    </ContainerSetting>
+    <ContainerSetting id="cont_auto_rate_new_obj">
+    </ContainerSetting>
+    <ContainerSetting id="cont_badges">
+    </ContainerSetting>
+    <ContainerSetting id="cont_bookings">
+    </ContainerSetting>
+    <ContainerSetting id="cont_custom_md">
+    </ContainerSetting>
+    <ContainerSetting id="cont_show_calendar">
+    </ContainerSetting>
+    <ContainerSetting id="cont_show_news">
+      0
+    </ContainerSetting>
+    <ContainerSetting id="cont_skills">
+    </ContainerSetting>
+    <ContainerSetting id="cont_tag_cloud">
+    </ContainerSetting>
+    <ContainerSetting id="cont_use_news">
+      0
+    </ContainerSetting>
+    <ContainerSetting id="hide_header_icon_and_title">
+    </ContainerSetting>
+    <ContainerSetting id="hide_top_actions">
+      1
+    </ContainerSetting>
+    <ContainerSetting id="list_presentation">
+    </ContainerSetting>
+    <ContainerSetting id="mail_external_prefix">
+    </ContainerSetting>
+    <ContainerSetting id="news_timeline">
+      0
+    </ContainerSetting>
+    <ContainerSetting id="news_timeline_incl_auto">
+      0
+    </ContainerSetting>
+    <ContainerSetting id="news_timeline_landing_page">
+      0
+    </ContainerSetting>
+    <ContainerSetting id="rep_breacrumb">
+    </ContainerSetting>
+    <ContainerSetting id="tile_size">
+      0
+    </ContainerSetting>
+  </ContainerSettings>
+</Course>
