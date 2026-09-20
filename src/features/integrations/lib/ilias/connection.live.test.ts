@@ -12,7 +12,8 @@
  *
  *   ILIAS_LIVE_CAL_TOKEN          iCal subscription (ILIAS: Calendar -> Subscribe)
  *   ILIAS_LIVE_FEED_USERNAME      private news feed (ILIAS: Profile -> News feed)
- *   ILIAS_LIVE_FEED_USER_ID
+ *   ILIAS_LIVE_FEED_USER_ID       from the generated feed URL
+ *   ILIAS_LIVE_FEED_HASH          from the generated feed URL — not the password
  *   ILIAS_LIVE_FEED_PASSWORD
  *   ILIAS_LIVE_USERNAME           SOAP read path
  *   ILIAS_LIVE_PASSWORD
@@ -139,6 +140,7 @@ describe.skipIf(!hasInstallation)('a real ILIAS installation', () => {
         clientId!,
         {
           userId: env.ILIAS_LIVE_FEED_USER_ID!,
+          hash: env.ILIAS_LIVE_FEED_HASH!,
           username: env.ILIAS_LIVE_FEED_USERNAME!,
           feedPassword: env.ILIAS_LIVE_FEED_PASSWORD!,
         },

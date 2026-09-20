@@ -463,19 +463,42 @@ export async function fetchCalendarFeed(
 }
 
 /**
+ * What `privfeed.php` needs. Three separate values, which is easy to get wrong:
+ * the URL carries the user id and a feed *hash*, while HTTP Basic wants the
+ * ILIAS login and the feed *password*. The hash and the password are different
+ * secrets — ILIAS checks the password in `privfeed.php` and then compares the
+ * hash inside `ilUserFeedWriter`. Passing the password as the hash
+ * authenticates fine and then yields an empty feed, silently.
+ *
+ * All of it comes out of one generated URL plus the profile page, so callers
+ * should read them off ILIAS rather than assemble them.
+ */
+export interface IliasFeedAccess {
+  /** From the generated feed URL. */
+  userId: string;
+  /** From the generated feed URL. Not the password. */
+  hash: string;
+  /** The ILIAS login name. */
+  username: string;
+  /** The feed password set in the ILIAS profile — not the university password. */
+  feedPassword: string;
+}
+
+/**
  * Fetches the personal news feed.
  *
- * Authorised with HTTP Basic against the feed password a student sets in their
- * ILIAS profile — deliberately not their university password.
+ * SOAP has no call for news, so this is the official route to announcements.
+ * It is authorised entirely by secrets the student creates for it, which is
+ * why it is usable where SOAP is not.
  */
 export async function fetchAnnouncements(
   installation: IliasInstallation,
   clientId: string,
-  feed: { userId: string; username: string; feedPassword: string },
+  feed: IliasFeedAccess,
   transport: Transport,
 ): Promise<ExternalAnnouncement[]> {
   const response = await transport({
-    url: privateNewsFeedUrl(installation.baseUrl, clientId, feed.userId, feed.feedPassword),
+    url: privateNewsFeedUrl(installation.baseUrl, clientId, feed.userId, feed.hash),
     headers: {
       Accept: 'application/rss+xml',
       Authorization: basicAuthHeader(feed.username, feed.feedPassword),
@@ -490,7 +513,24 @@ export async function fetchAnnouncements(
   }
   if (response.status !== 200) throw fromHttpStatus(response.status);
 
-  return parseNewsFeed(response.text, { origin: originOf(installation) });
+  const announcements = parseNewsFeed(response.text, { origin: originOf(installation) });
+
+  // A wrong hash, or private feeds switched off, produces a feed ILIAS never
+  // filled in — no items and no channel title. A genuinely quiet week has a
+  // title and no items, so the two are worth telling apart: one is something
+  // to fix, the other is nothing at all.
+  if (announcements.length === 0 && !hasChannelTitle(response.text)) {
+    throw new IliasError(
+      'credentials-rejected',
+      'ILIAS returned an empty feed. Check the feed hash in the subscription link, and that your ILIAS allows private news feeds.',
+    );
+  }
+  return announcements;
+}
+
+function hasChannelTitle(rss: string): boolean {
+  const title = /<channel>[\s\S]*?<title>([\s\S]*?)<\/title>/.exec(rss)?.[1];
+  return (title ?? '').trim() !== '';
 }
 
 // --- plumbing -------------------------------------------------------------

@@ -390,7 +390,12 @@ describe('fetchCalendarFeed', () => {
 });
 
 describe('fetchAnnouncements', () => {
-  const feed = { userId: '4711', username: 'student', feedPassword: 'feed-secret' };
+  const feed = {
+    userId: '4711',
+    hash: 'feed-hash-from-the-url',
+    username: 'student',
+    feedPassword: 'feed-secret',
+  };
 
   it('reads the feed and maps its items', async () => {
     const transport = transportOf(() => ok(feedRss));
@@ -401,12 +406,37 @@ describe('fetchAnnouncements', () => {
     expect(announcements[0]?.title).toBe('Vorlesung am Freitag fällt aus');
   });
 
-  it('authenticates with Basic against the feed password', async () => {
+  /**
+   * ILIAS checks the password in privfeed.php and then compares the hash inside
+   * ilUserFeedWriter. They are different secrets, and sending the password as
+   * the hash authenticates fine before yielding an empty feed.
+   */
+  it('sends the hash in the URL and the feed password over Basic', async () => {
     const transport = transportOf(() => ok(feedRss));
     await fetchAnnouncements(installed, 'iliashhn', feed, transport);
 
+    expect(transport.calls[0]?.url).toBe(
+      'https://demo.ilias.de/privfeed.php?client_id=iliashhn&user_id=4711&hash=feed-hash-from-the-url',
+    );
     expect(transport.calls[0]?.headers?.Authorization).toBe(`Basic ${btoa('student:feed-secret')}`);
-    expect(transport.calls[0]?.url).toContain('privfeed.php?client_id=iliashhn&user_id=4711');
+  });
+
+  it('tells a feed ILIAS never filled in apart from a quiet week', async () => {
+    // No items and no channel title: the writer bailed out, which is what a
+    // wrong hash or private feeds being switched off looks like.
+    const unfilled = '<rss version="2.0"><channel><title></title></channel></rss>';
+    const transport = transportOf(() => ok(unfilled));
+
+    await expect(fetchAnnouncements(installed, 'iliashhn', feed, transport)).rejects.toThrowError(
+      /feed hash/,
+    );
+  });
+
+  it('accepts a titled feed with nothing in it as a quiet week', async () => {
+    const quiet = '<rss version="2.0"><channel><title>ILIAS HHN</title></channel></rss>';
+    const transport = transportOf(() => ok(quiet));
+
+    await expect(fetchAnnouncements(installed, 'iliashhn', feed, transport)).resolves.toEqual([]);
   });
 
   it('names the feed password when ILIAS rejects it', async () => {

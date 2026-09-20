@@ -55,11 +55,17 @@ That much needs no secret and confirms the release, the client id and whether
 SOAP is reachable. Each further channel switches itself on when its own
 credentials are present:
 
-| Variable                                                        | Turns on          | Where it comes from          |
-| --------------------------------------------------------------- | ----------------- | ---------------------------- |
-| `ILIAS_LIVE_CAL_TOKEN`                                          | iCal subscription | ILIAS → Calendar → Subscribe |
-| `ILIAS_LIVE_FEED_USERNAME` + `_FEED_USER_ID` + `_FEED_PASSWORD` | private news feed | ILIAS → Profile → News feed  |
-| `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`                   | SOAP read path    | the ILIAS account            |
+| Variable                                                                       | Turns on          | Where it comes from          |
+| ------------------------------------------------------------------------------ | ----------------- | ---------------------------- |
+| `ILIAS_LIVE_CAL_TOKEN`                                                         | iCal subscription | ILIAS → Calendar → Subscribe |
+| `ILIAS_LIVE_FEED_USERNAME` + `_FEED_USER_ID` + `_FEED_HASH` + `_FEED_PASSWORD` | private news feed | ILIAS → Profile → News feed  |
+| `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`                                  | SOAP read path    | the ILIAS account            |
+
+The feed needs four values because ILIAS uses two different secrets for it:
+the generated URL carries `user_id` and a feed **hash**, while HTTP Basic
+wants the ILIAS login and the feed **password**. Sending the password as the
+hash authenticates fine and then returns an empty feed, so the connector
+rejects an unfilled feed rather than reporting "no announcements".
 
 Nothing is printed that could leak: tokens, passwords and session ids never
 reach the output. Keep the values out of shell history — a gitignored `.env`

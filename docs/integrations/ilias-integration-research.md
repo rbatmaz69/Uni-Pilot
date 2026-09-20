@@ -940,14 +940,21 @@ vollständig aus dem Login-Seiten-Fallback, weil SOAP dort nichts beantwortet.
 > und `login.php` antwortet an der HHN mit `302`. Damit blieben Version und `client_id`
 > unbekannt. Behoben durch ein `redirect`-Feld im Transport. Genau dafür existiert dieser Test.
 
+> Ein zweiter Fehler kam beim Gegenlesen des ILIAS-Quelltextes heraus: `privfeed.php` prüft das
+> Feed-Passwort, `ilUserFeedWriter` vergleicht danach zusätzlich einen **Feed-Hash** aus der URL.
+> Das sind zwei verschiedene Geheimnisse. Die erste Fassung schickte das Passwort als Hash — die
+> Basic-Authentifizierung wäre durchgegangen und der Feed dann **stillschweigend leer** geblieben.
+> Der Connector unterscheidet jetzt einen nie gefüllten Feed (kein Kanaltitel) von einer ruhigen
+> Woche und meldet den Fehlerfall, statt „keine Ankündigungen" zu behaupten.
+
 #### Noch nicht verifiziert 🔴
 
-| Kanal             | Was fehlt                                            | Variable zum Einschalten                               |
-| ----------------- | ---------------------------------------------------- | ------------------------------------------------------ |
-| iCal-Abo          | Abruf mit echtem Token                               | `ILIAS_LIVE_CAL_TOKEN`                                 |
-| Privater Feed     | Abruf mit echtem Feed-Passwort                       | `ILIAS_LIVE_FEED_USERNAME`/`_USER_ID`/`_FEED_PASSWORD` |
-| SOAP-Lesepfad     | Login, Kursliste, Kursinhalte                        | `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`          |
-| Desktop-Transport | Ob `tauri-plugin-http` `redirect: 'manual'` beachtet | nur in einem gepackten Build prüfbar                   |
+| Kanal             | Was fehlt                                            | Variable zum Einschalten                                  |
+| ----------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| iCal-Abo          | Abruf mit echtem Token                               | `ILIAS_LIVE_CAL_TOKEN`                                    |
+| Privater Feed     | Abruf mit echtem Hash und Feed-Passwort              | `ILIAS_LIVE_FEED_USERNAME`/`_USER_ID`/`_HASH`/`_PASSWORD` |
+| SOAP-Lesepfad     | Login, Kursliste, Kursinhalte                        | `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`             |
+| Desktop-Transport | Ob `tauri-plugin-http` `redirect: 'manual'` beachtet | nur in einem gepackten Build prüfbar                      |
 
 Die drei ersten Zeilen sind in Minuten zu schließen — die Werte erzeugt man sich in ILIAS selbst
 (Kalender → Abonnieren, Profil → Nachrichten-Feed). Es wird dabei nichts geloggt, was ein
