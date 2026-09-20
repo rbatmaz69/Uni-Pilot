@@ -7,12 +7,14 @@ import { useEventStore } from '@/features/calendar/store/eventStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
+import { useFocusStore } from '@/features/focus/store/focusStore';
 
 // Tests provide their own calendar fixtures, including on the first run.
 beforeEach(() => useEventStore.setState({ events: [] }));
 
 afterEach(() => {
   cleanup();
+  useFocusStore.setState(useFocusStore.getInitialState(), true);
   localStorage.clear();
   useEventStore.setState({ events: [] });
   useReminderStore.setState({

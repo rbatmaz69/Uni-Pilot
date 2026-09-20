@@ -1,6 +1,5 @@
-import { Page } from '@/components/layout';
-import { NAV_ITEMS } from '@/lib/navigation';
+import { FocusWorkspace } from '@/features/focus/components/FocusWorkspace';
 
 export function FocusPage() {
-  return <Page item={NAV_ITEMS.focus} />;
+  return <FocusWorkspace />;
 }

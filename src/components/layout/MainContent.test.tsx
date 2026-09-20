@@ -22,4 +22,11 @@ describe('MainContent', () => {
 
     expect(column()).toHaveClass('max-w-none');
   });
+
+  it('keeps the focus workspace at window height without page scrolling', () => {
+    renderApp(NAV_ITEMS.focus.path);
+
+    expect(screen.getByRole('main')).toHaveClass('overflow-hidden');
+    expect(column()).toHaveClass('h-full', 'min-h-0');
+  });
 });
