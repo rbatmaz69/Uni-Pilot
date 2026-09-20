@@ -42,6 +42,32 @@ export {
 } from './lib/ilias/errors';
 
 export { buildEnvelope, buildResultSet, readEnvelope } from './lib/ilias/envelope';
+
+export {
+  closeSession,
+  discoverInstallation,
+  fetchAnnouncements,
+  fetchAssignments,
+  fetchCalendarFeed,
+  fetchContents,
+  fetchCourse,
+  fetchCourses,
+  openSession,
+  originOf,
+  verifySession,
+  type IliasCredentials,
+  type IliasInstallation,
+  type IliasSession,
+  type SoapAvailability,
+} from './lib/ilias/connection';
+
+export {
+  basicAuthHeader,
+  httpTransport,
+  type HttpRequest,
+  type HttpResponse,
+  type Transport,
+} from './lib/ilias/transport';
 export { parseCourse, parseCourseList } from './lib/ilias/parseCourses';
 export { isReadable, parseTreeChildren } from './lib/ilias/parseTree';
 export { parseExercise } from './lib/ilias/parseExercise';

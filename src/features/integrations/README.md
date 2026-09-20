@@ -42,10 +42,28 @@ tests should not have to change.
 Never commit a fixture holding a real person's name, login or course
 enrolment.
 
-## Running the mappers against a live installation
+## Checking it against a real installation
+
+`connection.live.test.ts` runs the connector against a live server. It is
+skipped unless the environment names one, so `npm run check` stays offline.
 
 ```bash
-node scripts/ilias-probe.js https://ilias.hs-heilbronn.de
+ILIAS_LIVE_BASE_URL=https://ilias.hs-heilbronn.de npm run test:ilias
 ```
 
-See [`scripts/README.md`](../../../scripts/README.md).
+That much needs no secret and confirms the release, the client id and whether
+SOAP is reachable. Each further channel switches itself on when its own
+credentials are present:
+
+| Variable                                                        | Turns on          | Where it comes from          |
+| --------------------------------------------------------------- | ----------------- | ---------------------------- |
+| `ILIAS_LIVE_CAL_TOKEN`                                          | iCal subscription | ILIAS → Calendar → Subscribe |
+| `ILIAS_LIVE_FEED_USERNAME` + `_FEED_USER_ID` + `_FEED_PASSWORD` | private news feed | ILIAS → Profile → News feed  |
+| `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`                   | SOAP read path    | the ILIAS account            |
+
+Nothing is printed that could leak: tokens, passwords and session ids never
+reach the output. Keep the values out of shell history — a gitignored `.env`
+you source is enough.
+
+For grading an installation without running the test suite, there is also
+`node scripts/ilias-probe.js <url>`; see [`scripts/README.md`](../../../scripts/README.md).

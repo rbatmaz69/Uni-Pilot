@@ -875,26 +875,86 @@ Bericht — ein fehlgeschlagener Schritt ist ein Ergebnis.
 
 ### 14.3 Implementierter Code
 
-| Artefakt                                           | Umfang                                         |
-| -------------------------------------------------- | ---------------------------------------------- |
-| `scripts/ilias-probe.js`                           | Hochschulunabhängige Instanzanalyse ohne Login |
-| `scripts/ilias-soap-poc.js`                        | Vertikaler SOAP-Durchstich inkl. Fehlerfälle   |
-| `src/features/integrations/lib/types.ts`           | Provider-agnostische Lesemodelle               |
-| `src/features/integrations/lib/ilias/endpoints.ts` | Versionsabhängige URL-Bildung                  |
-| `src/features/integrations/lib/ilias/errors.ts`    | 11 typisierte Fehlerarten, handlungsleitend    |
-| `src/features/integrations/lib/ilias/envelope.ts`  | SOAP-Envelope bauen und auspacken              |
-| `src/features/integrations/lib/ilias/parse*.ts`    | Vier reine Mapper: Kurse, Baum, Übungen, Feed  |
-| **Tests**                                          | **86, alle grün** — Teil von `npm run check`   |
+| Artefakt                                 | Umfang                                                        |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| `scripts/ilias-probe.js`                 | Hochschulunabhängige Instanzanalyse ohne Login                |
+| `scripts/ilias-soap-poc.js`              | Vertikaler SOAP-Durchstich inkl. Fehlerfälle                  |
+| `src/features/integrations/lib/types.ts` | Provider-agnostische Lesemodelle                              |
+| `…/lib/ilias/connection.ts`              | **Die Verbindungsschicht**: Discovery, Session, Lesezugriffe  |
+| `…/lib/ilias/transport.ts`               | HTTP-Transport, injizierbar — Tests brauchen kein Netz        |
+| `…/lib/ilias/endpoints.ts`               | Versionsabhängige URL-Bildung                                 |
+| `…/lib/ilias/errors.ts`                  | 11 typisierte Fehlerarten, handlungsleitend                   |
+| `…/lib/ilias/envelope.ts`                | SOAP-Envelope bauen und auspacken                             |
+| `…/lib/ilias/parse*.ts`                  | Vier reine Mapper: Kurse, Baum, Übungen, Feed                 |
+| `…/lib/ilias/connection.live.test.ts`    | Opt-in-Test gegen eine echte Installation                     |
+| **Tests**                                | **116 offline** (Teil von `npm run check`) **+ 6 Live-Tests** |
 
 Die Mapper für Kurse und Materialbaum laufen gegen **echte, live abgerufene** ILIAS-Antworten.
 Die Fixtures für Übungen und Feed sind aus den ILIAS-XML-Writern abgeleitet, weil beide Endpunkte
 einen Account verlangen — jede dieser Dateien sagt das in ihrem eigenen Kopf.
 
-**Es gibt bewusst keinen Connector.** Wie er sich authentifiziert, hängt an Antworten der
-Hochschule. Die Mapping-Schicht ist der Teil, der sich dadurch nicht mehr ändert — deshalb
-existiert sie.
+### 14.4 Verbindungsschicht — was sie kann und was verifiziert ist
 
----
+`connection.ts` ist der Einstiegspunkt: Adresse rein, Installation erkennen, lesen.
+
+```ts
+const installation = await discoverInstallation('https://ilias.hs-heilbronn.de', httpTransport);
+// → { version: '9.23', clientId: 'iliashhn', layout: 'legacy', soap: 'blocked' }
+```
+
+Zwei Befunde aus der Recherche sind fest eingebaut, damit kein Aufrufer sie vergessen kann:
+
+1. **Der Endpunkt wird ermittelt, nicht konfiguriert.** Beide bekannten Pfade werden probiert,
+   der neuere zuerst. Ein `403` wird als `blocked` festgehalten und nicht mit `missing`
+   überschrieben — der Unterschied entscheidet, ob die Hochschule etwas tun muss.
+2. **Eine leere Antwort wird nie ungeprüft weitergereicht.** `fetchCourses` und `fetchContents`
+   verifizieren bei leerem Ergebnis erst die Session, bevor sie `[]` zurückgeben (siehe 6.5).
+   Ohne das sähen Studierende nach Session-Ablauf eine leere, fehlerfreie Kursliste.
+
+Ist SOAP gesperrt, liefert die Discovery trotzdem Version und `client_id` — sie liest sie dann
+aus der Login-Seite. Genau das brauchen die Token-Kanäle, und genau das ist der Fall an der HHN.
+
+#### Live verifiziert (ohne Zugangsdaten, 20.09.2026)
+
+```
+$ ILIAS_LIVE_BASE_URL=https://ilias.hs-heilbronn.de npm run test:ilias
+    version   9.23
+    client    iliashhn
+    layout    legacy
+    soap      blocked
+    ✓ can be identified without signing in
+
+$ ILIAS_LIVE_BASE_URL=https://demo.ilias.de npm run test:ilias
+    version   10.11 2026-09-03
+    client    demo
+    layout    public-root
+    soap      available (https://demo.ilias.de/soap/server.php)
+    ✓ can be identified without signing in
+```
+
+Die Verbindungsschicht erkennt also beide realen Installationen korrekt, inklusive des
+Pfadunterschieds zwischen ILIAS 9 und 10 und der Netzsperre an der HHN — die HHN-Werte stammen
+vollständig aus dem Login-Seiten-Fallback, weil SOAP dort nichts beantwortet.
+
+> Der Live-Test hat dabei einen echten Fehler gefunden: Die erste Fassung folgte keinen Redirects,
+> und `login.php` antwortet an der HHN mit `302`. Damit blieben Version und `client_id`
+> unbekannt. Behoben durch ein `redirect`-Feld im Transport. Genau dafür existiert dieser Test.
+
+#### Noch nicht verifiziert 🔴
+
+| Kanal             | Was fehlt                                            | Variable zum Einschalten                               |
+| ----------------- | ---------------------------------------------------- | ------------------------------------------------------ |
+| iCal-Abo          | Abruf mit echtem Token                               | `ILIAS_LIVE_CAL_TOKEN`                                 |
+| Privater Feed     | Abruf mit echtem Feed-Passwort                       | `ILIAS_LIVE_FEED_USERNAME`/`_USER_ID`/`_FEED_PASSWORD` |
+| SOAP-Lesepfad     | Login, Kursliste, Kursinhalte                        | `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`          |
+| Desktop-Transport | Ob `tauri-plugin-http` `redirect: 'manual'` beachtet | nur in einem gepackten Build prüfbar                   |
+
+Die drei ersten Zeilen sind in Minuten zu schließen — die Werte erzeugt man sich in ILIAS selbst
+(Kalender → Abonnieren, Profil → Nachrichten-Feed). Es wird dabei nichts geloggt, was ein
+Geheimnis preisgibt.
+
+**Es gibt bewusst keine UI.** Welche Kanäle eine Hochschule freigibt, entscheidet, was ein Feature
+überhaupt anzeigen kann — die Verbindungsschicht ist der Teil, der sich dadurch nicht mehr ändert.
 
 ## 15. Risiken
 
