@@ -49,6 +49,14 @@ export const httpTransport: Transport = async ({
   headers = {},
   redirect = 'manual',
 }) => {
+  // No ILIAS sends CORS headers, so from a browser tab a direct request can
+  // only fail — and fill the console on its way. During `npm run dev` the Vite
+  // server relays it instead (see iliasDevProxy in vite.config.ts); the
+  // packaged app never gets here.
+  if (!isDesktopRuntime() && import.meta.env.DEV) {
+    return viaDevProxy({ url, method, headers, redirect, ...(body === undefined ? {} : { body }) });
+  }
+
   const request = await resolveFetch();
 
   let response: Response;
@@ -73,6 +81,54 @@ export const httpTransport: Transport = async ({
   return { status: response.status, text: await response.text(), headers: collected };
 };
 
+/**
+ * Sends a request through the dev server, which answers with ILIAS's reply
+ * wrapped in JSON — status, the headers the connector reads, and the body — so
+ * a 403 or a 302 arrives as ILIAS said it rather than as something the browser
+ * acted on.
+ */
+async function viaDevProxy(
+  request: Required<Omit<HttpRequest, 'body'>> & { body?: string },
+): Promise<HttpResponse> {
+  let proxied: Response;
+  try {
+    proxied = await fetch('/__ilias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw fromNetworkFailure(cause);
+  }
+
+  const payload = (await proxied.json().catch(() => null)) as unknown;
+  if (typeof payload !== 'object' || payload === null) {
+    throw fromNetworkFailure(new Error('The dev server returned nothing readable.'));
+  }
+  const reply = payload as Record<string, unknown>;
+
+  if (!proxied.ok) {
+    throw fromNetworkFailure(
+      new Error(
+        typeof reply.error === 'string' ? reply.error : `Dev proxy answered ${proxied.status}.`,
+      ),
+    );
+  }
+
+  const headers: Record<string, string> = {};
+  if (typeof reply.headers === 'object' && reply.headers !== null) {
+    for (const [name, value] of Object.entries(reply.headers)) {
+      if (typeof value === 'string') headers[name] = value;
+    }
+  }
+  return {
+    status: typeof reply.status === 'number' ? reply.status : 0,
+    text: typeof reply.text === 'string' ? reply.text : '',
+    headers,
+  };
+}
+
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
 async function resolveFetch(): Promise<FetchLike> {
@@ -84,9 +140,10 @@ async function resolveFetch(): Promise<FetchLike> {
     // worth confirming before relying on the distinction on the desktop.
     return desktopFetch;
   }
-  // In a browser tab this reaches ILIAS only if the installation happens to
-  // send CORS headers, which none do. It is kept so the module is usable in
-  // tests and in the dev server without branching at every call site.
+  // Only a production build running in a plain browser tab ends up here, and
+  // it reaches ILIAS only if the installation sends CORS headers, which none
+  // do. Uni Pilot ships as a desktop app, so this is the honest failure path
+  // rather than a supported one.
   return (url, init) => fetch(url, init);
 }
 
