@@ -52,6 +52,17 @@ export type SoapAvailability =
   /** Not at either known path. Wrong address, or an unexpected release. */
   | 'missing';
 
+/**
+ * What the login page offers.
+ *
+ * This describes the *installation*, not the person. Heilbronn is `both`: the
+ * page carries a password form and a link to its single sign-on, but a student
+ * account there has no local password — the form is for local accounts such as
+ * administrators. So `both` means "prefer the SSO route when speaking to
+ * students", never "students have a password here".
+ */
+export type IliasSignIn = 'sso' | 'password' | 'both' | 'unknown';
+
 export interface IliasInstallation {
   baseUrl: string;
   /** As ILIAS reports it: `9.23`, `10.11 2026-09-03`. */
@@ -62,6 +73,7 @@ export interface IliasInstallation {
   clientId: string | null;
   /** Every client the installation serves, when it would say. */
   clients: readonly string[];
+  signIn: IliasSignIn;
   soap: SoapAvailability;
   /** Null unless `soap` is `available`. */
   soapEndpoint: string | null;
@@ -151,17 +163,59 @@ export async function discoverInstallation(
   const version = info?.version ?? fallback?.version ?? null;
   const release = version ? majorRelease(version) : null;
   const clients = info?.clients ?? (fallback?.clientId ? [fallback.clientId] : []);
+  const clientId = clients[0] ?? null;
 
   return {
     baseUrl,
     version,
     release,
     layout: release ? layoutForRelease(release) : (fallback?.layout ?? 'public-root'),
-    clientId: clients[0] ?? null,
+    clientId,
     clients,
+    signIn: await readSignIn(baseUrl, clientId, transport),
     soap: availability,
     soapEndpoint: endpoint,
   };
+}
+
+/**
+ * Reads the sign-in options off the real login form.
+ *
+ * `cmd=force_login` matters: the bare `login.php` redirects a signed-out visitor
+ * to the public repository at Heilbronn, which is not where the form lives.
+ *
+ * The password check looks for `type="password"`, not a field name — ILIAS 9
+ * and later generate names like `login_form/input_3/input_5`, so matching on
+ * `name="password"` finds nothing and reports every installation as SSO-only.
+ * SSO counts only as a link on the page: the endpoints themselves exist on
+ * every ILIAS whether configured or not.
+ */
+async function readSignIn(
+  baseUrl: string,
+  clientId: string | null,
+  transport: Transport,
+): Promise<IliasSignIn> {
+  const query = new URLSearchParams({ cmd: 'force_login' });
+  if (clientId) query.set('client_id', clientId);
+
+  let response: HttpResponseLike;
+  try {
+    response = await transport({
+      url: `${baseUrl}/login.php?${query.toString()}`,
+      headers: { Accept: 'text/html' },
+      redirect: 'follow',
+    });
+  } catch {
+    return 'unknown';
+  }
+  if (response.status !== 200) return 'unknown';
+
+  const sso = /href="[^"]*(?:openidconnect|saml|shib_login)\.php/i.test(response.text);
+  const password = /<input[^>]*type="password"/i.test(response.text);
+  if (sso && password) return 'both';
+  if (sso) return 'sso';
+  if (password) return 'password';
+  return 'unknown';
 }
 
 function readInstallationInfo(xml: string): { version: string | null; clients: string[] } {

@@ -47,8 +47,10 @@ export function normaliseBaseUrl(input: string): string {
     return '';
   }
   // People paste `…/ilias.php?baseClass=…`; the directory holding it is the root.
-  const directory = url.pathname.replace(/\/[^/]*$/, '');
-  return `${url.origin}${directory}`.replace(/\/$/, '');
+  // Only a segment that looks like a file is dropped, so an installation that
+  // lives in a subdirectory (`…/ilias`) survives being normalised twice.
+  const directory = url.pathname.replace(/\/[^/]*\.[^/]*$/, '');
+  return `${url.origin}${directory}`.replace(/\/+$/, '');
 }
 
 export function soapEndpoint(baseUrl: string, layout: IliasLayout): string {
@@ -91,7 +93,106 @@ export function privateNewsFeedUrl(
   return `${normaliseBaseUrl(baseUrl)}/privfeed.php?${query.toString()}`;
 }
 
-/** Deep link to any repository object, for the "open in ILIAS" fallback. */
-export function objectUrl(baseUrl: string, refId: string, type = 'crs'): string {
-  return `${normaliseBaseUrl(baseUrl)}/goto.php?target=${type}_${refId}`;
+/**
+ * Deep link to any repository object, for the "open in ILIAS" fallback.
+ *
+ * The client id is optional here because the mappers that build these links do
+ * not know it. They do not need to: `resolveIliasTarget` adds it on the way out,
+ * so no link is ever opened without one.
+ */
+export function objectUrl(baseUrl: string, refId: string, type = 'crs', clientId?: string): string {
+  const query = new URLSearchParams({ target: `${type}_${refId}` });
+  if (clientId) query.set('client_id', clientId);
+  return `${normaliseBaseUrl(baseUrl)}/goto.php?${query.toString()}`;
+}
+
+/**
+ * Where to send someone who just wants "ILIAS".
+ *
+ * Not the root. At Heilbronn the root redirects to the public repository — not
+ * signed in, nothing personal. The dashboard is right in both states: signed in,
+ * it is the student's own start page; signed out, ILIAS sends them to its login
+ * first and brings them back. `ilDashboardGUI` exists from ILIAS 7 to 11.
+ */
+export function dashboardUrl(baseUrl: string, clientId: string): string {
+  const query = new URLSearchParams({ baseClass: 'ilDashboardGUI', client_id: clientId });
+  return `${normaliseBaseUrl(baseUrl)}/ilias.php?${query.toString()}`;
+}
+
+/** ILIAS client ids end up in a query string; nothing else belongs in one. */
+const CLIENT_ID = /^[A-Za-z0-9_.-]+$/;
+
+/** `crs_717`, `exc_4711` — the shorthand `goto.php` understands. */
+const GOTO_SHORTHAND = /^[a-z]+_\d+$/;
+
+/**
+ * Decides what the ILIAS window may open, and turns it into a full address.
+ *
+ * This is the one gate every "open in ILIAS" passes through, and it exists
+ * twice: here for the browser tab, and as `resolve_target` in
+ * `src-tauri/src/ilias_window.rs` for the desktop window, where it is the rule
+ * that actually matters. The two are tested against the same cases so they
+ * cannot drift apart.
+ *
+ * - No target opens the dashboard, not the root (see `dashboardUrl`).
+ * - A `crs_717` shorthand becomes a `goto.php` link.
+ * - A full address is only accepted from the configured installation's origin.
+ *   Deep links arrive inside calendar feeds, so they come from outside — a
+ *   feed must not be able to open an arbitrary page in a window that is about
+ *   to be handed a university password.
+ * - The client id is added when missing, and a link naming a *different* client
+ *   is refused rather than silently rewritten.
+ *
+ * Throws with a readable message; the UI shows it as it is.
+ */
+export function resolveIliasTarget(baseUrl: string, clientId: string, target?: string): string {
+  const base = parseHttpsBase(baseUrl);
+  if (!CLIENT_ID.test(clientId)) {
+    throw new Error('That ILIAS client name contains characters it should not.');
+  }
+
+  const wanted = target?.trim() ?? '';
+  if (!wanted) return dashboardUrl(base, clientId);
+  if (GOTO_SHORTHAND.test(wanted)) {
+    const [type, refId] = wanted.split('_') as [string, string];
+    return objectUrl(base, refId, type, clientId);
+  }
+
+  let url: URL;
+  try {
+    url = new URL(wanted);
+  } catch {
+    throw new Error('That is not an address ILIAS can open.');
+  }
+  // Also rules out javascript:, data: and file:, none of which have an origin
+  // that could match an https installation.
+  if (url.protocol !== 'https:' || url.origin !== new URL(base).origin) {
+    throw new Error('That link does not belong to your ILIAS, so it will not open here.');
+  }
+
+  const named = url.searchParams.get('client_id');
+  if (named === null) {
+    url.searchParams.set('client_id', clientId);
+  } else if (named !== clientId) {
+    throw new Error('That link points to a different ILIAS client.');
+  }
+  return url.toString();
+}
+
+function parseHttpsBase(baseUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    throw new Error('The ILIAS address is not a web address.');
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error('ILIAS has to be reached over https.');
+  }
+  // Checked on the raw address: normalising rebuilds it from the origin, which
+  // would drop the credentials silently instead of refusing them.
+  if (url.username || url.password) {
+    throw new Error('The ILIAS address must not carry a username or password.');
+  }
+  return normaliseBaseUrl(baseUrl);
 }

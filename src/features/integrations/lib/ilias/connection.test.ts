@@ -78,6 +78,7 @@ const installed: IliasInstallation = {
   layout: 'public-root',
   clientId: 'demo',
   clients: ['demo'],
+  signIn: 'password',
   soap: 'available',
   soapEndpoint: 'https://demo.ilias.de/soap/server.php',
 };
@@ -146,6 +147,66 @@ describe('discoverInstallation', () => {
 
   it('refuses something that is not an address rather than probing it', async () => {
     await expect(discoverInstallation('   ', transportOf())).rejects.toThrowError(IliasError);
+  });
+
+  // Markup taken from the two real login forms, 23.09.2026. ILIAS 9+ generates
+  // field names, so only the input type says "password".
+  const PASSWORD_FIELD =
+    '<input type="text" name="login_form/input_3/input_4" />' +
+    '<input type="password" name="login_form/input_3/input_5" autocomplete="off" />';
+  const SSO_LINK = '<a href="https://ilias.hs-heilbronn.de/openidconnect.php">Anmelden</a>';
+
+  const loginPageWith =
+    (html: string): Handler =>
+    (request) =>
+      request.url.includes('/login.php?') ? ok(`<html><body>${html}</body></html>`) : null;
+
+  it('reads Heilbronn as offering both, which is what its login page does', async () => {
+    const found = await discoverInstallation(
+      'https://ilias.hs-heilbronn.de',
+      transportOf(loginPageWith(PASSWORD_FIELD + SSO_LINK)),
+    );
+    expect(found.signIn).toBe('both');
+  });
+
+  it('reads an installation with only a password form as password', async () => {
+    const found = await discoverInstallation(
+      'https://demo.ilias.de',
+      transportOf(loginPageWith(PASSWORD_FIELD)),
+    );
+    expect(found.signIn).toBe('password');
+  });
+
+  it('reads an installation with only a sign-on link as sso', async () => {
+    const found = await discoverInstallation(
+      'https://sso-only.example.edu',
+      transportOf(loginPageWith(SSO_LINK)),
+    );
+    expect(found.signIn).toBe('sso');
+  });
+
+  /**
+   * The first version of this check matched `name="password"`, which ILIAS 9
+   * never renders — every installation looked SSO-only, Heilbronn included.
+   */
+  it('does not rely on the field being named password', () => {
+    expect(PASSWORD_FIELD).not.toContain('name="password"');
+  });
+
+  it('asks for the real login form, not the page login.php redirects to', async () => {
+    const transport = transportOf(servesSoapAt('/soap/server.php'), loginPageWith(PASSWORD_FIELD));
+    await discoverInstallation('https://demo.ilias.de', transport);
+
+    const signInRequest = transport.calls.find((call) => call.url.includes('/login.php?'));
+    expect(signInRequest?.url).toBe(
+      'https://demo.ilias.de/login.php?cmd=force_login&client_id=demo',
+    );
+    expect(signInRequest?.redirect).toBe('follow');
+  });
+
+  it('reports unknown when the login page cannot be read', async () => {
+    const found = await discoverInstallation('https://demo.ilias.de', transportOf());
+    expect(found.signIn).toBe('unknown');
   });
 
   it('derives the origin from the host, so two universities never collide', () => {

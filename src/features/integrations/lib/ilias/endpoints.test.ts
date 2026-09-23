@@ -4,8 +4,10 @@ import {
   layoutForRelease,
   majorRelease,
   normaliseBaseUrl,
+  dashboardUrl,
   objectUrl,
   privateNewsFeedUrl,
+  resolveIliasTarget,
   soapEndpoint,
   soapEndpointCandidates,
 } from './endpoints';
@@ -62,6 +64,15 @@ describe('normaliseBaseUrl', () => {
     );
   });
 
+  // Stored addresses get normalised again on the way out. Dropping the last
+  // segment unconditionally turned `…/ilias` into the bare host the second time.
+  it('leaves an already normalised subdirectory alone', () => {
+    expect(normaliseBaseUrl('https://example.edu/ilias')).toBe('https://example.edu/ilias');
+    expect(normaliseBaseUrl(normaliseBaseUrl('https://example.edu/ilias/login.php'))).toBe(
+      'https://example.edu/ilias',
+    );
+  });
+
   it('returns an empty string for junk rather than throwing', () => {
     expect(normaliseBaseUrl('   ')).toBe('');
     expect(normaliseBaseUrl('http://')).toBe('');
@@ -111,6 +122,98 @@ describe('token-based URLs', () => {
   it('builds a deep link for any object type', () => {
     expect(objectUrl('https://demo.ilias.de', '717', 'crs')).toBe(
       'https://demo.ilias.de/goto.php?target=crs_717',
+    );
+  });
+
+  it('adds the client to a deep link when it knows it', () => {
+    expect(objectUrl('https://ilias.hs-heilbronn.de', '717', 'crs', 'iliashhn')).toBe(
+      'https://ilias.hs-heilbronn.de/goto.php?target=crs_717&client_id=iliashhn',
+    );
+  });
+});
+
+describe('dashboardUrl', () => {
+  // The root of the Heilbronn installation redirects to the public repository,
+  // signed out. The dashboard is the page that means "my ILIAS".
+  it('points at the dashboard, not the root', () => {
+    expect(dashboardUrl('https://ilias.hs-heilbronn.de', 'iliashhn')).toBe(
+      'https://ilias.hs-heilbronn.de/ilias.php?baseClass=ilDashboardGUI&client_id=iliashhn',
+    );
+  });
+});
+
+/**
+ * The same cases are tested against `resolve_target` in
+ * src-tauri/src/ilias_window.rs. If one of these changes, change it there too —
+ * the desktop window and the browser tab must agree on what they will open.
+ */
+describe('resolveIliasTarget', () => {
+  const base = 'https://ilias.hs-heilbronn.de';
+  const client = 'iliashhn';
+
+  it('opens the dashboard when there is no target', () => {
+    expect(resolveIliasTarget(base, client)).toBe(
+      'https://ilias.hs-heilbronn.de/ilias.php?baseClass=ilDashboardGUI&client_id=iliashhn',
+    );
+    expect(resolveIliasTarget(base, client, '   ')).toBe(
+      'https://ilias.hs-heilbronn.de/ilias.php?baseClass=ilDashboardGUI&client_id=iliashhn',
+    );
+  });
+
+  it('turns a goto shorthand into a deep link', () => {
+    expect(resolveIliasTarget(base, client, 'crs_717')).toBe(
+      'https://ilias.hs-heilbronn.de/goto.php?target=crs_717&client_id=iliashhn',
+    );
+  });
+
+  it('accepts a link from the same installation and adds the client', () => {
+    expect(
+      resolveIliasTarget(base, client, 'https://ilias.hs-heilbronn.de/goto.php?target=exc_42'),
+    ).toBe('https://ilias.hs-heilbronn.de/goto.php?target=exc_42&client_id=iliashhn');
+  });
+
+  it('keeps a link that already names the right client', () => {
+    const link = 'https://ilias.hs-heilbronn.de/goto.php?target=exc_42&client_id=iliashhn';
+    expect(resolveIliasTarget(base, client, link)).toBe(link);
+  });
+
+  it('refuses a link that names a different client', () => {
+    expect(() =>
+      resolveIliasTarget(base, client, 'https://ilias.hs-heilbronn.de/goto.php?client_id=other'),
+    ).toThrowError(/different ILIAS client/);
+  });
+
+  // Deep links arrive inside calendar feeds. A feed must not be able to open an
+  // arbitrary page in the window a student is about to sign in through.
+  it.each([
+    ['another host', 'https://evil.example/login'],
+    ['a look-alike host', 'https://ilias.hs-heilbronn.de.evil.example/'],
+    ['plain http', 'http://ilias.hs-heilbronn.de/goto.php?target=crs_1'],
+    ['a different port', 'https://ilias.hs-heilbronn.de:8443/'],
+    ['javascript', 'javascript:alert(1)'],
+    ['a data URL', 'data:text/html,hello'],
+    ['a file URL', 'file:///etc/passwd'],
+  ])('refuses %s', (_label, target) => {
+    expect(() => resolveIliasTarget(base, client, target)).toThrowError();
+  });
+
+  it('refuses an installation that is not on https', () => {
+    expect(() => resolveIliasTarget('http://ilias.hs-heilbronn.de', client)).toThrowError(/https/);
+  });
+
+  it('refuses an installation address that carries credentials', () => {
+    expect(() => resolveIliasTarget('https://user:pw@ilias.example', client)).toThrowError(
+      /username or password/,
+    );
+  });
+
+  it('refuses a client id that would break out of the query', () => {
+    expect(() => resolveIliasTarget(base, 'hhn&baseClass=x')).toThrowError(/client name/);
+  });
+
+  it('keeps a subdirectory installation in the path', () => {
+    expect(resolveIliasTarget('https://example.edu/ilias', 'c', 'crs_5')).toBe(
+      'https://example.edu/ilias/goto.php?target=crs_5&client_id=c',
     );
   });
 });

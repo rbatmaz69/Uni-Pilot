@@ -134,9 +134,10 @@ async function askInstallationInfo(base) {
  * client id in the data directory it serves styles from.
  */
 async function readLoginPage(base) {
-  // A signed-out installation bounces to the public repository view, sometimes
-  // more than once, so this one request follows redirects to the end.
-  const response = await get(`${base}/login.php`, {
+  // The bare login.php bounces a signed-out visitor to the public repository,
+  // which carries the release stamps but not the login form. `force_login` is
+  // the form itself, and it carries the stamps too.
+  const response = await get(`${base}/login.php?cmd=force_login`, {
     headers: { Accept: 'text/html' },
     redirect: 'follow',
   });
@@ -162,11 +163,15 @@ async function readLoginPage(base) {
       html.match(/[?&]client_id=([A-Za-z0-9_.-]+)/)?.[1] ??
       html.match(/\.\/data\/([A-Za-z0-9_.-]+)\//)?.[1] ??
       null,
+    // Links only: the SSO endpoints exist on every ILIAS, configured or not.
+    // The password field is found by type — ILIAS 9+ generates field names such
+    // as `login_form/input_3/input_5`, so `name="username"` never matched and
+    // every installation looked SSO-only.
     signIn: [
-      /openidconnect\.php/.test(html) && 'OpenID Connect',
-      /shib_login\.php|Shibboleth/i.test(html) && 'Shibboleth',
-      /saml\.php|SAML/i.test(html) && 'SAML',
-      /name="username"/.test(html) && 'username + password form',
+      /href="[^"]*openidconnect\.php/i.test(html) && 'OpenID Connect',
+      /href="[^"]*shib_login\.php/i.test(html) && 'Shibboleth',
+      /href="[^"]*saml\.php/i.test(html) && 'SAML',
+      /<input[^>]*type="password"/i.test(html) && 'password form',
     ].filter(Boolean),
   };
 }

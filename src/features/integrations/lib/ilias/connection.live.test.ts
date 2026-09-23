@@ -99,6 +99,7 @@ describe.skipIf(!hasInstallation)('a real ILIAS installation', () => {
     report(`version   ${installation.version ?? 'unknown'}`);
     report(`client    ${installation.clients.join(', ') || 'unknown'}`);
     report(`layout    ${installation.layout}`);
+    report(`sign-in   ${installation.signIn}`);
     report(
       `soap      ${installation.soap}${installation.soapEndpoint ? ` (${installation.soapEndpoint})` : ''}`,
     );
