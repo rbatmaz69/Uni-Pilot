@@ -1,10 +1,11 @@
 /**
- * PROTOTYPE — see ./README.md before building on this.
+ * ILIAS inside Uni Pilot.
  *
- * Read models and ILIAS mappers only. There is deliberately no connector,
- * no store and no UI here yet: what a connector may call is still waiting on
- * answers from the university, and this layer is the part that does not
- * change once those answers arrive.
+ * Two layers with different maturity. The ILIAS window — the page, its store
+ * and `openIlias` — is what students use today: it opens ILIAS in a window of
+ * the app's own. The read models, mappers and SOAP connector underneath are
+ * still a PROTOTYPE, waiting on the university to open an interface; see
+ * ./README.md before building on those.
  */
 
 export type {
@@ -22,11 +23,13 @@ export type {
 
 export {
   calendarSubscriptionUrl,
+  dashboardUrl,
   layoutForRelease,
   majorRelease,
   normaliseBaseUrl,
   objectUrl,
   privateNewsFeedUrl,
+  resolveIliasTarget,
   soapEndpoint,
   soapEndpointCandidates,
   type IliasLayout,
@@ -54,12 +57,25 @@ export {
   fetchCourses,
   openSession,
   originOf,
+  toConnection,
   verifySession,
+  type IliasConnection,
   type IliasCredentials,
   type IliasInstallation,
   type IliasSession,
+  type IliasSignIn,
   type SoapAvailability,
 } from './lib/ilias/connection';
+
+export {
+  KNOWN_INSTALLATIONS,
+  knownInstallationFor,
+  type KnownInstallation,
+} from './lib/ilias/knownInstallations';
+
+export { belongsToIlias, canOpenIliasWindow, openIlias } from './lib/iliasWindow';
+export { useIliasStore } from './store/iliasStore';
+export { IliasWorkspace } from './components/IliasWorkspace';
 
 export {
   basicAuthHeader,

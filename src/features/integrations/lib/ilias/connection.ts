@@ -96,6 +96,61 @@ const COURSE_STATUS = { member: 1, tutor: 2, admin: 4, owner: 8 } as const;
 /** Member, tutor and admin — a course someone tutors is still their course. */
 const ALL_ENROLMENTS = COURSE_STATUS.member | COURSE_STATUS.tutor | COURSE_STATUS.admin;
 
+/**
+ * The part of a discovered installation worth keeping between sessions.
+ *
+ * Deliberately holds no secret: no token, no password, no session id. It is
+ * persisted to `localStorage`, which is the wrong place for any of those, and
+ * the ILIAS window keeps its own sign-in in its own cookies.
+ */
+export interface IliasConnection {
+  /** "Hochschule Heilbronn" for a known installation, the host otherwise. */
+  name: string;
+  baseUrl: string;
+  /**
+   * Required, not optional. Every URL the ILIAS window opens carries it; on an
+   * installation serving several clients a link without it lands in the wrong
+   * one.
+   */
+  clientId: string;
+  version: string | null;
+  signIn: IliasSignIn;
+  soap: SoapAvailability;
+  /** ISO 8601. */
+  checkedAt: string;
+}
+
+/**
+ * Keeps what matters from a discovery, or refuses when it would be unsafe to.
+ *
+ * An installation that would not say which client it is cannot be connected:
+ * the window would open without a client id and land wherever the server's
+ * default happens to point. Better to say so now than to open the wrong ILIAS.
+ */
+export function toConnection(
+  installation: IliasInstallation,
+  name: string,
+  now: Date = new Date(),
+): IliasConnection {
+  if (!installation.clientId) {
+    throw new IliasError(
+      'unreadable-response',
+      installation.version
+        ? 'This looks like ILIAS, but it would not say which client it is. Uni Pilot cannot open it reliably.'
+        : 'That address does not look like an ILIAS installation.',
+    );
+  }
+  return {
+    name,
+    baseUrl: installation.baseUrl,
+    clientId: installation.clientId,
+    version: installation.version,
+    signIn: installation.signIn,
+    soap: installation.soap,
+    checkedAt: now.toISOString(),
+  };
+}
+
 export function originOf(installation: IliasInstallation): ExternalOrigin {
   return { provider: 'ilias', installation: hostOf(installation.baseUrl) };
 }

@@ -12,6 +12,7 @@ import {
   ExamsPage,
   FocusPage,
   GradesPage,
+  IliasPage,
   SettingsPage,
   StudiesPage,
   TasksPage,
@@ -28,6 +29,7 @@ export function AppRoutes() {
         <Route path={NAV_ITEMS.tasks.path} element={<TasksPage />} />
         <Route path={NAV_ITEMS.focus.path} element={<FocusPage />} />
         <Route path={NAV_ITEMS.courses.path} element={<CoursesPage />} />
+        <Route path={NAV_ITEMS.ilias.path} element={<IliasPage />} />
         <Route path={NAV_ITEMS.exams.path} element={<ExamsPage />} />
         <Route path={NAV_ITEMS.grades.path} element={<GradesPage />} />
         <Route path={NAV_ITEMS.events.path} element={<EventsPage />} />
