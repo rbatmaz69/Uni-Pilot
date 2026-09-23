@@ -1005,6 +1005,25 @@ bevorzugte Variante; der Systembrowser bleibt der Rückfall, falls das SSO im Fe
 Die Umsetzung ist ein eigenes Feature und gehört in ein eigenes Issue — in dieser Story steht nur
 die Bewertung.
 
+#### Umsetzung
+
+**Umgesetzt** auf dem Branch `ilias-window`, beschrieben in [`docs/ilias-window.md`](../ilias-window.md).
+Drei Befunde aus der Umsetzung ergänzen diesen Abschnitt:
+
+- **Der Einstieg ist das Dashboard, nicht die Wurzel.** `ilias.hs-heilbronn.de/` leitet auf das
+  öffentliche Repository um, abgemeldet und ohne Persönliches. `ilias.php?baseClass=ilDashboardGUI`
+  ist in beiden Zuständen richtig. ✅ verifiziert
+- **Die Login-Seite der HHN hat doch ein Passwortfeld.** ILIAS 9 vergibt generierte Feldnamen
+  (`login_form/input_3/input_5`); eine Suche nach `name="password"` findet deshalb nichts. Das
+  Formular dient lokalen Konten — ein Studierenden-Konto hat laut 8.5 weiterhin kein lokales
+  Passwort. Die Seite bietet also _beides_ an, für Studierende gilt nur SSO. ✅ verifiziert
+- **Im Browser (`npm run dev`) kommt ILIAS wegen fehlender CORS-Header nicht an.** Die Desktop-App
+  ist davon nicht betroffen; für die Entwicklung gibt es ein Relay im Vite-Dev-Server. ✅ verifiziert
+
+Weiter **offen** 🔴: ob die Keycloak-Anmeldung der HHN (`login.hs-heilbronn.de/realms/hhn`) in einem
+eingebetteten Fenster funktioniert. Keycloak selbst sperrt eingebettete Browser nicht, anders als
+Google oder Microsoft; belegt ist es aber erst mit einem Lauf der Desktop-App.
+
 ---
 
 ## 13. Scraping

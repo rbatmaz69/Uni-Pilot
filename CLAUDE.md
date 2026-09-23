@@ -50,7 +50,8 @@ src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
                   calendar/  {components,store,lib}/ + index.ts
                   dashboard/ {components,lib}/ + index.ts
                   reminders/ {components,store,lib}/
-                  integrations/ lib/ — Prototyp, siehe docs/integrations/
+                  integrations/ {components,store,lib}/ — ILIAS-Fenster (siehe
+                                docs/ilias-window.md); SOAP-Connector noch Prototyp
 src/pages/        Eine schlanke Komponente pro Route
 src/lib/          navigation.ts (Quelle der Wahrheit), date.ts, ics.ts, tone.ts, utils.ts
 src/store/        Zustand-Store, nur UI-State (App-weit, nicht feature-spezifisch)
