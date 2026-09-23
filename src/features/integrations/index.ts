@@ -74,7 +74,18 @@ export {
 } from './lib/ilias/knownInstallations';
 
 export { belongsToIlias, canOpenIliasWindow, openIlias } from './lib/iliasWindow';
+export {
+  boundsOf,
+  canEmbedIlias,
+  closeIliasView,
+  hideIliasView,
+  overlayIsOpen,
+  placeIliasView,
+  showIliasView,
+  type ViewBounds,
+} from './lib/iliasView';
 export { useIliasStore } from './store/iliasStore';
+export { EmbeddedIlias } from './components/EmbeddedIlias';
 export { IliasWorkspace } from './components/IliasWorkspace';
 export { OpenInIliasButton } from './components/OpenInIliasButton';
 

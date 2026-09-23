@@ -1,3 +1,4 @@
+mod ilias_view;
 mod ilias_window;
 mod reminders;
 use tauri::Manager;
@@ -8,7 +9,11 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             reminders::reminder_request,
-            ilias_window::open_ilias
+            ilias_window::open_ilias,
+            ilias_view::show_ilias_view,
+            ilias_view::place_ilias_view,
+            ilias_view::hide_ilias_view,
+            ilias_view::close_ilias_view
         ]);
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());

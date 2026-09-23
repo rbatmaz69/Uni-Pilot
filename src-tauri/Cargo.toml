@@ -14,7 +14,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `unstable` for Window::add_child, which embeds ILIAS in the main window
+# (src/ilias_view.rs). Tauri marks multi-webview as unfinished; that module
+# keeps the separate ILIAS window in src/ilias_window.rs as the fallback.
+tauri = { version = "2", features = ["unstable"] }
 # Calendar subscriptions are fetched here rather than in the webview: feeds
 # carry no CORS headers, so the browser would refuse them.
 tauri-plugin-http = "2"

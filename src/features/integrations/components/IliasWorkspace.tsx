@@ -13,6 +13,8 @@ import { Button } from '@/components/ui';
 import type { IliasConnection, IliasSignIn } from '@/features/integrations/lib/ilias/connection';
 import { KNOWN_INSTALLATIONS } from '@/features/integrations/lib/ilias/knownInstallations';
 import { canOpenIliasWindow, openIlias } from '@/features/integrations/lib/iliasWindow';
+import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
+import { EmbeddedIlias } from './EmbeddedIlias';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
 const FIELD =
@@ -25,15 +27,24 @@ function messageOf(cause: unknown): string {
   return 'That did not work.';
 }
 
+interface IliasWorkspaceProps {
+  /** A deep link to open on arrival, from "Open in ILIAS" in the calendar. */
+  target?: string | undefined;
+}
+
 /**
  * ILIAS inside Uni Pilot.
  *
  * At Heilbronn the university's ILIAS offers Uni Pilot one data channel — the
  * calendar — and nothing for courses, materials, submissions or forums. So this
- * page does not try to rebuild ILIAS; it opens it, in a window of its own, and
- * is honest about what that window is.
+ * page does not try to rebuild ILIAS; it shows ILIAS itself, and is honest
+ * about what that is.
+ *
+ * In the desktop app, once connected, ILIAS sits right here in the page. A
+ * browser tab cannot embed it — ILIAS forbids framing — so there the page
+ * offers to open it in a tab instead.
  */
-export function IliasWorkspace() {
+export function IliasWorkspace({ target }: IliasWorkspaceProps = {}) {
   const connection = useIliasStore((state) => state.connection);
   const busy = useIliasStore((state) => state.busy);
   const connect = useIliasStore((state) => state.connect);
@@ -75,6 +86,21 @@ export function IliasWorkspace() {
       ) : null}
     </>
   );
+
+  if (connection && canEmbedIlias()) {
+    return (
+      <EmbeddedIlias
+        connection={connection}
+        initialTarget={target}
+        onDisconnect={() => {
+          const name = connection.name;
+          disconnect();
+          setError(null);
+          setNotice(`Disconnected from ${name}.`);
+        }}
+      />
+    );
+  }
 
   if (!connection) {
     return (

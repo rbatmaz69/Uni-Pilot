@@ -66,7 +66,11 @@ pub async fn open_ilias(
 /// `src/features/integrations/lib/ilias/endpoints.ts`, which does the same for
 /// the browser tab. The tests below use the same cases as the TypeScript ones;
 /// change both or neither.
-fn resolve_target(base_url: &str, client_id: &str, target: Option<&str>) -> Result<Url, String> {
+pub(crate) fn resolve_target(
+    base_url: &str,
+    client_id: &str,
+    target: Option<&str>,
+) -> Result<Url, String> {
     let base = parse_base(base_url)?;
     if !is_client_id(client_id) {
         return Err("That ILIAS client name contains characters it should not.".into());

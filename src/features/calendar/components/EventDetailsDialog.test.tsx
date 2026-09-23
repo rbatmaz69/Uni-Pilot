@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { CalendarEvent } from '@/features/calendar/lib/types';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -36,13 +37,15 @@ const SPLAN_LECTURE: CalendarEvent = {
 
 const renderDialog = (event: CalendarEvent) =>
   render(
-    <EventDetailsDialog
-      event={event}
-      now={NOW}
-      sourceName="ilias.hs-heilbronn.de"
-      onClose={() => undefined}
-      onRemove={() => undefined}
-    />,
+    <MemoryRouter>
+      <EventDetailsDialog
+        event={event}
+        now={NOW}
+        sourceName="ilias.hs-heilbronn.de"
+        onClose={() => undefined}
+        onRemove={() => undefined}
+      />
+    </MemoryRouter>,
   );
 
 beforeEach(() => {
