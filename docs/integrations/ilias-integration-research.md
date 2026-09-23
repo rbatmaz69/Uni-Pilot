@@ -32,10 +32,10 @@ Die Recherche hat vier Dinge ergeben, die die Planung verändern:
    Kalender-Pipeline bereits vollständig verarbeitbar (303/303 Events). ✅ verifiziert, siehe 8.3.
    Das verschiebt die MVP-Priorität: Der nützlichste Kalender kostet **keine** Entwicklungszeit.
 
-6. **An der HHN ist derzeit vermutlich gar kein ILIAS-Kanal nutzbar.** Im angemeldeten Konto
-   fehlen die Reiter „Passwort" und „Newsfeed": Es gibt kein lokales ILIAS-Passwort (nur SSO) und
-   der private Nachrichten-Feed ist abgeschaltet. ✅ verifiziert, siehe 8.5. Offen ist nur noch das
-   Kalender-Abo — daran hängt, ob überhaupt etwas geht.
+6. **An der HHN ist genau ein ILIAS-Kanal nutzbar — und er ist nachgewiesen.** Der persönliche
+   iCal-Kalender wurde am 23.09.2026 mit einem echten Token abgerufen (6 Termine). ✅ verifiziert.
+   Die übrigen sind zu: Im angemeldeten Konto fehlen die Reiter „Passwort" und „Newsfeed", es gibt
+   also kein lokales ILIAS-Passwort (nur SSO) und keinen privaten Nachrichten-Feed. Siehe 8.5.
 
 **Empfehlung für den MVP:** Stundenplan über **StarPlan** — das funktioniert heute, vollständig und
 ohne jede Freischaltung. ILIAS kommt dazu, sobald das Rechenzentrum einen der drei Schalter aus 8.5
@@ -681,21 +681,31 @@ zwei Kanäle endgültig, die der Bericht zuvor noch als Option geführt hat.
 
 #### Bilanz der ILIAS-Kanäle an der HHN
 
-| Kanal                    | Status                | Grund                                                      |
-| ------------------------ | --------------------- | ---------------------------------------------------------- |
-| SOAP                     | ❌ **nicht nutzbar**  | Endpunkt 403 **und** kein Passwort                         |
-| Privater RSS-Feed        | ❌ **nicht nutzbar**  | `enable_private_feed` abgeschaltet                         |
-| WebDAV                   | ❌ **nicht nutzbar**  | braucht HTTP-Basic, also ein Passwort                      |
-| Öffentliche Objekt-Feeds | ⚠️ theoretisch        | nur pro Objekt freigeschaltet, nur öffentliche Neuigkeiten |
-| iCal-Kalender-Token      | 🔴 **noch zu prüfen** | hängt an einer eigenen Einstellung                         |
+| Kanal                    | Status               | Grund                                                      |
+| ------------------------ | -------------------- | ---------------------------------------------------------- |
+| SOAP                     | ❌ **nicht nutzbar** | Endpunkt 403 **und** kein Passwort                         |
+| Privater RSS-Feed        | ❌ **nicht nutzbar** | `enable_private_feed` abgeschaltet                         |
+| WebDAV                   | ❌ **nicht nutzbar** | braucht HTTP-Basic, also ein Passwort                      |
+| Öffentliche Objekt-Feeds | ⚠️ theoretisch       | nur pro Objekt freigeschaltet, nur öffentliche Neuigkeiten |
+| **iCal-Kalender-Token**  | ✅ **funktioniert**  | am 23.09.2026 mit echtem Token abgerufen                   |
 
-**Damit steht und fällt die ILIAS-Anbindung an der HHN mit dem Kalender-Abo.** Ist auch das
-abgeschaltet, gilt: _Kein einziger ILIAS-Kanal ist für Uni Pilot nutzbar, solange das
-Rechenzentrum nichts freischaltet._
+**Genau ein ILIAS-Kanal ist an der HHN nutzbar — und er wurde nachgewiesen.** Am 23.09.2026 hat der
+Connector mit einem echten, vom Nutzer erzeugten Token den persönlichen ILIAS-Kalender abgerufen:
+**6 Termine**. Damit ist die zentrale Frage dieser Story praktisch beantwortet: Uni Pilot kann über
+eine offizielle Schnittstelle echte Daten aus dem ILIAS der Hochschule Heilbronn lesen, ohne je ein
+Hochschulpasswort zu berühren.
 
-Das ist ein unbequemes, aber sauberes Ergebnis — und es ändert nichts an der Qualität der Arbeit,
-sondern nur an ihrer Reihenfolge: Die Connector-Schicht ist gebaut und getestet, sie wartet auf
-eine Freischaltung. Bis dahin trägt **splan** (8.3) den Kalender allein, und das tut es vollständig.
+Die drei übrigen Kanäle bleiben zu. Für Kurse, Materialien, Aufgaben und Ankündigungen geht es ohne
+Mitwirkung des Rechenzentrums nicht weiter. Die Connector-Schicht dafür ist gebaut und getestet —
+sie wartet auf eine Freischaltung, nicht auf Code.
+
+Bis dahin trägt **splan** (8.3) den Stundenplan allein und vollständig, und der ILIAS-Kalender
+ergänzt ihn um das, was an einzelnen Kursen hängt. Die Größenordnung zeigt das Verhältnis: 306
+Stundenplan-Termine gegen 6 ILIAS-Termine.
+
+> Nebenbefund: ILIAS setzt im Abo keinen Kalendernamen (`X-WR-CALNAME`). Die Quelle erscheint in
+> Uni Pilot deshalb als `ilias.hs-heilbronn.de`. Ein Feature, das den ILIAS-Kalender anbietet,
+> sollte selbst einen sprechenden Namen vergeben.
 
 #### Die drei Schalter, um die es geht
 
@@ -939,9 +949,61 @@ Gegenüber dem Issue **umsortiert**, weil die Messergebnisse eine andere Reihenf
 Tests nicht nur ein Notbehelf — er ist die richtige Lösung. Jedes `ExternalRecord` trägt deshalb
 ein `url`-Feld.
 
-**Embedded WebView wird nicht empfohlen.** Ein eingebetteter WebView müsste die SSO-Session
-selbst verwalten, was bedeutet, Hochschul-Anmeldedaten durch unser Fenster laufen zu lassen. Der
-Systembrowser hat die Session bereits und ist die sicherere und ehrlichere Variante.
+### 12.1 Revidiert: Ein eigenes ILIAS-Fenster in der App
+
+Eine frühere Fassung dieses Berichts riet von einem eingebetteten WebView ab und empfahl den
+Systembrowser. **Diese Empfehlung wird hier revidiert**, und es lohnt sich zu sagen warum: Sie
+entstand unter der Annahme, die offiziellen Schnittstellen stünden weitgehend offen und ein
+WebView wäre nur ein Notbehelf für Randfälle. Nach 8.5 ist an der Zielhochschule das Gegenteil der
+Fall — ein einziger Kanal funktioniert. Damit wiegt der Nutzen eines integrierten Fensters
+deutlich schwerer als vorher, und das Sicherheitsargument bleibt zwar richtig, ist aber allein
+nicht mehr ausschlaggebend.
+
+#### Zwei Varianten, von denen nur eine geht ✅ verifiziert
+
+`ilias.hs-heilbronn.de` sendet `x-frame-options: SAMEORIGIN`.
+
+| Variante                                            | Möglich? | Begründung                                                                                                   |
+| --------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| ILIAS als `<iframe>` **innerhalb** der Uni-Pilot-UI | ❌ nein  | Vom Header aktiv unterbunden; Schutz vor Clickjacking.                                                       |
+| ILIAS in einem **eigenen Fenster der App**          | ✅ ja    | Kein Frame, sondern ein Top-Level-Dokument — der Header greift nicht. Tauri 2 kann das über `WebviewWindow`. |
+
+Für Studierende ist der Unterschied gering: Ein Klick in Uni Pilot, ein Fenster im App-Kontext geht
+auf, ILIAS ist darin. Die App wird nicht verlassen.
+
+#### Was dafür spricht
+
+- **Alles wird erreichbar**, was über keine Schnittstelle geht: Aufgabenabgabe, Foren, Tests, Noten.
+- **Die Anmeldung bleibt bestehen** — die Cookies leben in der Partition des Fensters, kein
+  erneutes SSO bei jedem Aufruf.
+- **Es verbindet sich mit den vorhandenen Daten.** Jeder `ExternalRecord` trägt bereits ein
+  `url`-Feld mit einem `goto.php`-Deep-Link. Aus „Uni Pilot weiß etwas über diesen Kurs" wird damit
+  „…und die zugehörige ILIAS-Seite ist einen Klick entfernt" — nicht die Startseite, die richtige Seite.
+
+#### Was dagegen spricht, und die Regel, die daraus folgt
+
+Studierende tippen ihr Hochschul-Passwort in ein Fenster, das die App geöffnet hat. Technisch
+_könnte_ eine Anwendung dort mitlesen. Daraus folgt eine Regel, die nicht verhandelbar ist:
+
+> **In das ILIAS-Fenster wird niemals eigenes JavaScript injiziert.** Es ist ein Browser, sonst
+> nichts. Kein Auslesen von Formularen, kein Automatisieren der Anmeldung, keine Skripte im
+> Dokument der Hochschule.
+
+Das gehört sichtbar in die App und in die Dokumentation, damit niemand raten muss, was dort passiert.
+
+Zwei weitere Punkte:
+
+- **Manche Identity Provider blockieren eingebettete WebViews.** Ob das HHN-OIDC das tut, ist 🔴
+  ungeprüft und muss vor einer Umsetzung getestet werden. Falls ja, bleibt der Systembrowser.
+- **Es bleibt eine Webseite in einem Fenster** — kein Uni-Pilot-Design, keine strukturierten Daten.
+  Es ersetzt die Schnittstelle nicht, es fängt auf, was sie nicht kann.
+
+#### Einordnung
+
+Das eigene Fenster ersetzt in der Kette oben **Stufe 4** (Deep Link in den Systembrowser) als
+bevorzugte Variante; der Systembrowser bleibt der Rückfall, falls das SSO im Fenster scheitert.
+Die Umsetzung ist ein eigenes Feature und gehört in ein eigenes Issue — in dieser Story steht nur
+die Bewertung.
 
 ---
 
@@ -1087,12 +1149,12 @@ vollständig aus dem Login-Seiten-Fallback, weil SOAP dort nichts beantwortet.
 
 #### Noch nicht verifiziert 🔴
 
-| Kanal             | Was fehlt                                            | Variable zum Einschalten                                  |
-| ----------------- | ---------------------------------------------------- | --------------------------------------------------------- |
-| iCal-Abo          | Abruf mit echtem Token                               | `ILIAS_LIVE_CAL_TOKEN`                                    |
-| Privater Feed     | Abruf mit echtem Hash und Feed-Passwort              | `ILIAS_LIVE_FEED_USERNAME`/`_USER_ID`/`_HASH`/`_PASSWORD` |
-| SOAP-Lesepfad     | Login, Kursliste, Kursinhalte                        | `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`             |
-| Desktop-Transport | Ob `tauri-plugin-http` `redirect: 'manual'` beachtet | nur in einem gepackten Build prüfbar                      |
+| Kanal             | Was fehlt                                                         | Variable zum Einschalten                                  |
+| ----------------- | ----------------------------------------------------------------- | --------------------------------------------------------- |
+| ~~iCal-Abo~~      | ✅ **erledigt 23.09.2026** — 6 Termine mit echtem Token abgerufen | —                                                         |
+| Privater Feed     | Abruf mit echtem Hash und Feed-Passwort                           | `ILIAS_LIVE_FEED_USERNAME`/`_USER_ID`/`_HASH`/`_PASSWORD` |
+| SOAP-Lesepfad     | Login, Kursliste, Kursinhalte                                     | `ILIAS_LIVE_USERNAME` + `ILIAS_LIVE_PASSWORD`             |
+| Desktop-Transport | Ob `tauri-plugin-http` `redirect: 'manual'` beachtet              | nur in einem gepackten Build prüfbar                      |
 
 Die drei ersten Zeilen sind in Minuten zu schließen — die Werte erzeugt man sich in ILIAS selbst
 (Kalender → Abonnieren, Profil → Nachrichten-Feed). Es wird dabei nichts geloggt, was ein
