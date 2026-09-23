@@ -203,6 +203,7 @@ export function toCalendarEvents(calendar: IcsCalendar, sourceId: string): Calen
       ...(room ? { room } : {}),
       ...(details.instructor ? { instructor: details.instructor } : {}),
       ...(details.note ? { note: details.note } : {}),
+      ...(entry.url ? { url: entry.url } : {}),
     };
 
     // An all-day entry has no meaningful clock, so the pinned row shows the

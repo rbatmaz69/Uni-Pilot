@@ -76,6 +76,7 @@ export {
 export { belongsToIlias, canOpenIliasWindow, openIlias } from './lib/iliasWindow';
 export { useIliasStore } from './store/iliasStore';
 export { IliasWorkspace } from './components/IliasWorkspace';
+export { OpenInIliasButton } from './components/OpenInIliasButton';
 
 export {
   basicAuthHeader,
