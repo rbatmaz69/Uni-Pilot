@@ -32,8 +32,14 @@ Die Recherche hat vier Dinge ergeben, die die Planung verändern:
    Kalender-Pipeline bereits vollständig verarbeitbar (303/303 Events). ✅ verifiziert, siehe 8.3.
    Das verschiebt die MVP-Priorität: Der nützlichste Kalender kostet **keine** Entwicklungszeit.
 
-**Empfehlung für den MVP:** Stundenplan über StarPlan (fertig), Ankündigungen und kursbezogene
-Termine über die ILIAS-Token-Kanäle. Das ist keine
+6. **An der HHN ist derzeit vermutlich gar kein ILIAS-Kanal nutzbar.** Im angemeldeten Konto
+   fehlen die Reiter „Passwort" und „Newsfeed": Es gibt kein lokales ILIAS-Passwort (nur SSO) und
+   der private Nachrichten-Feed ist abgeschaltet. ✅ verifiziert, siehe 8.5. Offen ist nur noch das
+   Kalender-Abo — daran hängt, ob überhaupt etwas geht.
+
+**Empfehlung für den MVP:** Stundenplan über **StarPlan** — das funktioniert heute, vollständig und
+ohne jede Freischaltung. ILIAS kommt dazu, sobald das Rechenzentrum einen der drei Schalter aus 8.5
+umlegt. Bis dahin ist die fertige Connector-Schicht das, was sie ist: einsatzbereit und wartend. Das ist keine
 Notlösung — es ist der einzige Weg, der ohne Zutun der Hochschule funktioniert, ohne
 Hochschul-Passwörter auskommt und über beliebig viele Hochschulen hinweg trägt. Für Kurse,
 Materialien und Aufgaben muss die SOAP-Freischaltung mit dem Rechenzentrum geklärt werden,
@@ -494,7 +500,7 @@ separates Feed-Passwort
 | 18  | Abgabe ändern                  | Write      | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
 | 19  | Feedback/Bewertung             | Read       | SOAP `getExerciseXML` (nur mit `write`) | ✅   | alle    | `write`         | Pwd       | Dozentenrolle                           | —                 | ❌                       | WebView                  | ❌ für Studierende   |
 | 20  | **Ankündigungen (kursweit)**   | Read       | RSS `feed.php`                          | ✅   | alle    | öffentlich      | keine     | Feed je Objekt aktiv                    | niedrig           | ⚠️ Endpunkt erreichbar   | WebView                  | ⚠️                   |
-| 21  | **Ankündigungen (persönlich)** | Read       | RSS `privfeed.php`                      | ✅   | alle    | eigene          | Feed-Pwd  | `enable_private_feed`                   | niedrig           | ✅ Mapper getestet       | WebView                  | ✅ **MVP**           |
+| 21  | **Ankündigungen (persönlich)** | Read       | RSS `privfeed.php`                      | ✅   | alle    | eigene          | Feed-Pwd  | `enable_private_feed`                   | niedrig           | ✅ Mapper getestet       | WebView                  | 🏫 **HHN: aus**      |
 | 22  | Gelesen-Status setzen          | Write      | —                                       | —    | —       | —               | —         | —                                       | —                 | —                        | WebView                  | ❌ nicht möglich     |
 | 23  | **Kurstermine/Deadlines**      | Read       | iCal `calendar.php?token=`              | ✅   | alle    | eigene          | Token     | Kalender aktiv                          | **sehr niedrig**³ | ✅ Endpunkt verifiziert  | manueller ICS-Import     | ✅ **MVP**           |
 | 23b | **Vorlesungsplan**             | Read       | iCal StarPlan (**nicht ILIAS**)         | ✅   | —       | öffentlich      | **keine** | keine                                   | **null**          | ✅ 303/303 Events        | manueller ICS-Import     | ✅ **fertig**        |
@@ -652,6 +658,60 @@ ILIAS; auch dort ist der Aufwand gering, weil jeder Link eine Kalender- bzw. Fee
 jede andere ist und durch das bestehende `sourceStore` läuft.
 
 ---
+
+### 8.5 Was ein Studierenden-Account an der HHN tatsächlich sieht
+
+Alles bisher in Abschnitt 8 wurde von außen gemessen. Die folgenden Punkte hat ein Mitglied des
+Uni-Pilot-Teams am 23.09.2026 **im eigenen, angemeldeten ILIAS-Konto** nachgesehen. Das ist die
+belastbarste Quelle in diesem Bericht, weil sie zeigt, was einem Studierenden wirklich angeboten
+wird — und nicht, was die Software könnte.
+
+**Unter _Einstellungen_ gibt es nur zwei Reiter: „Allgemeine Einstellungen" und
+„Mail-Einstellungen".** ✅ verifiziert
+
+ILIAS blendet dort normalerweise weitere Reiter ein. Dass genau diese zwei fehlen, ist aussagekräftig:
+
+| Fehlender Reiter | Was daraus folgt                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **„Passwort"**   | Es gibt **kein lokales ILIAS-Passwort**. Die Anmeldung läuft ausschließlich über OIDC-SSO. Damit ist SOAP-`login()` an der HHN ausgeschlossen — unabhängig von der Netzsperre (siehe 6.2). |
+| **„Newsfeed"**   | Die Einstellung `enable_private_feed` ist **global deaktiviert**. Ohne sie gibt es weder den Menüpunkt noch ein Feed-Passwort, also auch keinen privaten Nachrichten-Feed.                 |
+
+Beide Befunde bestätigen Ableitungen, die vorher nur aus dem Quelltext stammten — und sie schließen
+zwei Kanäle endgültig, die der Bericht zuvor noch als Option geführt hat.
+
+#### Bilanz der ILIAS-Kanäle an der HHN
+
+| Kanal                    | Status                | Grund                                                      |
+| ------------------------ | --------------------- | ---------------------------------------------------------- |
+| SOAP                     | ❌ **nicht nutzbar**  | Endpunkt 403 **und** kein Passwort                         |
+| Privater RSS-Feed        | ❌ **nicht nutzbar**  | `enable_private_feed` abgeschaltet                         |
+| WebDAV                   | ❌ **nicht nutzbar**  | braucht HTTP-Basic, also ein Passwort                      |
+| Öffentliche Objekt-Feeds | ⚠️ theoretisch        | nur pro Objekt freigeschaltet, nur öffentliche Neuigkeiten |
+| iCal-Kalender-Token      | 🔴 **noch zu prüfen** | hängt an einer eigenen Einstellung                         |
+
+**Damit steht und fällt die ILIAS-Anbindung an der HHN mit dem Kalender-Abo.** Ist auch das
+abgeschaltet, gilt: _Kein einziger ILIAS-Kanal ist für Uni Pilot nutzbar, solange das
+Rechenzentrum nichts freischaltet._
+
+Das ist ein unbequemes, aber sauberes Ergebnis — und es ändert nichts an der Qualität der Arbeit,
+sondern nur an ihrer Reihenfolge: Die Connector-Schicht ist gebaut und getestet, sie wartet auf
+eine Freischaltung. Bis dahin trägt **splan** (8.3) den Kalender allein, und das tut es vollständig.
+
+#### Die drei Schalter, um die es geht
+
+Damit lässt sich dem Rechenzentrum sehr konkret sagen, was gebraucht wird — statt allgemein nach
+„einer Schnittstelle" zu fragen:
+
+| #   | Schalter                                                           | Was er ermöglicht                          | Aufwand für das RZ  |
+| --- | ------------------------------------------------------------------ | ------------------------------------------ | ------------------- |
+| 1   | **Kalender-Abo für Studierende** (falls deaktiviert)               | Kurstermine, Abgabefristen, Klausurtermine | eine Einstellung    |
+| 2   | **`enable_private_feed`** aktivieren                               | Ankündigungen aus allen Kursen             | eine Einstellung    |
+| 3   | **SOAP** freigeben **und** einen Zugriffsweg ohne lokales Passwort | Kurse, Materialien, Dateien, Aufgaben      | konzeptionell offen |
+
+Schalter 1 und 2 sind Häkchen in der ILIAS-Administration und betreffen ausschließlich Lesezugriff
+auf die eigenen Daten der jeweiligen Person. Schalter 3 ist die eigentliche Diskussion: Dort geht es
+nicht nur um eine Freigabe, sondern um die Frage, wie sich ein externes Programm überhaupt
+authentifizieren soll, wenn es kein Passwort gibt (siehe 6.3).
 
 ## 9. Empfohlene Architektur
 
