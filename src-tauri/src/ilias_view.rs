@@ -23,6 +23,13 @@
 //! strip, so this module — not the page, which can no longer see the window —
 //! lays out both, and again on every resize.
 //!
+//! **Linux is different.** There Tauri packs every webview of a window into a
+//! vertical GTK box and ignores the positions and sizes set on them — so both
+//! got half the window, ILIAS in the lower half. The box already stacks them
+//! the right way round, Uni Pilot above ILIAS, so on Linux `stack` only tells
+//! GTK how to share it: the strip its height, ILIAS the rest. It also sits
+//! below any title bar on its own, so the title bar plays no part there.
+//!
 //! It is not an `<iframe>`: ILIAS forbids those (`x-frame-options:
 //! SAMEORIGIN`). It is a second webview attached with `Window::add_child`,
 //! behind Tauri's `unstable` feature, which Tauri describes as unfinished; the
@@ -158,6 +165,8 @@ fn apply<R: Runtime>(app: &tauri::AppHandle<R>, layout: Layout) -> Result<(), St
         main.set_auto_resize(false)
             .map_err(|error| format!("Uni Pilot could not make room for ILIAS: {error}"))?;
         place(&main, strip_rect)?;
+        #[cfg(target_os = "linux")]
+        stack(&main, Some(layout.strip))?;
     }
     if let Some(view) = app.get_webview(ILIAS) {
         place(&view, ilias_rect)?;
@@ -189,8 +198,41 @@ fn restore<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
         )?;
         main.set_auto_resize(true)
             .map_err(|error| format!("Uni Pilot could not take the window back: {error}"))?;
+        #[cfg(target_os = "linux")]
+        stack(&main, None)?;
     }
     Ok(())
+}
+
+/// Linux only: shares the window's GTK box between the strip and ILIAS.
+///
+/// `Some(height)` holds Uni Pilot to the strip and leaves the rest of the box
+/// to ILIAS, which is packed after it and expands; `None` lets Uni Pilot fill
+/// the box again. A hidden ILIAS takes no room, so leaving needs nothing more.
+#[cfg(target_os = "linux")]
+fn stack<R: Runtime>(main: &tauri::Webview<R>, strip: Option<f64>) -> Result<(), String> {
+    main.with_webview(move |platform| {
+        use gtk::prelude::*;
+
+        let view = platform.inner();
+        let Some(stack) = view
+            .parent()
+            .and_then(|parent| parent.downcast::<gtk::Box>().ok())
+        else {
+            return;
+        };
+        match strip {
+            Some(height) => {
+                stack.set_child_packing(&view, false, false, 0, gtk::PackType::Start);
+                view.set_size_request(-1, height.round() as i32);
+            }
+            None => {
+                stack.set_child_packing(&view, true, true, 0, gtk::PackType::Start);
+                view.set_size_request(-1, -1);
+            }
+        }
+    })
+    .map_err(|error| format!("Uni Pilot could not make room for ILIAS: {error}"))
 }
 
 fn current<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<Layout> {

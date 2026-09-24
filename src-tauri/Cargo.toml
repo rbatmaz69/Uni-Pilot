@@ -39,6 +39,8 @@ windows = "0.61"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = "2.0"
+# ILIAS mode on Linux shares the window's GTK box (src/ilias_view.rs).
+gtk = "0.18"
 
 [profile.release]
 codegen-units = 1
