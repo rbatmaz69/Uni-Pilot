@@ -39,9 +39,10 @@ use std::sync::Mutex;
 use tauri::webview::WebviewBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl};
 
+use crate::ilias_browser;
 use crate::ilias_window::resolve_target;
 
-const ILIAS: &str = "ilias-view";
+pub(crate) const ILIAS: &str = "ilias-view";
 const MAIN: &str = "main";
 
 /// The strip is a bar, not a page. Anything outside this range means the page
@@ -91,9 +92,19 @@ struct Rect {
 /// Where the strip and ILIAS go in a window of this size. Pure, so it can be
 /// tested without a window.
 fn arrange(width: f64, height: f64, titlebar: f64, strip: f64) -> (Rect, Rect) {
-    let strip_rect = Rect { x: 0.0, y: titlebar, width, height: strip };
+    let strip_rect = Rect {
+        x: 0.0,
+        y: titlebar,
+        width,
+        height: strip,
+    };
     let top = titlebar + strip;
-    let ilias_rect = Rect { x: 0.0, y: top, width, height: (height - top).max(0.0) };
+    let ilias_rect = Rect {
+        x: 0.0,
+        y: top,
+        width,
+        height: (height - top).max(0.0),
+    };
     (strip_rect, ilias_rect)
 }
 
@@ -115,7 +126,10 @@ fn titlebar_offset(window_height: f64, page_height: f64) -> f64 {
 
 fn logical_size<R: Runtime>(window: &tauri::Window<R>) -> Result<(f64, f64), String> {
     let scale = window.scale_factor().map_err(|error| error.to_string())?;
-    let size = window.inner_size().map_err(|error| error.to_string())?.to_logical::<f64>(scale);
+    let size = window
+        .inner_size()
+        .map_err(|error| error.to_string())?
+        .to_logical::<f64>(scale);
     Ok((size.width, size.height))
 }
 
@@ -132,7 +146,11 @@ fn apply<R: Runtime>(app: &tauri::AppHandle<R>, layout: Layout) -> Result<(), St
         .ok_or_else(|| "The Uni Pilot window is gone.".to_string())?;
     let (width, height) = logical_size(&window)?;
     let fullscreen = window.is_fullscreen().unwrap_or(false);
-    let titlebar = if fullscreen { 0.0 } else { layout.titlebar_windowed };
+    let titlebar = if fullscreen {
+        0.0
+    } else {
+        layout.titlebar_windowed
+    };
     let (strip_rect, ilias_rect) = arrange(width, height, titlebar, layout.strip);
 
     if let Some(main) = app.get_webview(MAIN) {
@@ -142,7 +160,8 @@ fn apply<R: Runtime>(app: &tauri::AppHandle<R>, layout: Layout) -> Result<(), St
     }
     if let Some(view) = app.get_webview(ILIAS) {
         place(&view, ilias_rect)?;
-        view.show().map_err(|error| format!("ILIAS could not be shown: {error}"))?;
+        view.show()
+            .map_err(|error| format!("ILIAS could not be shown: {error}"))?;
     }
     Ok(())
 }
@@ -150,14 +169,23 @@ fn apply<R: Runtime>(app: &tauri::AppHandle<R>, layout: Layout) -> Result<(), St
 /// Gives the main webview the whole window back.
 fn restore<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(view) = app.get_webview(ILIAS) {
-        view.hide().map_err(|error| format!("ILIAS could not be hidden: {error}"))?;
+        view.hide()
+            .map_err(|error| format!("ILIAS could not be hidden: {error}"))?;
     }
     let window = app
         .get_window(MAIN)
         .ok_or_else(|| "The Uni Pilot window is gone.".to_string())?;
     let (width, height) = logical_size(&window)?;
     if let Some(main) = app.get_webview(MAIN) {
-        place(&main, Rect { x: 0.0, y: 0.0, width, height })?;
+        place(
+            &main,
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width,
+                height,
+            },
+        )?;
         main.set_auto_resize(true)
             .map_err(|error| format!("Uni Pilot could not take the window back: {error}"))?;
     }
@@ -220,9 +248,9 @@ pub async fn enter_ilias_mode(
     remember(&app, Some(layout));
 
     {
-        let _creating = CREATING
-            .lock()
-            .map_err(|_| "ILIAS could not be opened: a previous attempt failed midway.".to_string())?;
+        let _creating = CREATING.lock().map_err(|_| {
+            "ILIAS could not be opened: a previous attempt failed midway.".to_string()
+        })?;
         match app.get_webview(ILIAS) {
             Some(view) => {
                 if target.is_some() {
@@ -232,13 +260,16 @@ pub async fn enter_ilias_mode(
             }
             None => {
                 // Created at zero size; `apply` below puts it where it belongs.
-                window
+                let view = window
                     .add_child(
-                        WebviewBuilder::new(ILIAS, WebviewUrl::External(url)),
+                        WebviewBuilder::new(ILIAS, WebviewUrl::External(url))
+                            .on_download(ilias_browser::on_download)
+                            .on_page_load(ilias_browser::on_page_load),
                         LogicalPosition::new(0.0, 0.0),
                         LogicalSize::new(0.0, 0.0),
                     )
                     .map_err(|error| format!("ILIAS could not be opened: {error}"))?;
+                ilias_browser::prepare(&view);
             }
         }
     }
@@ -268,7 +299,9 @@ pub async fn navigate_ilias(
 ) -> Result<(), String> {
     let url = resolve_target(&base_url, &client_id, Some(&target))?;
     match app.get_webview(ILIAS) {
-        Some(view) => view.navigate(url).map_err(|error| format!("ILIAS could not be opened: {error}")),
+        Some(view) => view
+            .navigate(url)
+            .map_err(|error| format!("ILIAS could not be opened: {error}")),
         None => Err("ILIAS is not open.".into()),
     }
 }
@@ -280,7 +313,9 @@ pub async fn close_ilias_view(app: tauri::AppHandle) -> Result<(), String> {
     remember(&app, None);
     restore(&app)?;
     match app.get_webview(ILIAS) {
-        Some(view) => view.close().map_err(|error| format!("ILIAS could not be closed: {error}")),
+        Some(view) => view
+            .close()
+            .map_err(|error| format!("ILIAS could not be closed: {error}")),
         None => Ok(()),
     }
 }
@@ -303,8 +338,24 @@ mod tests {
     #[test]
     fn puts_the_strip_under_the_title_bar_and_ilias_under_the_strip() {
         let (strip, ilias) = arrange(1440.0, 900.0, 28.0, 48.0);
-        assert_eq!(strip, Rect { x: 0.0, y: 28.0, width: 1440.0, height: 48.0 });
-        assert_eq!(ilias, Rect { x: 0.0, y: 76.0, width: 1440.0, height: 824.0 });
+        assert_eq!(
+            strip,
+            Rect {
+                x: 0.0,
+                y: 28.0,
+                width: 1440.0,
+                height: 48.0
+            }
+        );
+        assert_eq!(
+            ilias,
+            Rect {
+                x: 0.0,
+                y: 76.0,
+                width: 1440.0,
+                height: 824.0
+            }
+        );
     }
 
     /// The two never overlap — overlapping is what made the cursor flicker.

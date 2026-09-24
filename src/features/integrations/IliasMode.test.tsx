@@ -17,6 +17,10 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (command: string, args: Record<string, unknown>) => invoke(command, args),
 }));
 
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: () => Promise.resolve(() => undefined),
+}));
+
 const pretendDesktop = () =>
   Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
 

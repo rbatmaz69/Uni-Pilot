@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppWindow, ArrowLeft, House, LogOut, School, TriangleAlert, Unplug } from 'lucide-react';
+import {
+  AppWindow,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  House,
+  LogOut,
+  School,
+  TriangleAlert,
+  Unplug,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button, IconButton } from '@/components/ui';
+import { IliasDownloadStatus } from '@/features/integrations/components/IliasDownloadStatus';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
+import { goBackInIlias, goForwardInIlias } from '@/features/integrations/lib/iliasBrowser';
 import {
   closeIliasView,
   enterIliasMode,
@@ -11,6 +23,11 @@ import {
   overlayIsOpen,
 } from '@/features/integrations/lib/iliasView';
 import { openIlias } from '@/features/integrations/lib/iliasWindow';
+import {
+  listenToIliasBrowser,
+  refreshIliasHistory,
+  useIliasBrowserStore,
+} from '@/features/integrations/store/iliasBrowserStore';
 import { DEFAULT_ROUTE } from '@/lib/navigation';
 
 /** Tauri rejects a command with the Rust `Err` string itself, not an Error. */
@@ -45,6 +62,7 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
   const stripRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const history = useIliasBrowserStore((state) => state.history);
 
   const report = useCallback((cause: unknown) => setError(messageOf(cause)), []);
   const stripHeight = () => stripRef.current?.getBoundingClientRect().height || STRIP_HEIGHT;
@@ -54,7 +72,12 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
   const arrivalTarget = useRef(initialTarget);
 
   useEffect(() => {
-    enterIliasMode(connection, stripHeight(), arrivalTarget.current).catch(report);
+    // Listening first, so the first page load in ILIAS is not missed; the
+    // history is then read once for whatever loaded before the strip was here.
+    listenToIliasBrowser().catch(report);
+    enterIliasMode(connection, stripHeight(), arrivalTarget.current)
+      .then(refreshIliasHistory)
+      .catch(report);
     return () => {
       leaveIliasMode().catch(() => undefined);
     };
@@ -97,6 +120,11 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
     void (index > 0 ? navigate(-1) : navigate(DEFAULT_ROUTE));
   };
 
+  const travel = (step: () => Promise<void>) => {
+    setError(null);
+    step().catch(report);
+  };
+
   const go = (target: string) => {
     setError(null);
     navigateIlias(connection, target).catch(report);
@@ -123,6 +151,25 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
           Uni Pilot
         </Button>
 
+        <div className="flex flex-none items-center gap-0.5 border-l border-line-soft pl-2">
+          <IconButton
+            label="Back in ILIAS"
+            size="sm"
+            disabled={!history.canGoBack}
+            onClick={() => travel(goBackInIlias)}
+          >
+            <ChevronLeft size={16} />
+          </IconButton>
+          <IconButton
+            label="Forward in ILIAS"
+            size="sm"
+            disabled={!history.canGoForward}
+            onClick={() => travel(goForwardInIlias)}
+          >
+            <ChevronRight size={16} />
+          </IconButton>
+        </div>
+
         <div className="flex min-w-0 flex-1 items-center gap-2 border-l border-line-soft pl-3">
           <School size={15} className="flex-none text-accent" aria-hidden />
           <h1
@@ -145,6 +192,8 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
             </span>
           ) : null}
         </div>
+
+        <IliasDownloadStatus onError={report} />
 
         <div className="flex flex-none items-center gap-1">
           <IconButton label="ILIAS dashboard" size="sm" onClick={() => go('')}>

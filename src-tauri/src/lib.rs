@@ -1,3 +1,4 @@
+mod ilias_browser;
 mod ilias_view;
 mod ilias_window;
 mod reminders;
@@ -13,9 +14,14 @@ pub fn run() {
             ilias_view::enter_ilias_mode,
             ilias_view::leave_ilias_mode,
             ilias_view::navigate_ilias,
-            ilias_view::close_ilias_view
+            ilias_view::close_ilias_view,
+            ilias_browser::travel_ilias,
+            ilias_browser::ilias_history,
+            ilias_browser::open_ilias_download,
+            ilias_browser::reveal_ilias_download
         ])
-        .manage(ilias_view::Mode::default());
+        .manage(ilias_view::Mode::default())
+        .manage(ilias_browser::Downloads::default());
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());
     builder

@@ -10,6 +10,7 @@ Why ILIAS itself rather than native screens: at Heilbronn, ILIAS gives Uni Pilot
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | **Connect**                   | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved. |
 | **Uni Pilot** (back)          | Leaves ILIAS mode for the page you came from; the sidebar and header return.                                                 |
+| **‹ ›** (back, forward)       | Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too. |
 | **ILIAS dashboard** (house)   | Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.    |
 | **Open in a separate window** | The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                        |
 | **Sign out of ILIAS**         | Opens ILIAS's own `logout.php`, which ends the session ILIAS knows about.                                                    |
@@ -18,6 +19,20 @@ Why ILIAS itself rather than native screens: at Heilbronn, ILIAS gives Uni Pilot
 In the calendar, an entry that came from an ILIAS feed shows **Open in ILIAS**. ILIAS writes a link to the course or exercise into every entry it exports, so this goes to the ILIAS page and opens the exercise itself rather than the start page. Timetable entries from splan carry no link and show nothing.
 
 Leaving the ILIAS page and coming back finds ILIAS where you left it.
+
+## Downloads
+
+A file ILIAS offers for download — slides, exercise sheets, a submission you uploaded — is saved to your **Downloads** folder. The strip says so while it runs (**Downloading Blatt 3.pdf…**) and when it is done (**Blatt 3.pdf saved to Downloads**), or that it failed. A saved file can be opened from there, or shown in its folder.
+
+Before this, downloads did not work at all: a webview without a download handler cancels every download, silently. Clicking a PDF in ILIAS did nothing, and nothing said so.
+
+How it is kept safe (`src-tauri/src/ilias_browser.rs`):
+
+- **The file name is ours to check.** The server suggests one; Uni Pilot keeps only the last part — no folders, so nothing can land outside Downloads — replaces what file systems refuse, drops leading dots so nothing is hidden, and shortens endless names. An existing file is never overwritten: the new one becomes `Blatt 3 (1).pdf`.
+- **The page never names a path.** Rust hands out an id per download and opens or shows only files it saved itself, looked up by that id. The strip only ever learns the file name.
+- **Only documents and media are opened** — PDF, Office and OpenDocument files, text, images, audio, video, zip. Anything else, a program above all, is only ever shown in its folder; opening it stays your own, deliberate step.
+
+A PDF that ILIAS shows inline rather than as a download opens in the ILIAS view itself. **‹** takes you back from it.
 
 ## ILIAS mode: side by side, not on top
 
@@ -53,6 +68,8 @@ Stored, in `localStorage` under `uni-pilot.ilias`: the university's name, the IL
 
 **Uni Pilot never injects script into ILIAS.** No initialisation script, no `eval`, nothing that reads the page, fills in the login form or watches what you type. You enter your university password there; it is a browser and nothing else.
 
+That holds for back and forward too. `history.back()` would have been one line of script; instead Rust calls the platform's webview directly — `WKWebView` on macOS, WebView2 on Windows, WebKitGTK on Linux — which is why `Cargo.toml` names those three crates. They were already there through Tauri and are pinned to the versions it uses.
+
 Two things make that more than a promise:
 
 - Both the embedded view and the separate window are created in Rust (`src-tauri/src/ilias_view.rs`, `src-tauri/src/ilias_window.rs`), the only place that can make them. The permission that would let the page create webviews itself has no URL scope and is not granted.
@@ -76,6 +93,8 @@ Once open, ILIAS navigates freely — it has to, or the university's single sign
 
 - `src-tauri/src/ilias_view.rs` — ILIAS mode: entering, leaving, laying out the window on every resize, with Rust tests for the layout and the title bar.
 - `src-tauri/src/ilias_window.rs` — the separate window, and `resolve_target`, with Rust tests.
+- `src-tauri/src/ilias_browser.rs` — back, forward and downloads for both, with Rust tests for file names and the download list.
+- `src/features/integrations/lib/iliasBrowser.ts` and `store/iliasBrowserStore.ts` — the commands and events, and what the strip shows. Listening starts once and lasts as long as the app, so a download that ends while you are elsewhere is still heard.
 - `src/features/integrations/lib/ilias/endpoints.ts` — `resolveIliasTarget`, `dashboardUrl`; the TypeScript mirror of the rule.
 - `src/features/integrations/lib/ilias/connection.ts` — `discoverInstallation`, which also reads the sign-in options, and `toConnection`.
 - `src/features/integrations/lib/ilias/knownInstallations.ts` — Heilbronn, as configuration rather than a special case.
@@ -93,4 +112,5 @@ Run `npm run check`, then `cargo test --manifest-path src-tauri/Cargo.toml` for 
 
 - ✅ **Heilbronn's sign-in works inside an embedded webview.** Confirmed on 23.09.2026 by signing in to the dashboard with a real HHN account. Heilbronn signs in through Keycloak (`login.hs-heilbronn.de`), which — unlike Google or Microsoft — does not refuse embedded browsers.
 - 🔴 **ILIAS mode on every platform.** Rust computes the layout and handles the title bar, but Tauri has open issues about child webviews, and resizing the main webview goes further into its unfinished API than laying one over it did. Check it by eye after a Tauri update, on each platform you ship to — windowed, full screen, and resizing between the two.
+- 🔴 **Back, forward and downloads on Windows and Linux.** Written against each platform's webview and type-checked for Windows, but only tried on macOS. On macOS the webview does not report where a download went, so Uni Pilot chooses the path itself; check the file lands in Downloads on the others.
 - 🔴 **Whether `tauri-plugin-http` honours `redirect: 'manual'`** in a packaged build. Discovery relies on it to tell a blocked SOAP endpoint from a redirect.

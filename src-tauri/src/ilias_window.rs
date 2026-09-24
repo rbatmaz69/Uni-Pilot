@@ -55,8 +55,10 @@ pub async fn open_ilias(
         .title("ILIAS")
         .inner_size(1180.0, 860.0)
         .min_inner_size(820.0, 600.0)
+        // Without it, downloads are silently cancelled.
+        .on_download(crate::ilias_browser::on_download)
         .build()
-        .map(|_| ())
+        .map(|window| crate::ilias_browser::prepare(window.as_ref()))
         .map_err(|error| format!("ILIAS could not be opened: {error}"))
 }
 
@@ -90,7 +92,11 @@ pub(crate) fn resolve_target(
     }
 
     if is_goto_shorthand(wanted) {
-        return Ok(with_query(&base, "goto.php", &[("target", wanted), ("client_id", client_id)]));
+        return Ok(with_query(
+            &base,
+            "goto.php",
+            &[("target", wanted), ("client_id", client_id)],
+        ));
     }
 
     // Deep links come out of calendar feeds, which is to say from outside. Only
@@ -212,7 +218,10 @@ mod tests {
 
     #[test]
     fn refuses_a_link_that_names_a_different_client() {
-        let error = open(Some("https://ilias.hs-heilbronn.de/goto.php?client_id=other")).unwrap_err();
+        let error = open(Some(
+            "https://ilias.hs-heilbronn.de/goto.php?client_id=other",
+        ))
+        .unwrap_err();
         assert!(error.contains("different ILIAS client"), "{error}");
     }
 
@@ -229,7 +238,10 @@ mod tests {
             "data:text/html,hello",
             "file:///etc/passwd",
         ] {
-            assert!(open(Some(target)).is_err(), "{target} should have been refused");
+            assert!(
+                open(Some(target)).is_err(),
+                "{target} should have been refused"
+            );
         }
     }
 

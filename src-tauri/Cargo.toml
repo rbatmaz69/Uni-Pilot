@@ -24,6 +24,19 @@ tauri-plugin-http = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Back and forward in ILIAS (src/ilias_browser.rs) go straight to each
+# platform's webview, which Tauri does not expose. All three already come in
+# through Tauri; these only name them, at the versions Tauri uses.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows = "0.61"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0"
+
 [profile.release]
 codegen-units = 1
 lto = true

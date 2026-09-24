@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,9 +8,26 @@ import { IliasStrip } from './IliasStrip';
 const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>();
 const openIlias = vi.fn<(connection: IliasConnection, target?: string) => Promise<void>>();
 
+type Handler = (event: { payload: unknown }) => void;
+/** What the strip listens to, by event name — for playing Rust's part. */
+const listeners = new Map<string, Handler>();
+
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: (command: string, args: Record<string, unknown>) => invoke(command, args),
 }));
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: (name: string, handler: Handler) => {
+    listeners.set(name, handler);
+    return Promise.resolve(() => listeners.delete(name));
+  },
+}));
+
+/** Sends an event as Rust would, once the strip is listening for it. */
+async function fromRust(name: string, payload: unknown) {
+  await waitFor(() => expect(listeners.has(name)).toBe(true));
+  act(() => listeners.get(name)?.({ payload }));
+}
 
 vi.mock('@/features/integrations/lib/iliasWindow', () => ({
   openIlias: (connection: IliasConnection, target?: string) => openIlias(connection, target),
@@ -26,11 +43,15 @@ const HEILBRONN: IliasConnection = {
   checkedAt: '2026-09-23T10:00:00.000Z',
 };
 
-/** Every command sent to Rust, in order, with its target where it has one. */
+/**
+ * Every layout or navigation command sent to Rust, in order, with its target
+ * where it has one. Asking where ILIAS stands in its history changes nothing,
+ * so it is left out.
+ */
 const sent = () =>
-  invoke.mock.calls.map(([command, args]) =>
-    'target' in args ? `${command}(${String(args.target)})` : command,
-  );
+  invoke.mock.calls
+    .filter(([command]) => command !== 'ilias_history')
+    .map(([command, args]) => ('target' in args ? `${command}(${String(args.target)})` : command));
 
 function renderStrip(props: { initialTarget?: string; onDisconnect?: () => void } = {}) {
   const view = (target?: string) => (
@@ -57,6 +78,7 @@ function renderStrip(props: { initialTarget?: string; onDisconnect?: () => void 
 beforeEach(() => {
   invoke.mockReset().mockResolvedValue(undefined);
   openIlias.mockReset().mockResolvedValue(undefined);
+  listeners.clear();
   document.body.innerHTML = '';
 });
 
@@ -176,5 +198,70 @@ describe('the strip', () => {
     renderStrip();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('the Uni Pilot window is gone');
+  });
+});
+
+describe('back and forward', () => {
+  const back = () => screen.getByRole('button', { name: 'Back in ILIAS' });
+  const forward = () => screen.getByRole('button', { name: 'Forward in ILIAS' });
+
+  it('has nowhere to go before ILIAS has been anywhere', () => {
+    renderStrip();
+    expect(back()).toBeDisabled();
+    expect(forward()).toBeDisabled();
+  });
+
+  /** Returning to the page, the strip must not show a stale history. */
+  it('asks where ILIAS stands once it is on screen', async () => {
+    invoke.mockImplementation((command) =>
+      Promise.resolve(
+        command === 'ilias_history' ? { canGoBack: true, canGoForward: false } : undefined,
+      ),
+    );
+    renderStrip();
+    await waitFor(() => expect(back()).toBeEnabled());
+    expect(forward()).toBeDisabled();
+  });
+
+  it('follows ILIAS as it moves from page to page', async () => {
+    renderStrip();
+    await fromRust('ilias-history', { canGoBack: true, canGoForward: true });
+    expect(back()).toBeEnabled();
+    expect(forward()).toBeEnabled();
+  });
+
+  it('goes back and forward like a browser', async () => {
+    renderStrip();
+    await fromRust('ilias-history', { canGoBack: true, canGoForward: true });
+
+    await userEvent.click(back());
+    await userEvent.click(forward());
+
+    expect(invoke).toHaveBeenCalledWith('travel_ilias', { step: 'back' });
+    expect(invoke).toHaveBeenLastCalledWith('travel_ilias', { step: 'forward' });
+  });
+});
+
+describe('downloads', () => {
+  const pdf = { id: 1, fileName: 'Blatt 3.pdf', openable: true };
+
+  /** The bug this answers: a PDF was clicked, and nothing said whether it came. */
+  it('says a download is running, then that it arrived', async () => {
+    renderStrip();
+
+    await fromRust('ilias-download', { ...pdf, state: 'started' });
+    expect(screen.getByRole('status')).toHaveTextContent('Downloading Blatt 3.pdf');
+
+    await fromRust('ilias-download', { ...pdf, state: 'finished' });
+    expect(screen.getByRole('status')).toHaveTextContent('Blatt 3.pdf saved to Downloads');
+  });
+
+  it('opens the file it saved, by its id', async () => {
+    renderStrip();
+    await fromRust('ilias-download', { ...pdf, state: 'finished' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open Blatt 3.pdf' }));
+
+    expect(invoke).toHaveBeenCalledWith('open_ilias_download', { id: 1 });
   });
 });
