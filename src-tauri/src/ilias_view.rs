@@ -40,6 +40,7 @@ use tauri::webview::WebviewBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl};
 
 use crate::ilias_browser;
+use crate::ilias_links;
 use crate::ilias_window::resolve_target;
 
 pub(crate) const ILIAS: &str = "ilias-view";
@@ -262,8 +263,9 @@ pub async fn enter_ilias_mode(
                 // Created at zero size; `apply` below puts it where it belongs.
                 let view = window
                     .add_child(
-                        WebviewBuilder::new(ILIAS, WebviewUrl::External(url))
+                        WebviewBuilder::new(ILIAS, WebviewUrl::External(url.clone()))
                             .on_download(ilias_browser::on_download)
+                            .on_new_window(ilias_links::on_new_window(app.clone(), ILIAS, url))
                             .on_page_load(ilias_browser::on_page_load),
                         LogicalPosition::new(0.0, 0.0),
                         LogicalSize::new(0.0, 0.0),

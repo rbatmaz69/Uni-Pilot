@@ -6,15 +6,16 @@ Why ILIAS itself rather than native screens: at Heilbronn, ILIAS gives Uni Pilot
 
 ## What the page does
 
-| Control                       | What happens                                                                                                                 |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Connect**                   | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved. |
-| **Uni Pilot** (back)          | Leaves ILIAS mode for the page you came from; the sidebar and header return.                                                 |
-| **‹ ›** (back, forward)       | Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too. |
-| **ILIAS dashboard** (house)   | Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.    |
-| **Open in a separate window** | The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                        |
-| **Sign out of ILIAS**         | Opens ILIAS's own `logout.php`, which ends the session ILIAS knows about.                                                    |
-| **Disconnect**                | Makes Uni Pilot forget the address. It does not sign you out of ILIAS — do that first if you want to.                        |
+| Control                          | What happens                                                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Connect**                      | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved. |
+| **Uni Pilot** (back)             | Leaves ILIAS mode for the page you came from; the sidebar and header return.                                                 |
+| **‹ ›** (back, forward)          | Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too. |
+| **ILIAS dashboard** (house)      | Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.    |
+| **Open in your browser** (globe) | The page ILIAS is on, in your default browser. For signing in with Touch ID — see below.                                     |
+| **Open in a separate window**    | The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                        |
+| **Sign out of ILIAS**            | Opens ILIAS's own `logout.php`, which ends the session ILIAS knows about.                                                    |
+| **Disconnect**                   | Makes Uni Pilot forget the address. It does not sign you out of ILIAS — do that first if you want to.                        |
 
 In the calendar, an entry that came from an ILIAS feed shows **Open in ILIAS**. ILIAS writes a link to the course or exercise into every entry it exports, so this goes to the ILIAS page and opens the exercise itself rather than the start page. Timetable entries from splan carry no link and show nothing.
 
@@ -24,7 +25,13 @@ Leaving the ILIAS page and coming back finds ILIAS where you left it.
 
 A file ILIAS offers for download — slides, exercise sheets, a submission you uploaded — is saved to your **Downloads** folder. The strip says so while it runs (**Downloading Blatt 3.pdf…**) and when it is done (**Blatt 3.pdf saved to Downloads**), or that it failed. A saved file can be opened from there, or shown in its folder.
 
-Before this, downloads did not work at all: a webview without a download handler cancels every download, silently. Clicking a PDF in ILIAS did nothing, and nothing said so.
+Before this, downloads did not work at all, for two reasons. A webview without a download handler cancels every download, silently. And ILIAS opens every file it shows inline — PDFs above all — in a new window (`target="_blank"`, see `ilObjFileListGUI::getCommandFrame` in ILIAS 9), which a webview without a handler for new windows simply refuses. Clicking a PDF did nothing, and nothing said so.
+
+Links that ask for a new window now go where a browser's new tab would (`src-tauri/src/ilias_links.rs`):
+
+- **To ILIAS itself** (same origin), Uni Pilot asks for the link once, with the ILIAS view's own cookies. A file is saved to Downloads like any other download; a page opens in the ILIAS view.
+- **To anywhere else** — `http`, `https`, `mailto` — your default browser or mail app.
+- **Anything else** is refused.
 
 How it is kept safe (`src-tauri/src/ilias_browser.rs`):
 
@@ -32,7 +39,7 @@ How it is kept safe (`src-tauri/src/ilias_browser.rs`):
 - **The page never names a path.** Rust hands out an id per download and opens or shows only files it saved itself, looked up by that id. The strip only ever learns the file name.
 - **Only documents and media are opened** — PDF, Office and OpenDocument files, text, images, audio, video, zip. Anything else, a program above all, is only ever shown in its folder; opening it stays your own, deliberate step.
 
-A PDF that ILIAS shows inline rather than as a download opens in the ILIAS view itself. **‹** takes you back from it.
+Opening a PDF from the strip hands it to Preview (or whatever opens PDFs on your computer).
 
 ## ILIAS mode: side by side, not on top
 
@@ -58,11 +65,22 @@ What follows from that:
 - **Leaving hides ILIAS; only Disconnect closes it.** That is what keeps your place.
 - **Calls to Rust go strictly in order**, each with a time limit. They are async and could overtake each other — React mounts effects twice in development — and a "leave" that landed after the student's last "enter" would show a strip over an empty window, or the other way round. The limit keeps a call that never returns from holding up every later one.
 
+## Signing in with Touch ID
+
+The university sign-in offers **passkeys**: in Safari, Touch ID or your Mac's password sign you in. Inside Uni Pilot that option does not work, and it cannot be made to: Apple only lets a web browser, or an app on its own domains, use passkeys for a website. The login page in Uni Pilot is neither — it is `login.hs-heilbronn.de`, not Uni Pilot's domain.
+
+What works instead:
+
+- **Your HHN user name and password** in Uni Pilot. You sign in rarely: the sign-in is kept across restarts.
+- **Open in your browser** (globe) in the strip, which opens the page ILIAS is on in your default browser, where Touch ID works. That signs in the browser, not Uni Pilot — the two keep their sign-ins apart.
+
 ## What is stored, and what is not
 
 Stored, in `localStorage` under `uni-pilot.ilias`: the university's name, the ILIAS address, its client id, its release, how its login page lets people sign in, and when it was last checked.
 
 **Not stored anywhere by Uni Pilot:** no password, no token, no session id. Your sign-in lives only in ILIAS's own cookies, the same way it would in a browser.
+
+One exception to _reading_ it: to fetch a link ILIAS opens in a new window, Rust reads the ILIAS view's cookies for that one request. It sends them only to ILIAS's own origin — same scheme, host and port — follows redirects only within it, keeps nothing, and never hands them to the page.
 
 ## The rule ILIAS is shown under
 
@@ -93,6 +111,7 @@ Once open, ILIAS navigates freely — it has to, or the university's single sign
 
 - `src-tauri/src/ilias_view.rs` — ILIAS mode: entering, leaving, laying out the window on every resize, with Rust tests for the layout and the title bar.
 - `src-tauri/src/ilias_window.rs` — the separate window, and `resolve_target`, with Rust tests.
+- `src-tauri/src/ilias_links.rs` — links ILIAS opens in a new window, and **Open in your browser**, with Rust tests for where a link goes, telling a file from a page, and file names from headers.
 - `src-tauri/src/ilias_browser.rs` — back, forward and downloads for both, with Rust tests for file names and the download list.
 - `src/features/integrations/lib/iliasBrowser.ts` and `store/iliasBrowserStore.ts` — the commands and events, and what the strip shows. Listening starts once and lasts as long as the app, so a download that ends while you are elsewhere is still heard.
 - `src/features/integrations/lib/ilias/endpoints.ts` — `resolveIliasTarget`, `dashboardUrl`; the TypeScript mirror of the rule.
@@ -113,4 +132,5 @@ Run `npm run check`, then `cargo test --manifest-path src-tauri/Cargo.toml` for 
 - ✅ **Heilbronn's sign-in works inside an embedded webview.** Confirmed on 23.09.2026 by signing in to the dashboard with a real HHN account. Heilbronn signs in through Keycloak (`login.hs-heilbronn.de`), which — unlike Google or Microsoft — does not refuse embedded browsers.
 - 🔴 **ILIAS mode on every platform.** Rust computes the layout and handles the title bar, but Tauri has open issues about child webviews, and resizing the main webview goes further into its unfinished API than laying one over it did. Check it by eye after a Tauri update, on each platform you ship to — windowed, full screen, and resizing between the two.
 - 🔴 **Back, forward and downloads on Windows and Linux.** Written against each platform's webview and type-checked for Windows, but only tried on macOS. On macOS the webview does not report where a download went, so Uni Pilot chooses the path itself; check the file lands in Downloads on the others.
+- 🔴 **Links ILIAS opens in a new window** are fetched once by Rust to tell a file from a page, and a page is then loaded a second time by the ILIAS view. Harmless for ILIAS's links, which only read; watch for anything that behaves differently when opened twice.
 - 🔴 **Whether `tauri-plugin-http` honours `redirect: 'manual'`** in a packaged build. Discovery relies on it to tell a blocked SOAP endpoint from a redirect.

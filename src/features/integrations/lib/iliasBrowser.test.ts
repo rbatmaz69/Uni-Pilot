@@ -4,6 +4,7 @@ import {
   goForwardInIlias,
   listenToIlias,
   openIliasDownload,
+  openIliasInBrowser,
   readIliasHistory,
   revealIliasDownload,
 } from './iliasBrowser';
@@ -61,6 +62,25 @@ describe('downloads', () => {
       ['open_ilias_download', { id: 7 }],
       ['reveal_ilias_download', { id: 7 }],
     ]);
+  });
+});
+
+describe('openIliasInBrowser', () => {
+  /** Rust decides the page; the connection only says which ILIAS is home. */
+  it('passes the connection, never a page address', async () => {
+    await openIliasInBrowser({
+      name: 'Hochschule Heilbronn',
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+      version: '9.23',
+      signIn: 'both',
+      soap: 'blocked',
+      checkedAt: '2026-09-23T10:00:00.000Z',
+    });
+    expect(invoke).toHaveBeenCalledWith('open_ilias_in_browser', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+    });
   });
 });
 

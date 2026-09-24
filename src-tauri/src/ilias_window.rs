@@ -51,12 +51,14 @@ pub async fn open_ilias(
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::External(url))
+    WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::External(url.clone()))
         .title("ILIAS")
         .inner_size(1180.0, 860.0)
         .min_inner_size(820.0, 600.0)
-        // Without it, downloads are silently cancelled.
+        // Without these, downloads are silently cancelled and links that open
+        // a new window — PDFs among them — do nothing.
         .on_download(crate::ilias_browser::on_download)
+        .on_new_window(crate::ilias_links::on_new_window(app.clone(), LABEL, url))
         .build()
         .map(|window| crate::ilias_browser::prepare(window.as_ref()))
         .map_err(|error| format!("ILIAS could not be opened: {error}"))

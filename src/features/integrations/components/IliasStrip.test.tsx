@@ -177,6 +177,16 @@ describe('the strip', () => {
     );
   });
 
+  /** Passkeys (Touch ID) work in a browser, never in an app's webview. */
+  it('opens ILIAS in the student’s own browser', async () => {
+    renderStrip();
+    await userEvent.click(screen.getByRole('button', { name: 'Open in your browser' }));
+    expect(invoke).toHaveBeenCalledWith('open_ilias_in_browser', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+    });
+  });
+
   it('still offers the separate window', async () => {
     renderStrip();
     await userEvent.click(screen.getByRole('button', { name: 'Open in a separate window' }));

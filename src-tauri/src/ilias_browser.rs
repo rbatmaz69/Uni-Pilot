@@ -245,40 +245,60 @@ pub fn on_download<R: Runtime>(view: Webview<R>, event: DownloadEvent<'_>) -> bo
     let app = view.app_handle();
     match event {
         DownloadEvent::Requested { url, destination } => {
-            let Ok(dir) = app.path().download_dir() else {
-                eprintln!("ILIAS download: there is no Downloads folder.");
-                return false;
-            };
             let suggested = destination
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            let name = safe_file_name(&suggested);
-            let downloads = app.state::<Downloads>();
-            let report = {
-                let Ok(mut book) = downloads.0.lock() else {
-                    return false;
-                };
-                let path = free_path(&dir, &name, |path| path.exists() || book.is_taken(path));
-                *destination = path.clone();
-                book.start(url.to_string(), path)
-            };
-            tell(app, DOWNLOAD_EVENT, report);
-            true
+            match begin_download(app, url.as_str(), &suggested) {
+                Some(path) => {
+                    *destination = path;
+                    true
+                }
+                None => false,
+            }
         }
         DownloadEvent::Finished { url, success, .. } => {
-            let report = app
-                .state::<Downloads>()
-                .0
-                .lock()
-                .ok()
-                .and_then(|mut book| book.finish(url.as_str(), success));
-            if let Some(report) = report {
-                tell(app, DOWNLOAD_EVENT, report);
-            }
+            end_download(app, url.as_str(), success);
             true
         }
         _ => true,
+    }
+}
+
+/// Picks where a download goes — in Downloads, under a checked name, never
+/// over an existing file — and tells the strip it has started. `None` when
+/// there is nowhere to put it.
+pub(crate) fn begin_download<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    url: &str,
+    suggested: &str,
+) -> Option<PathBuf> {
+    let Ok(dir) = app.path().download_dir() else {
+        eprintln!("ILIAS download: there is no Downloads folder.");
+        return None;
+    };
+    let name = safe_file_name(suggested);
+    let downloads = app.state::<Downloads>();
+    let (path, report) = {
+        let mut book = downloads.0.lock().ok()?;
+        let path = free_path(&dir, &name, |path| path.exists() || book.is_taken(path));
+        let report = book.start(url.to_string(), path.clone());
+        (path, report)
+    };
+    tell(app, DOWNLOAD_EVENT, report);
+    Some(path)
+}
+
+/// Marks the download from `url` as ended and tells the strip.
+pub(crate) fn end_download<R: Runtime>(app: &tauri::AppHandle<R>, url: &str, success: bool) {
+    let downloads = app.state::<Downloads>();
+    let report = downloads
+        .0
+        .lock()
+        .ok()
+        .and_then(|mut book| book.finish(url, success));
+    if let Some(report) = report {
+        tell(app, DOWNLOAD_EVENT, report);
     }
 }
 
@@ -305,9 +325,20 @@ fn launch(program: &str, args: &[std::ffi::OsString]) -> Result<(), String> {
     let mut child = std::process::Command::new(program)
         .args(args)
         .spawn()
-        .map_err(|error| format!("The file could not be opened: {error}"))?;
+        .map_err(|error| format!("It could not be opened: {error}"))?;
     std::thread::spawn(move || child.wait());
     Ok(())
+}
+
+/// Hands a file or a web address to the system: the default app for a file,
+/// the default browser for a link.
+pub(crate) fn open_with_system(target: impl Into<std::ffi::OsString>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return launch("open", &[target.into()]);
+    #[cfg(windows)]
+    return launch("explorer", &[target.into()]);
+    #[cfg(not(any(target_os = "macos", windows)))]
+    return launch("xdg-open", &[target.into()]);
 }
 
 /// Opens a finished download with its default app — documents and media only.
@@ -319,12 +350,7 @@ pub async fn open_ilias_download(app: tauri::AppHandle, id: u64) -> Result<(), S
             "Uni Pilot only opens documents and media. Find this file in its folder.".into(),
         );
     }
-    #[cfg(target_os = "macos")]
-    return launch("open", &[path.into()]);
-    #[cfg(windows)]
-    return launch("explorer", &[path.into()]);
-    #[cfg(not(any(target_os = "macos", windows)))]
-    return launch("xdg-open", &[path.into()]);
+    open_with_system(path)
 }
 
 /// Shows a finished download in its folder.

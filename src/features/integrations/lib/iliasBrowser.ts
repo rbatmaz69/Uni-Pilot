@@ -9,6 +9,8 @@
  * cannot ask Rust to open an arbitrary file, only one Rust saved itself.
  */
 
+import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
+
 export type IliasDownloadState = 'started' | 'finished' | 'failed';
 
 export interface IliasDownload {
@@ -59,6 +61,19 @@ export function openIliasDownload(id: number): Promise<void> {
 /** Shows a finished download in its folder. */
 export function revealIliasDownload(id: number): Promise<void> {
   return call('reveal_ilias_download', { id });
+}
+
+/**
+ * Opens the page ILIAS is on in the default browser — the dashboard when ILIAS
+ * is elsewhere, at the sign-in say. For passkeys: Touch ID and the Mac's
+ * password work at the university sign-in in a browser, but Apple keeps them
+ * from an app's webview.
+ */
+export function openIliasInBrowser(connection: IliasConnection): Promise<void> {
+  return call('open_ilias_in_browser', {
+    baseUrl: connection.baseUrl,
+    clientId: connection.clientId,
+  });
 }
 
 export interface IliasBrowserListeners {

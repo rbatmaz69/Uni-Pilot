@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Globe,
   House,
   LogOut,
   School,
@@ -14,7 +15,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button, IconButton } from '@/components/ui';
 import { IliasDownloadStatus } from '@/features/integrations/components/IliasDownloadStatus';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
-import { goBackInIlias, goForwardInIlias } from '@/features/integrations/lib/iliasBrowser';
+import {
+  goBackInIlias,
+  goForwardInIlias,
+  openIliasInBrowser,
+} from '@/features/integrations/lib/iliasBrowser';
 import {
   closeIliasView,
   enterIliasMode,
@@ -198,6 +203,15 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
         <div className="flex flex-none items-center gap-1">
           <IconButton label="ILIAS dashboard" size="sm" onClick={() => go('')}>
             <House size={15} />
+          </IconButton>
+          <IconButton
+            label="Open in your browser"
+            size="sm"
+            onClick={() => {
+              openIliasInBrowser(connection).catch(report);
+            }}
+          >
+            <Globe size={15} />
           </IconButton>
           <IconButton
             label="Open in a separate window"
