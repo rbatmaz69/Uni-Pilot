@@ -1020,9 +1020,19 @@ Drei Befunde aus der Umsetzung ergänzen diesen Abschnitt:
 - **Im Browser (`npm run dev`) kommt ILIAS wegen fehlender CORS-Header nicht an.** Die Desktop-App
   ist davon nicht betroffen; für die Entwicklung gibt es ein Relay im Vite-Dev-Server. ✅ verifiziert
 
-Weiter **offen** 🔴: ob die Keycloak-Anmeldung der HHN (`login.hs-heilbronn.de/realms/hhn`) in einem
-eingebetteten Fenster funktioniert. Keycloak selbst sperrt eingebettete Browser nicht, anders als
-Google oder Microsoft; belegt ist es aber erst mit einem Lauf der Desktop-App.
+**Beantwortet** ✅: Die Keycloak-Anmeldung der HHN (`login.hs-heilbronn.de/realms/hhn`) funktioniert
+in einem eingebetteten Fenster. Am 23.09.2026 mit einem echten HHN-Konto bis ins ILIAS-Dashboard
+durchgespielt. Keycloak sperrt eingebettete Browser nicht, anders als Google oder Microsoft. Damit
+war die letzte offene Frage des Vorhabens beantwortet.
+
+**Danach weiterentwickelt:** ILIAS erscheint in der Desktop-App nicht mehr in einem eigenen Fenster,
+sondern **direkt im Uni-Pilot-Fenster** — als zweite native Webansicht über dem Inhaltsbereich der
+ILIAS-Seite (`Window::add_child`). Das ist kein `<iframe>`, die Sperre `x-frame-options` greift also
+nicht. Die Funktion liegt hinter Taurs `unstable`-Schalter, den Tauri als unfertig bezeichnet; das
+eigene Fenster bleibt als Rückfall erreichbar. Einzelheiten in [`docs/ilias-window.md`](../ilias-window.md).
+
+Weiter **offen** 🔴: ob die eingebettete Ansicht auf jeder Plattform exakt über ihrer Fläche sitzt.
+Tauri hat offene Fehlermeldungen zur Positionierung solcher Ansichten.
 
 ---
 

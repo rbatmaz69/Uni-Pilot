@@ -113,7 +113,7 @@ scripts/        Eigenständige Node-Skripte
 | Dokument                                                                                             | Inhalt                                                            |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | [`docs/reminders.md`](docs/reminders.md)                                                             | Kalender-Erinnerungen                                             |
-| [`docs/ilias-window.md`](docs/ilias-window.md)                                                       | ILIAS in einem eigenen App-Fenster öffnen                         |
+| [`docs/ilias-window.md`](docs/ilias-window.md)                                                       | ILIAS direkt in der App anzeigen                                  |
 | [`docs/integrations/ilias-integration-research.md`](docs/integrations/ilias-integration-research.md) | ILIAS: Schnittstellen-Recherche, Feature-Matrix, Architektur, PoC |
 
 ### Design-System
