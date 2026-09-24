@@ -2,7 +2,6 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import {
   AppWindow,
   CircleCheck,
-  LogOut,
   RefreshCw,
   School,
   ShieldCheck,
@@ -134,15 +133,6 @@ export function IliasWorkspace({ target }: IliasWorkspaceProps = {}) {
           return 'ILIAS answered. Everything is up to date.';
         })
       }
-      onSignOut={() =>
-        void run(async () => {
-          // ILIAS's own sign-out, in the ILIAS window. Portable where clearing
-          // the webview's storage is not, and it ends the session ILIAS knows
-          // about rather than just hiding it from us.
-          await openIlias(connection, `${connection.baseUrl}/logout.php`);
-          return 'ILIAS is signing you out in its window.';
-        })
-      }
       onDisconnect={() => {
         const name = connection.name;
         disconnect();
@@ -236,7 +226,6 @@ interface ConnectedProps {
   busy: boolean;
   onOpen: () => void;
   onRecheck: () => void;
-  onSignOut: () => void;
   onDisconnect: () => void;
   children: ReactNode;
 }
@@ -264,7 +253,6 @@ function Connected({
   busy,
   onOpen,
   onRecheck,
-  onSignOut,
   onDisconnect,
   children,
 }: ConnectedProps) {
@@ -315,14 +303,6 @@ function Connected({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onSignOut}
-          leadingIcon={<LogOut size={13} aria-hidden />}
-        >
-          Sign out of ILIAS
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
           onClick={onDisconnect}
           leadingIcon={<Unplug size={13} aria-hidden />}
         >
@@ -330,8 +310,8 @@ function Connected({
         </Button>
       </div>
       <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
-        Disconnecting only makes Uni Pilot forget this ILIAS. To end your session there, sign out of
-        ILIAS first.
+        Disconnecting only makes Uni Pilot forget this ILIAS. To end your session there, sign out in
+        ILIAS itself, from the menu at the top right.
       </p>
 
       <p className="mt-5 flex items-start gap-2 rounded-xl bg-surface-secondary p-3 text-xs leading-relaxed text-secondary">

@@ -133,14 +133,12 @@ fn file_name_from_url(url: &Url) -> String {
         .unwrap_or_default()
 }
 
-/// Fetches an ILIAS link the way the ILIAS webview would, then saves a file or
-/// shows a page.
-async fn fetch_or_show<R: Runtime>(
-    app: &tauri::AppHandle<R>,
-    label: &str,
-    link: Url,
-) -> Result<(), String> {
-    let view = app.get_webview(label).ok_or("ILIAS is not open.")?;
+/// Asks ILIAS for `link` as the ILIAS webview would: with its cookies, sent
+/// only to that origin, following redirects only within it.
+pub(crate) async fn fetch_as_ilias<R: Runtime>(
+    view: &tauri::Webview<R>,
+    link: &Url,
+) -> Result<reqwest::Response, String> {
     let cookie = view
         .cookies_for_url(link.clone())
         .map_err(|error| format!("ILIAS could not be asked: {error}"))?
@@ -160,12 +158,23 @@ async fn fetch_or_show<R: Runtime>(
         }))
         .build()
         .map_err(|error| format!("ILIAS could not be asked: {error}"))?;
-    let mut response = client
+    client
         .get(link.clone())
         .header(header::COOKIE, cookie)
         .send()
         .await
-        .map_err(|error| format!("ILIAS could not be reached: {error}"))?;
+        .map_err(|error| format!("ILIAS could not be reached: {error}"))
+}
+
+/// Fetches an ILIAS link the way the ILIAS webview would, then saves a file or
+/// shows a page.
+async fn fetch_or_show<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    label: &str,
+    link: Url,
+) -> Result<(), String> {
+    let view = app.get_webview(label).ok_or("ILIAS is not open.")?;
+    let mut response = fetch_as_ilias(&view, &link).await?;
 
     let text = |name: header::HeaderName| {
         response

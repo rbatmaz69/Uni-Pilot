@@ -6,16 +6,16 @@ Why ILIAS itself rather than native screens: at Heilbronn, ILIAS gives Uni Pilot
 
 ## What the page does
 
-| Control                          | What happens                                                                                                                 |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Connect**                      | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved. |
-| **Uni Pilot** (back)             | Leaves ILIAS mode for the page you came from; the sidebar and header return.                                                 |
-| **‹ ›** (back, forward)          | Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too. |
-| **ILIAS dashboard** (house)      | Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.    |
-| **Open in your browser** (globe) | The page ILIAS is on, in your default browser. For signing in with Touch ID — see below.                                     |
-| **Open in a separate window**    | The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                        |
-| **Sign out of ILIAS**            | Opens ILIAS's own `logout.php`, which ends the session ILIAS knows about.                                                    |
-| **Disconnect**                   | Makes Uni Pilot forget the address. It does not sign you out of ILIAS — do that first if you want to.                        |
+| Control                          | What happens                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Connect**                      | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved.                                 |
+| **Uni Pilot** (back)             | Leaves ILIAS mode for the page you came from; the sidebar and header return.                                                                                 |
+| **‹ ›** (back, forward)          | Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too.                                 |
+| **ILIAS dashboard** (house)      | Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.                                    |
+| **Open in your browser** (globe) | The page ILIAS is on, in your default browser. For signing in with Touch ID — see below.                                                                     |
+| **Open in a separate window**    | The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                                                        |
+| **Sign out of ILIAS**            | Signs out the way ILIAS's own menu does, then makes this computer forget the university sign-on, so the next sign-in asks for the password again. See below. |
+| **Disconnect**                   | Makes Uni Pilot forget the address. It does not sign you out of ILIAS — do that first if you want to.                                                        |
 
 In the calendar, an entry that came from an ILIAS feed shows **Open in ILIAS**. ILIAS writes a link to the course or exercise into every entry it exports, so this goes to the ILIAS page and opens the exercise itself rather than the start page. Timetable entries from splan carry no link and show nothing.
 
@@ -68,6 +68,14 @@ What follows from that:
 - **Leaving hides ILIAS; only Disconnect closes it.** That is what keeps your place.
 - **Calls to Rust go strictly in order**, each with a time limit. They are async and could overtake each other — React mounts effects twice in development — and a "leave" that landed after the student's last "enter" would show a strip over an empty window, or the other way round. The limit keeps a call that never returns from holding up every later one.
 
+## Signing out
+
+ILIAS 9 signs out only through the link in its own user menu. `doLogout` is one of the commands ILIAS runs only with the token that link carries (`rtoken`); a bare `logout.php` is dropped without a word, and ILIAS sends you straight back to the dashboard. That is why the button first did nothing but flicker.
+
+**Sign out of ILIAS** now asks ILIAS for the dashboard once, finds that link in it and opens it in the ILIAS view, so ILIAS ends the session on its side (`src-tauri/src/ilias_sign_out.rs`). A few seconds later the view forgets every cookie that is not ILIAS's own, the university sign-on's among them — otherwise the next sign-in would pass straight through without a password. If ILIAS offers no sign-out link, nobody was signed in; the view then forgets ILIAS's cookies too, and the strip says so.
+
+In a browser tab Uni Pilot cannot sign ILIAS out, so the page there has no such button and points to ILIAS's own menu instead.
+
 ## Signing in with Touch ID
 
 The university sign-in offers **passkeys**: in Safari, Touch ID or your Mac's password sign you in. Inside Uni Pilot that option does not work, and it cannot be made to: Apple only lets a web browser, or an app on its own domains, use passkeys for a website. The login page in Uni Pilot is neither — it is `login.hs-heilbronn.de`, not Uni Pilot's domain.
@@ -83,7 +91,7 @@ Stored, in `localStorage` under `uni-pilot.ilias`: the university's name, the IL
 
 **Not stored anywhere by Uni Pilot:** no password, no token, no session id. Your sign-in lives only in ILIAS's own cookies, the same way it would in a browser.
 
-One exception to _reading_ it: to fetch a link ILIAS opens in a new window, Rust reads the ILIAS view's cookies for that one request. It sends them only to ILIAS's own origin — same scheme, host and port — follows redirects only within it, keeps nothing, and never hands them to the page.
+Two exceptions to _reading_ it, both in Rust and both one request long: to fetch a link ILIAS opens in a new window, and to find the sign-out link (below). For each, Rust reads the ILIAS view's cookies for that one request. It sends them only to ILIAS's own origin — same scheme, host and port — follows redirects only within it, keeps nothing, and never hands them to the page.
 
 ## The rule ILIAS is shown under
 
@@ -114,6 +122,7 @@ Once open, ILIAS navigates freely — it has to, or the university's single sign
 
 - `src-tauri/src/ilias_view.rs` — ILIAS mode: entering, leaving, laying out the window on every resize, with Rust tests for the layout and the title bar.
 - `src-tauri/src/ilias_window.rs` — the separate window, and `resolve_target`, with Rust tests.
+- `src-tauri/src/ilias_sign_out.rs` — **Sign out of ILIAS**, with Rust tests for finding ILIAS's own link and for whose cookie is whose.
 - `src-tauri/src/ilias_links.rs` — links ILIAS opens in a new window, and **Open in your browser**, with Rust tests for where a link goes, telling a file from a page, and file names from headers.
 - `src-tauri/src/ilias_browser.rs` — back, forward and downloads for both, with Rust tests for file names and the download list.
 - `src/features/integrations/lib/iliasBrowser.ts` and `store/iliasBrowserStore.ts` — the commands and events, and what the strip shows. Listening starts once and lasts as long as the app, so a download that ends while you are elsewhere is still heard.

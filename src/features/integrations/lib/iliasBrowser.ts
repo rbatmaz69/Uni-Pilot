@@ -76,6 +76,21 @@ export function openIliasInBrowser(connection: IliasConnection): Promise<void> {
   });
 }
 
+/** `ilias`: ILIAS ended the session. `here`: nobody was signed in, so only this computer forgot. */
+export type IliasSignOut = 'ilias' | 'here';
+
+/**
+ * Signs out the way ILIAS's own menu does — ILIAS 9 ignores a bare
+ * `logout.php` — and makes this computer forget the university sign-on, so
+ * the next sign-in asks for the password again. Rust finds the link.
+ */
+export function signOutOfIlias(connection: IliasConnection): Promise<IliasSignOut> {
+  return call<IliasSignOut>('sign_out_of_ilias', {
+    baseUrl: connection.baseUrl,
+    clientId: connection.clientId,
+  });
+}
+
 export interface IliasBrowserListeners {
   onDownload: (download: IliasDownload) => void;
   onHistory: (history: IliasHistory) => void;

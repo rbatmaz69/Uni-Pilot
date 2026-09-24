@@ -169,12 +169,24 @@ describe('the strip', () => {
     await waitFor(() => expect(sent()).toContain('navigate_ilias()'));
   });
 
-  it('signs out through ILIAS’s own logout page', async () => {
+  /** ILIAS 9 ignores a bare logout.php; Rust finds ILIAS's own link instead. */
+  it('signs out the way ILIAS’s own menu does', async () => {
     renderStrip();
     await userEvent.click(screen.getByRole('button', { name: 'Sign out of ILIAS' }));
-    await waitFor(() =>
-      expect(sent()).toContain('navigate_ilias(https://ilias.hs-heilbronn.de/logout.php)'),
+    expect(invoke).toHaveBeenCalledWith('sign_out_of_ilias', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+    });
+    expect(sent()).not.toContain('navigate_ilias(https://ilias.hs-heilbronn.de/logout.php)');
+  });
+
+  it('says so when no one was signed in', async () => {
+    invoke.mockImplementation((command) =>
+      Promise.resolve(command === 'sign_out_of_ilias' ? 'here' : undefined),
     );
+    renderStrip();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out of ILIAS' }));
+    expect(await screen.findByText('No one was signed in to ILIAS.')).toBeInTheDocument();
   });
 
   /** Passkeys (Touch ID) work in a browser, never in an app's webview. */

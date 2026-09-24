@@ -7,6 +7,7 @@ import {
   openIliasInBrowser,
   readIliasHistory,
   revealIliasDownload,
+  signOutOfIlias,
 } from './iliasBrowser';
 
 const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>();
@@ -78,6 +79,26 @@ describe('openIliasInBrowser', () => {
       checkedAt: '2026-09-23T10:00:00.000Z',
     });
     expect(invoke).toHaveBeenCalledWith('open_ilias_in_browser', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+    });
+  });
+});
+
+describe('signOutOfIlias', () => {
+  it('asks Rust to sign out, and reports how', async () => {
+    invoke.mockResolvedValue('ilias');
+    const result = await signOutOfIlias({
+      name: 'Hochschule Heilbronn',
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+      version: '9.23',
+      signIn: 'both',
+      soap: 'blocked',
+      checkedAt: '2026-09-23T10:00:00.000Z',
+    });
+    expect(result).toBe('ilias');
+    expect(invoke).toHaveBeenCalledWith('sign_out_of_ilias', {
       baseUrl: 'https://ilias.hs-heilbronn.de',
       clientId: 'iliashhn',
     });

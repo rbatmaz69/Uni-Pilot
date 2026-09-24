@@ -157,15 +157,20 @@ describe('once connected', () => {
     );
   });
 
-  it('signs out through ILIAS’s own logout page', async () => {
+  /**
+   * In a browser tab ILIAS lives in the browser, where Uni Pilot cannot sign
+   * it out — and ILIAS 9 ignores a bare logout.php. So there is no button that
+   * would only pretend; the page points to ILIAS's own menu instead.
+   */
+  it('leaves signing out to ILIAS’s own menu in a browser tab', () => {
     render(<IliasWorkspace />);
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out of ILIAS' }));
-    expect(openIlias).toHaveBeenCalledWith(CONNECTED, 'https://ilias.hs-heilbronn.de/logout.php');
+    expect(screen.queryByRole('button', { name: 'Sign out of ILIAS' })).not.toBeInTheDocument();
+    expect(screen.getByText(/from the menu at the top right/)).toBeInTheDocument();
   });
 
   it('explains what disconnecting does before it happens', () => {
     render(<IliasWorkspace />);
-    expect(screen.getByText(/sign out of ILIAS first/)).toBeInTheDocument();
+    expect(screen.getByText(/only makes Uni Pilot forget this ILIAS/)).toBeInTheDocument();
   });
 
   it('disconnects and goes back to the start', async () => {

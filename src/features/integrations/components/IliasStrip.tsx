@@ -19,6 +19,7 @@ import {
   goBackInIlias,
   goForwardInIlias,
   openIliasInBrowser,
+  signOutOfIlias,
 } from '@/features/integrations/lib/iliasBrowser';
 import {
   closeIliasView,
@@ -67,6 +68,7 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
   const stripRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const history = useIliasBrowserStore((state) => state.history);
 
   const report = useCallback((cause: unknown) => setError(messageOf(cause)), []);
@@ -130,8 +132,19 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
     step().catch(report);
   };
 
+  const signOut = () => {
+    setError(null);
+    setNotice(null);
+    signOutOfIlias(connection)
+      .then((result) => {
+        if (result === 'here') setNotice('No one was signed in to ILIAS.');
+      })
+      .catch(report);
+  };
+
   const go = (target: string) => {
     setError(null);
+    setNotice(null);
     navigateIlias(connection, target).catch(report);
   };
 
@@ -196,6 +209,11 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
               <span className="truncate">{error}</span>
             </span>
           ) : null}
+          {notice && !error ? (
+            <span role="status" className="truncate text-[12px] text-muted">
+              {notice}
+            </span>
+          ) : null}
         </div>
 
         <IliasDownloadStatus onError={report} />
@@ -225,7 +243,7 @@ export function IliasStrip({ connection, initialTarget, onDisconnect }: IliasStr
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => go(`${connection.baseUrl}/logout.php`)}
+            onClick={signOut}
             leadingIcon={<LogOut size={13} aria-hidden />}
           >
             Sign out of ILIAS
