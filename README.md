@@ -62,6 +62,17 @@ Rust wird nur für die Desktop-Hülle gebraucht:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
+**Linux: `symbol lookup error … /snap/core20/…`** beim Start von `npm run tauri:dev` kommt nicht aus
+dem Projekt, sondern aus einem VS Code, das als Snap installiert ist: Sein Terminal setzt
+GTK-Pfade auf die Bibliotheken des Snaps, und die passen nicht zum System. Entweder in einem
+normalen Terminal starten oder im VS-Code-Terminal so:
+
+```bash
+env -u GTK_PATH -u GIO_MODULE_DIR -u GTK_IM_MODULE_FILE -u GTK_EXE_PREFIX -u LOCPATH -u GSETTINGS_SCHEMA_DIR npm run tauri:dev
+```
+
+Dauerhaft hilft VS Code als `.deb` statt als Snap.
+
 ### Skripte
 
 | Skript                | Zweck                                          |
@@ -104,7 +115,17 @@ src/
   types/        Gemeinsame Typen
 src-tauri/      Tauri-2-Desktop-Hülle
 design/         Design-Referenz (Mockup)
+docs/           Technische Dokumentation
+scripts/        Eigenständige Node-Skripte
 ```
+
+### Dokumentation
+
+| Dokument                                                                                             | Inhalt                                                            |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`docs/reminders.md`](docs/reminders.md)                                                             | Kalender-Erinnerungen                                             |
+| [`docs/ilias-window.md`](docs/ilias-window.md)                                                       | ILIAS direkt in der App anzeigen                                  |
+| [`docs/integrations/ilias-integration-research.md`](docs/integrations/ilias-integration-research.md) | ILIAS: Schnittstellen-Recherche, Feature-Matrix, Architektur, PoC |
 
 ### Design-System
 

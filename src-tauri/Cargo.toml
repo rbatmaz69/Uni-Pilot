@@ -14,12 +14,33 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `unstable` for Window::add_child, which embeds ILIAS in the main window
+# (src/ilias_view.rs). Tauri marks multi-webview as unfinished; that module
+# keeps the separate ILIAS window in src/ilias_window.rs as the fallback.
+tauri = { version = "2", features = ["unstable"] }
 # Calendar subscriptions are fetched here rather than in the webview: feeds
 # carry no CORS headers, so the browser would refuse them.
 tauri-plugin-http = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Back and forward in ILIAS, and downloads the macOS webview would otherwise
+# show (src/ilias_browser.rs), go straight to each platform's webview, which
+# Tauri does not expose. All of these already come in through Tauri; they are
+# only named here, at the versions Tauri uses.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURLResponse"] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows = "0.61"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0"
+# ILIAS mode on Linux shares the window's GTK box (src/ilias_view.rs).
+gtk = "0.18"
 
 [profile.release]
 codegen-units = 1

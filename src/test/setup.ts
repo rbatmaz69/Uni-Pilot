@@ -4,6 +4,11 @@ import { afterEach, beforeEach } from 'vitest';
 import { useSourceStore } from '@/features/calendar/store/sourceStore';
 import { useTaskStore } from '@/features/calendar/store/taskStore';
 import { useEventStore } from '@/features/calendar/store/eventStore';
+import { NO_HISTORY } from '@/features/integrations/lib/iliasBrowser';
+import {
+  resetIliasBrowserListening,
+  useIliasBrowserStore,
+} from '@/features/integrations/store/iliasBrowserStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
@@ -22,7 +27,14 @@ afterEach(() => {
     error: null,
     settings: DEFAULT_SETTINGS,
   });
-  useUiStore.setState({ sidebarCollapsed: false, studentEventsCollapsed: false, theme: 'light' });
+  useUiStore.setState({
+    sidebarCollapsed: false,
+    studentEventsCollapsed: false,
+    theme: 'light',
+    immersive: false,
+  });
   useSourceStore.setState({ sources: [], syncingIds: [] });
   useTaskStore.setState({ tasks: [] });
+  useIliasBrowserStore.setState({ history: NO_HISTORY, downloads: [] });
+  resetIliasBrowserListening();
 });

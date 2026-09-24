@@ -1,11 +1,9 @@
-import type {
-  ActivityNotification,
-  AgendaEvent,
-  Assignment,
-  BusDeparture,
-  Course,
-  MensaMeal,
-} from './types';
+/**
+ * Demo courses for the Courses page, until real ones come from a course
+ * source. The dashboard no longer shows any of this.
+ */
+
+import type { Course } from './types';
 
 export const MOCK_COURSES: Course[] = [
   {
@@ -70,126 +68,5 @@ export const MOCK_COURSES: Course[] = [
     tone: 'teal',
     room: 'C 12',
     instructor: 'Dr. Michael Schmidt',
-  },
-];
-
-export const INITIAL_ASSIGNMENTS: Assignment[] = [
-  {
-    id: 'a1',
-    title: 'Database Assignment',
-    course: 'Database Systems',
-    due: 'Due tomorrow · 23:59',
-    progress: 40,
-    completed: false,
-    priority: 'high',
-    progressTone: 'accent',
-  },
-  {
-    id: 'a2',
-    title: 'UX Case Study',
-    course: 'HCI',
-    due: 'In 3 days',
-    progress: 70,
-    completed: false,
-    priority: 'med',
-    progressTone: 'coral',
-  },
-  {
-    id: 'a3',
-    title: 'Exam Registration',
-    course: 'Administration',
-    due: 'In 5 days',
-    progress: 0,
-    completed: false,
-    priority: 'high',
-    progressTone: 'accent',
-  },
-];
-
-export const MENSA_MENU: MensaMeal[] = [
-  {
-    id: 'm1',
-    name: 'Roasted pumpkin gnocchi',
-    tag: 'Vegetarian',
-    price: '3.20 €',
-  },
-  {
-    id: 'm2',
-    name: 'Herb chicken & rice bowl',
-    tag: 'High protein',
-    price: '4.10 €',
-  },
-  {
-    id: 'm3',
-    name: 'Lentil dahl, naan',
-    tag: 'Vegan',
-    price: '2.90 €',
-  },
-];
-
-export const BUS_INFO: BusDeparture = {
-  line: 'Bus 5',
-  destination: 'Hochschule Heilbronn',
-  stop: 'Bildungscampus Süd',
-  minutes: 4,
-  upcoming: "then in 19', 31'",
-  rideDuration: '12 min ride',
-};
-
-export const NOTIFICATIONS: ActivityNotification[] = [
-  {
-    id: 'n1',
-    sender: 'Prof. Dr. Lindqvist',
-    initials: 'PD',
-    source: 'Mail',
-    message: 'Lab 4 submission extension & guidelines released',
-    timeAgo: '4m',
-    unread: true,
-  },
-  {
-    id: 'n2',
-    sender: 'Campus IT Services',
-    initials: 'CI',
-    source: 'System',
-    message: 'VPN certificate update required for eduroam access',
-    timeAgo: '15m',
-    unread: true,
-  },
-  {
-    id: 'n3',
-    sender: 'Exam Office',
-    initials: 'EO',
-    source: 'ILIAS',
-    message: 'Exam registration closes tomorrow at 18:00',
-    timeAgo: '32m',
-    unread: true,
-  },
-];
-
-export const TODAY_AGENDA: AgendaEvent[] = [
-  {
-    id: 'e1',
-    startTime: '09:00',
-    endTime: '10:30',
-    title: 'Software Engineering',
-    room: 'A 312',
-    tone: 'green',
-  },
-  {
-    id: 'e2',
-    startTime: '11:00',
-    endTime: '12:45',
-    title: 'Programming II',
-    room: 'C 04',
-    tone: 'yellow',
-    isActive: true,
-  },
-  {
-    id: 'e3',
-    startTime: '15:00',
-    endTime: '16:00',
-    title: 'Project Meeting',
-    room: 'B 200',
-    tone: 'orange',
   },
 ];

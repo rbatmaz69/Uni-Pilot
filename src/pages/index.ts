@@ -8,6 +8,7 @@ export { EventsPage } from './EventsPage';
 export { ExamsPage } from './ExamsPage';
 export { FocusPage } from './FocusPage';
 export { GradesPage } from './GradesPage';
+export { IliasPage } from './IliasPage';
 export { SettingsPage } from './SettingsPage';
 export { StudiesPage } from './StudiesPage';
 export { TasksPage } from './TasksPage';

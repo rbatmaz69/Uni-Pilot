@@ -227,6 +227,23 @@ describe('a StarPlan-shaped feed', () => {
   });
 });
 
+describe('the link back to where an entry came from', () => {
+  it('carries the deep link an ILIAS feed writes', () => {
+    const entry = mapOne(
+      'UID:ilias-1',
+      'SUMMARY:Abgabe Blatt 3',
+      'DTSTART:20260929T235900',
+      'URL;VALUE=URI:https://ilias.hs-heilbronn.de/goto.php?target=exc_4711',
+    );
+    expect(entry?.url).toBe('https://ilias.hs-heilbronn.de/goto.php?target=exc_4711');
+  });
+
+  it('adds nothing to an entry without one, which is every splan entry', () => {
+    const entry = mapOne('UID:splan-1', 'SUMMARY:AKSE (262164)', 'DTSTART:20260929T080000');
+    expect(entry).not.toHaveProperty('url');
+  });
+});
+
 describe('merging sources', () => {
   const event = (id: string, title: string): CalendarEvent => ({
     id,

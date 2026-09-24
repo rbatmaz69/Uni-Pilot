@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ListTodo,
   PartyPopper,
+  School,
   Settings,
   Sparkles,
   Timer,
@@ -63,6 +64,14 @@ export const NAV_ITEMS = {
     placeholder: 'This area will list your enrolled courses.',
     icon: BookOpen,
     tone: 'yellow',
+  },
+  ilias: {
+    path: '/ilias',
+    label: 'ILIAS',
+    subtitle: 'Your university’s learning platform, one click away.',
+    placeholder: 'This area opens ILIAS inside Uni Pilot.',
+    icon: School,
+    tone: 'blue',
   },
   exams: {
     path: '/exams',
@@ -136,7 +145,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'academics',
     label: 'Academics',
-    items: [NAV_ITEMS.courses, NAV_ITEMS.exams, NAV_ITEMS.grades],
+    items: [NAV_ITEMS.courses, NAV_ITEMS.ilias, NAV_ITEMS.exams, NAV_ITEMS.grades],
   },
   {
     id: 'campus',

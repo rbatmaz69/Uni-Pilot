@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  DERIVED, NOT CAPTURED. The private feed needs a per-user feed password, so
+  this document follows Services/Feeds/templates/default/tpl.rss_2_0.xml from
+  ILIAS release_9 field for field: channel title/link/description, then one
+  item per notice with title, link, description, pubDate and guid.
+-->
+<rss version="2.0">
+	<channel>
+		<title>ILIAS Hochschule Heilbronn</title>
+		<link>https://ilias.hs-heilbronn.de</link>
+		<description>Persönlicher Nachrichten-Feed</description>
+
+		<item>
+			<title>Vorlesung am Freitag fällt aus</title>
+			<link>https://ilias.hs-heilbronn.de/goto.php?target=crs_4711</link>
+			<description>Die Vorlesung am 24.10. entfällt krankheitsbedingt.</description>
+			<pubDate>Tue, 21 Oct 2025 09:12:00 +0200</pubDate>
+			<guid>https://ilias.hs-heilbronn.de/news.php?id=88421</guid>
+		</item>
+		<item>
+			<title>Neues Skript online</title>
+			<link>https://ilias.hs-heilbronn.de/goto.php?target=file_5522</link>
+			<description>Kapitel 4 steht im Kursordner bereit.</description>
+			<pubDate>Mon, 20 Oct 2025 16:40:00 +0200</pubDate>
+			<guid>https://ilias.hs-heilbronn.de/news.php?id=88390</guid>
+		</item>
+	</channel>
+</rss>
