@@ -22,7 +22,12 @@ afterEach(() => {
     error: null,
     settings: DEFAULT_SETTINGS,
   });
-  useUiStore.setState({ sidebarCollapsed: false, studentEventsCollapsed: false, theme: 'light' });
+  useUiStore.setState({
+    sidebarCollapsed: false,
+    studentEventsCollapsed: false,
+    theme: 'light',
+    immersive: false,
+  });
   useSourceStore.setState({ sources: [], syncingIds: [] });
   useTaskStore.setState({ tasks: [] });
 });

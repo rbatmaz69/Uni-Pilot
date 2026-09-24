@@ -1,11 +1,30 @@
 import { ReminderService } from '@/features/reminders/components/ReminderService';
+import { cn } from '@/lib/utils';
+import { useUiStore } from '@/store/uiStore';
 import { Header } from './Header';
 import { MainContent } from './MainContent';
 import { Sidebar } from './Sidebar';
 
+/**
+ * The shell. When a page takes over the window (`immersive`), the sidebar and
+ * header step aside and the frame loses its padding and rounding, so the page
+ * runs edge to edge.
+ *
+ * The tree keeps its shape either way — the absent parts leave empty slots
+ * rather than a different structure. Otherwise React would remount the page
+ * on switching, the page would switch back on unmounting, and the two would
+ * loop.
+ */
 export function AppLayout() {
+  const immersive = useUiStore((state) => state.immersive);
+
   return (
-    <div className="app-shell relative flex h-full w-full overflow-hidden">
+    <div
+      className={cn(
+        'relative flex h-full w-full overflow-hidden',
+        immersive ? 'bg-surface' : 'app-shell',
+      )}
+    >
       <ReminderService />
       <a
         href="#main-content"
@@ -13,10 +32,20 @@ export function AppLayout() {
       >
         Skip to content
       </a>
-      <div className="app-frame flex min-w-0 flex-1 overflow-hidden rounded-[30px] max-[700px]:rounded-none">
-        <Sidebar />
-        <div className="workspace relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[26px]">
-          <Header />
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 overflow-hidden',
+          !immersive && 'app-frame rounded-[30px] max-[700px]:rounded-none',
+        )}
+      >
+        {immersive ? null : <Sidebar />}
+        <div
+          className={cn(
+            'relative flex min-w-0 flex-1 flex-col overflow-hidden',
+            !immersive && 'workspace rounded-[26px]',
+          )}
+        >
+          {immersive ? null : <Header />}
           <MainContent />
         </div>
       </div>

@@ -1,12 +1,14 @@
 /**
- * ILIAS embedded in the Uni Pilot window — the TypeScript side of
- * `src-tauri/src/ilias_view.rs`.
+ * ILIAS mode — the TypeScript side of `src-tauri/src/ilias_view.rs`.
  *
- * The view is a native webview laid *over* the page, not an element in it, so
- * the page has to say where it goes and when to step aside. That is all this
- * module does: measure, and pass on in order.
+ * On the ILIAS page the window holds two webviews side by side: Uni Pilot
+ * shrunk to a strip at the top, and ILIAS filling the rest. Rust lays them out,
+ * because once Uni Pilot is the strip, the page can no longer see the window.
+ * This module only says when to switch, and passes on the two numbers Rust
+ * cannot measure itself: how tall the strip is, and how tall the page was
+ * before it shrank.
  *
- * Desktop only. A browser tab cannot embed ILIAS at all — it forbids framing —
+ * Desktop only. A browser tab cannot hold ILIAS at all — it forbids framing —
  * so there the page falls back to opening a tab (`iliasWindow.ts`).
  */
 
@@ -14,42 +16,18 @@ import { isDesktopRuntime } from '@/lib/icsFetch';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import { resolveIliasTarget } from '@/features/integrations/lib/ilias/endpoints';
 
-/** Logical pixels, relative to the window's content — what the Rust side expects. */
-export interface ViewBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/** True where ILIAS can sit inside the Uni Pilot window. */
+/** True where ILIAS can fill the Uni Pilot window. */
 export function canEmbedIlias(): boolean {
   return isDesktopRuntime();
 }
 
 /**
- * Where an element sits in the window. Rounded, because a webview at a
- * fractional position renders with soft edges and leaves hairline gaps.
- */
-export function boundsOf(element: Element): ViewBounds {
-  const rect = element.getBoundingClientRect();
-  return {
-    x: Math.round(rect.left),
-    y: Math.round(rect.top),
-    width: Math.max(0, Math.round(rect.width)),
-    height: Math.max(0, Math.round(rect.height)),
-  };
-}
-
-/**
- * Whether the student has opened something the view would cover.
+ * Whether something is open that needs the whole window.
  *
- * The view is native and sits above every element of the page, so a dialog
- * rendered into the page would open *underneath* ILIAS. Only what the student
- * opens on purpose counts: dialogs (the app's `Modal`, the header's search and
- * notifications, which are a native `<dialog>`). Tooltips and reminders do not
- * — hiding ILIAS on hover would make it flicker, and a reminder should not make
- * a half-written forum post vanish.
+ * In ILIAS mode Uni Pilot is only the strip, so a dialog would be cut off at
+ * its edge. Only what the student opens on purpose counts: dialogs (the app's
+ * `Modal`, a native `<dialog>`). Tooltips and reminders do not — they would
+ * make ILIAS jump out of the way on hover or mid-sentence.
  */
 export function overlayIsOpen(root: ParentNode = document): boolean {
   return root.querySelector('dialog[open], [role="dialog"], [aria-modal="true"]') !== null;
@@ -60,16 +38,16 @@ export function overlayIsOpen(root: ParentNode = document): boolean {
 /**
  * Every call is sent strictly after the previous one finished. The commands
  * are async on the Rust side and could otherwise overtake each other — and
- * React mounts effects twice in development, so "show, hide, show" is routine.
- * If "hide" landed last, ILIAS would stay invisible on an open ILIAS page.
+ * React mounts effects twice in development, so "enter, leave, enter" is
+ * routine. If "leave" landed last, the ILIAS page would show a strip over an
+ * empty window.
  */
 let queue: Promise<unknown> = Promise.resolve();
 
 /**
- * How long one call may hold the queue. Creating the view takes well under a
- * second; the limit is only there so a call that never returns cannot leave
- * every later one waiting behind it — the ILIAS page would be dead until the
- * app restarted.
+ * How long one call may hold the queue. Laying out the window takes well under
+ * a second; the limit only stops a call that never returns from leaving every
+ * later one waiting behind it.
  */
 const CALL_LIMIT_MS = 15_000;
 
@@ -97,60 +75,69 @@ async function call(command: string, args: Record<string, unknown>): Promise<voi
 }
 
 /**
- * Shows ILIAS over `bounds`, creating the view the first time.
- *
- * `target` undefined keeps the page the student was on; any string navigates,
- * with `''` meaning the dashboard. It is checked here with the same rule Rust
- * applies, so a refused link fails before crossing over.
+ * Checked here with the same rule Rust applies, so a refused link never
+ * crosses. Synchronously, and that matters: checking in a `.then()` would
+ * queue the call a tick late, and a `leaveIliasMode()` made right after would
+ * overtake it — leaving ILIAS mode active on a page the student had left.
  */
-export function showIliasView(
-  connection: IliasConnection,
-  bounds: ViewBounds,
-  target?: string,
-): Promise<void> {
+function refusal(connection: IliasConnection, target: string | undefined): Error | null {
   try {
     resolveIliasTarget(connection.baseUrl, connection.clientId, target);
+    return null;
   } catch (cause) {
-    return Promise.reject(cause instanceof Error ? cause : new Error(String(cause)));
+    return cause instanceof Error ? cause : new Error(String(cause));
   }
+}
+
+/**
+ * Switches the window to ILIAS mode.
+ *
+ * `stripHeight` is the strip as it will be once Uni Pilot shrinks to it.
+ * `target` undefined keeps the page ILIAS was on; any string navigates, with
+ * `''` meaning the dashboard.
+ */
+export function enterIliasMode(
+  connection: IliasConnection,
+  stripHeight: number,
+  target?: string,
+): Promise<void> {
+  const refused = refusal(connection, target);
+  if (refused) return Promise.reject(refused);
+  // Read now, not when the call runs: by then an earlier enter in the queue
+  // may already have shrunk the page to the strip. Before anything shrinks,
+  // the page is the window minus whatever the title bar covers, and Rust
+  // reads the title bar from that difference.
+  const pageHeight = window.innerHeight;
   return enqueue(() =>
-    call('show_ilias_view', {
+    call('enter_ilias_mode', {
       baseUrl: connection.baseUrl,
       clientId: connection.clientId,
       target: target ?? null,
-      bounds,
+      strip: stripHeight,
+      pageHeight,
     }),
   );
 }
 
-/**
- * Only the latest position matters. While the sidebar animates, the page
- * reports new bounds every frame; sending each would queue up a backlog the
- * view then trails behind. So a placement already waiting just takes the
- * newest bounds instead of queueing another.
- */
-let pendingBounds: ViewBounds | null = null;
-let placing: Promise<void> = Promise.resolve();
-
-export function placeIliasView(bounds: ViewBounds): Promise<void> {
-  const waiting = pendingBounds !== null;
-  pendingBounds = bounds;
-  if (waiting) return placing;
-
-  placing = enqueue(async () => {
-    const latest = pendingBounds;
-    pendingBounds = null;
-    if (latest) await call('place_ilias_view', { bounds: latest });
-  });
-  return placing;
+/** Gives Uni Pilot the whole window back. ILIAS stays on its page, hidden. */
+export function leaveIliasMode(): Promise<void> {
+  return enqueue(() => call('leave_ilias_mode', {}));
 }
 
-/** Steps aside, keeping the page and the sign-in. */
-export function hideIliasView(): Promise<void> {
-  return enqueue(() => call('hide_ilias_view', {}));
+/** Sends ILIAS somewhere while staying in ILIAS mode. `''` is the dashboard. */
+export function navigateIlias(connection: IliasConnection, target: string): Promise<void> {
+  const refused = refusal(connection, target);
+  if (refused) return Promise.reject(refused);
+  return enqueue(() =>
+    call('navigate_ilias', {
+      baseUrl: connection.baseUrl,
+      clientId: connection.clientId,
+      target,
+    }),
+  );
 }
 
-/** Removes the view entirely — for disconnecting. */
+/** Removes ILIAS entirely and gives the window back — for disconnecting. */
 export function closeIliasView(): Promise<void> {
   return enqueue(() => call('close_ilias_view', {}));
 }

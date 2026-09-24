@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import {
-  boundsOf,
   closeIliasView,
-  hideIliasView,
+  enterIliasMode,
+  leaveIliasMode,
+  navigateIlias,
   overlayIsOpen,
-  placeIliasView,
-  showIliasView,
 } from './iliasView';
 
 const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>();
@@ -25,34 +24,15 @@ const HEILBRONN: IliasConnection = {
   checkedAt: '2026-09-23T10:00:00.000Z',
 };
 
-const AREA = { x: 248, y: 132, width: 1100, height: 700 };
+const commands = () => invoke.mock.calls.map(([command]) => command);
 
 beforeEach(() => {
   invoke.mockReset().mockResolvedValue(undefined);
   document.body.innerHTML = '';
 });
 
-describe('boundsOf', () => {
-  it('rounds, so the view does not land on half pixels', () => {
-    const element = document.createElement('div');
-    element.getBoundingClientRect = () =>
-      ({ left: 248.4, top: 131.6, width: 1100.5, height: 699.49 }) as DOMRect;
-
-    expect(boundsOf(element)).toEqual({ x: 248, y: 132, width: 1101, height: 699 });
-  });
-
-  it('never reports a negative size', () => {
-    const element = document.createElement('div');
-    element.getBoundingClientRect = () => ({ left: 0, top: 0, width: -3, height: -1 }) as DOMRect;
-
-    expect(boundsOf(element)).toMatchObject({ width: 0, height: 0 });
-  });
-});
-
 describe('overlayIsOpen', () => {
-  const add = (html: string) => {
-    document.body.insertAdjacentHTML('beforeend', html);
-  };
+  const add = (html: string) => document.body.insertAdjacentHTML('beforeend', html);
 
   it('is false on a page with nothing open', () => {
     expect(overlayIsOpen()).toBe(false);
@@ -63,60 +43,86 @@ describe('overlayIsOpen', () => {
     expect(overlayIsOpen()).toBe(true);
   });
 
-  /** The header's search and notifications are a native <dialog>. */
   it('sees an open native dialog, and ignores a closed one', () => {
     add('<dialog aria-label="Search workspace"></dialog>');
     expect(overlayIsOpen()).toBe(false);
-
     document.querySelector('dialog')?.setAttribute('open', '');
     expect(overlayIsOpen()).toBe(true);
   });
 
-  /** Hiding ILIAS on hover would make it flicker. */
-  it('ignores tooltips', () => {
-    add('<div role="tooltip">Close</div>');
-    expect(overlayIsOpen()).toBe(false);
-  });
-
-  /** A reminder should not make a half-written forum post vanish. */
-  it('ignores reminders', () => {
-    add('<div class="reminder-overlay" role="status">Exam tomorrow</div>');
+  /** ILIAS jumping out of the way on hover would be worse than a clipped tooltip. */
+  it('ignores tooltips and reminders', () => {
+    add('<div role="tooltip">Close</div><div class="reminder-overlay" role="status"></div>');
     expect(overlayIsOpen()).toBe(false);
   });
 });
 
-describe('showIliasView', () => {
-  it('asks Rust to show ILIAS over the area, keeping the page it was on', async () => {
-    await showIliasView(HEILBRONN, AREA);
+describe('entering ILIAS mode', () => {
+  /**
+   * Rust cannot see how tall the strip is, nor how tall the page was before
+   * it shrank — the second is what the title bar is read from. So both travel.
+   */
+  it('hands Rust the strip and the page height', async () => {
+    await enterIliasMode(HEILBRONN, 48);
 
-    expect(invoke).toHaveBeenCalledWith('show_ilias_view', {
+    expect(invoke).toHaveBeenCalledWith('enter_ilias_mode', {
       baseUrl: 'https://ilias.hs-heilbronn.de',
       clientId: 'iliashhn',
       target: null,
-      bounds: AREA,
+      strip: 48,
+      pageHeight: window.innerHeight,
     });
   });
 
-  it('passes an empty target through, which means the dashboard', async () => {
-    await showIliasView(HEILBRONN, AREA, '');
-    expect(invoke).toHaveBeenCalledWith('show_ilias_view', expect.objectContaining({ target: '' }));
+  it('passes a deep link to arrive at', async () => {
+    const link = 'https://ilias.hs-heilbronn.de/goto.php?target=exc_4711';
+    await enterIliasMode(HEILBRONN, 48, link);
+    expect(invoke).toHaveBeenCalledWith(
+      'enter_ilias_mode',
+      expect.objectContaining({ target: link }),
+    );
   });
 
   it('never crosses into Rust with a link from somewhere else', async () => {
-    await expect(showIliasView(HEILBRONN, AREA, 'https://evil.example/')).rejects.toThrowError(
+    await expect(enterIliasMode(HEILBRONN, 48, 'https://evil.example/')).rejects.toThrowError(
       /does not belong to your ILIAS/,
     );
     expect(invoke).not.toHaveBeenCalled();
   });
 });
 
+describe('the other commands', () => {
+  it('leaves, giving Uni Pilot the window back', async () => {
+    await leaveIliasMode();
+    expect(invoke).toHaveBeenCalledWith('leave_ilias_mode', {});
+  });
+
+  it('navigates, with an empty target meaning the dashboard', async () => {
+    await navigateIlias(HEILBRONN, '');
+    expect(invoke).toHaveBeenCalledWith('navigate_ilias', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+      target: '',
+    });
+  });
+
+  it('checks a navigation target before sending it', async () => {
+    await expect(navigateIlias(HEILBRONN, 'javascript:alert(1)')).rejects.toThrowError();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('closes ILIAS for good', async () => {
+    await closeIliasView();
+    expect(invoke).toHaveBeenCalledWith('close_ilias_view', {});
+  });
+});
+
 describe('the order calls reach Rust in', () => {
   /**
-   * React mounts effects twice in development: show, hide, show. The Rust
-   * commands are async and could overtake each other; if the hide landed last,
-   * ILIAS would stay invisible on an open ILIAS page.
+   * React mounts effects twice in development: enter, leave, enter. If the
+   * leave landed last, the ILIAS page would be a strip over an empty window.
    */
-  it('keeps show, hide, show in that order even when the first is slow', async () => {
+  it('keeps enter, leave, enter in that order even when the first is slow', async () => {
     let finishFirst: () => void = () => undefined;
     invoke.mockImplementationOnce(
       () =>
@@ -125,47 +131,41 @@ describe('the order calls reach Rust in', () => {
         }),
     );
 
-    const first = showIliasView(HEILBRONN, AREA);
-    const hide = hideIliasView();
-    const second = showIliasView(HEILBRONN, AREA);
+    const first = enterIliasMode(HEILBRONN, 48);
+    const leave = leaveIliasMode();
+    const second = enterIliasMode(HEILBRONN, 48);
 
     try {
       await vi.waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
       // Give the others every chance to jump ahead. They must not.
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(invoke.mock.calls.map(([command]) => command)).toEqual(['show_ilias_view']);
+      expect(commands()).toEqual(['enter_ilias_mode']);
     } finally {
-      // Released either way, so a failure here cannot leave the queue stuck
-      // for every test after it.
+      // Released either way, so a failure here cannot jam the queue for the
+      // tests after it.
       finishFirst();
     }
-    await Promise.all([first, hide, second]);
+    await Promise.all([first, leave, second]);
 
-    expect(invoke.mock.calls.map(([command]) => command)).toEqual([
-      'show_ilias_view',
-      'hide_ilias_view',
-      'show_ilias_view',
-    ]);
+    expect(commands()).toEqual(['enter_ilias_mode', 'leave_ilias_mode', 'enter_ilias_mode']);
   });
 
-  /**
-   * A call that never returns must not leave every later one waiting. Without
-   * the limit, the ILIAS page would be dead until the app restarted.
-   */
+  /** Without the limit, one call that never returns would jam the page for good. */
   it('lets later calls through when one never returns', async () => {
     vi.useFakeTimers();
     try {
       invoke.mockImplementationOnce(() => new Promise<undefined>(() => undefined));
 
-      const stuck = showIliasView(HEILBRONN, AREA);
-      const after = hideIliasView();
+      const stuck = enterIliasMode(HEILBRONN, 48);
       stuck.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(0);
+      const after = leaveIliasMode();
 
       await vi.advanceTimersByTimeAsync(15_000);
 
       await expect(stuck).rejects.toThrowError(/did not respond/);
       await after;
-      expect(invoke).toHaveBeenLastCalledWith('hide_ilias_view', {});
+      expect(invoke).toHaveBeenLastCalledWith('leave_ilias_mode', {});
     } finally {
       vi.useRealTimers();
     }
@@ -174,28 +174,9 @@ describe('the order calls reach Rust in', () => {
   it('carries on after a call fails', async () => {
     invoke.mockRejectedValueOnce('ILIAS could not be opened: gone');
 
-    await expect(showIliasView(HEILBRONN, AREA)).rejects.toBe('ILIAS could not be opened: gone');
-    await hideIliasView();
+    await expect(enterIliasMode(HEILBRONN, 48)).rejects.toBe('ILIAS could not be opened: gone');
+    await leaveIliasMode();
 
-    expect(invoke).toHaveBeenLastCalledWith('hide_ilias_view', {});
-  });
-
-  /** While the sidebar animates, only where it ends up matters. */
-  it('sends only the newest placement when several arrive at once', async () => {
-    const pending = [
-      placeIliasView({ ...AREA, x: 100 }),
-      placeIliasView({ ...AREA, x: 150 }),
-      placeIliasView({ ...AREA, x: 200 }),
-    ];
-    await Promise.all(pending);
-
-    const placements = invoke.mock.calls.filter(([command]) => command === 'place_ilias_view');
-    expect(placements).toHaveLength(1);
-    expect(placements[0]?.[1]).toEqual({ bounds: { ...AREA, x: 200 } });
-  });
-
-  it('closes the view for good', async () => {
-    await closeIliasView();
-    expect(invoke).toHaveBeenCalledWith('close_ilias_view', {});
+    expect(invoke).toHaveBeenLastCalledWith('leave_ilias_mode', {});
   });
 });

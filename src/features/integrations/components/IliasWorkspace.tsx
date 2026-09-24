@@ -14,7 +14,7 @@ import type { IliasConnection, IliasSignIn } from '@/features/integrations/lib/i
 import { KNOWN_INSTALLATIONS } from '@/features/integrations/lib/ilias/knownInstallations';
 import { canOpenIliasWindow, openIlias } from '@/features/integrations/lib/iliasWindow';
 import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
-import { EmbeddedIlias } from './EmbeddedIlias';
+import { IliasStrip } from './IliasStrip';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
 const FIELD =
@@ -40,9 +40,9 @@ interface IliasWorkspaceProps {
  * page does not try to rebuild ILIAS; it shows ILIAS itself, and is honest
  * about what that is.
  *
- * In the desktop app, once connected, ILIAS sits right here in the page. A
- * browser tab cannot embed it — ILIAS forbids framing — so there the page
- * offers to open it in a tab instead.
+ * In the desktop app, once connected, the page becomes ILIAS mode: Uni Pilot a
+ * strip at the top, ILIAS filling the window below. A browser tab cannot hold
+ * ILIAS — it forbids framing — so there the page offers to open it in a tab.
  */
 export function IliasWorkspace({ target }: IliasWorkspaceProps = {}) {
   const connection = useIliasStore((state) => state.connection);
@@ -89,7 +89,7 @@ export function IliasWorkspace({ target }: IliasWorkspaceProps = {}) {
 
   if (connection && canEmbedIlias()) {
     return (
-      <EmbeddedIlias
+      <IliasStrip
         connection={connection}
         initialTarget={target}
         onDisconnect={() => {
