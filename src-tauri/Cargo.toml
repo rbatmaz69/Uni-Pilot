@@ -24,11 +24,14 @@ tauri-plugin-http = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Back and forward in ILIAS (src/ilias_browser.rs) go straight to each
-# platform's webview, which Tauri does not expose. All three already come in
-# through Tauri; these only name them, at the versions Tauri uses.
+# Back and forward in ILIAS, and downloads the macOS webview would otherwise
+# show (src/ilias_browser.rs), go straight to each platform's webview, which
+# Tauri does not expose. All of these already come in through Tauri; they are
+# only named here, at the versions Tauri uses.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURLResponse"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

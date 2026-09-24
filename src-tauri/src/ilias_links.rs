@@ -29,7 +29,7 @@ use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::{Manager, Runtime, Url};
 use tauri_plugin_http::reqwest::{self, header, redirect};
 
-use crate::ilias_browser::{begin_download, end_download, open_with_system};
+use crate::ilias_browser::{begin_download, end_download, is_attachment, open_with_system};
 use crate::ilias_view::ILIAS;
 use crate::ilias_window::resolve_target;
 
@@ -61,8 +61,7 @@ fn is_page(status: u16, content_type: Option<&str>, disposition: Option<&str>) -
     if !(200..300).contains(&status) {
         return true;
     }
-    if disposition.is_some_and(|value| value.trim().to_ascii_lowercase().starts_with("attachment"))
-    {
+    if disposition.is_some_and(is_attachment) {
         return false;
     }
     match content_type {

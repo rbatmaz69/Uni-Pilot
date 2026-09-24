@@ -461,7 +461,7 @@ mod native {
     /// Two-finger swipe for back and forward, as in Safari. WebView2 has it on
     /// by default; WebKitGTK has no such gesture.
     #[cfg(target_os = "macos")]
-    pub fn allow_swipe(platform: PlatformWebview) {
+    pub fn allow_swipe(platform: &PlatformWebview) {
         use objc2::msg_send;
         use objc2::runtime::{AnyObject, Bool};
 
@@ -476,14 +476,141 @@ mod native {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub fn allow_swipe(_platform: PlatformWebview) {}
+    pub fn allow_swipe(_platform: &PlatformWebview) {}
+
+    /// What `WKNavigationResponsePolicy.download` is.
+    #[cfg(target_os = "macos")]
+    const DOWNLOAD_POLICY: isize = 2;
+
+    /// Makes the webview download what a server sends as an attachment.
+    ///
+    /// wry decides by one question alone — can WebKit display this type? — and
+    /// never looks at `Content-Disposition`. So a PDF that ILIAS sends as an
+    /// attachment, as it does for a student's own submission, was shown in the
+    /// view instead of saved, where Safari would have saved it.
+    ///
+    /// The fix swaps the class of this one webview's navigation delegate for a
+    /// subclass of wry's that answers `attachment` with a download and leaves
+    /// every other response to wry, unchanged. The subclass adds no state, so
+    /// the object stays exactly what wry made; Uni Pilot's own webview, with a
+    /// delegate of its own, is not touched.
+    #[cfg(target_os = "macos")]
+    pub fn honour_attachments(platform: &PlatformWebview) {
+        use std::sync::OnceLock;
+
+        use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
+        use objc2::{msg_send, sel};
+
+        unsafe extern "C-unwind" fn decide(
+            this: &AnyObject,
+            _cmd: Sel,
+            webview: &AnyObject,
+            response: &AnyObject,
+            handler: &block2::Block<dyn Fn(isize)>,
+        ) {
+            // SAFETY: WebKit calls this with a live `WKNavigationResponse`.
+            if unsafe { is_attachment(response) } {
+                handler.call((DOWNLOAD_POLICY,));
+                return;
+            }
+            let Some(wry) = this.class().superclass() else {
+                return;
+            };
+            // SAFETY: the same method, with the same arguments, on the class
+            // this one derives from — wry's own handling, as if nothing were here.
+            unsafe {
+                let _: () = msg_send![
+                    super(this, wry),
+                    webView: webview,
+                    decidePolicyForNavigationResponse: response,
+                    decisionHandler: handler
+                ];
+            }
+        }
+
+        /// `(wry's class, ours)`, made once.
+        static CLASSES: OnceLock<Option<(&'static AnyClass, &'static AnyClass)>> = OnceLock::new();
+
+        let view = platform.inner().cast::<AnyObject>();
+        if view.is_null() {
+            return;
+        }
+        // SAFETY: the live `WKWebView` on the main thread, as in `act`. The
+        // subclass derives from the delegate's own class, adds no instance
+        // variables, and overrides one method with the same signature.
+        unsafe {
+            let delegate: *mut AnyObject = msg_send![&*view, navigationDelegate];
+            let Some(delegate) = delegate.as_ref() else {
+                return;
+            };
+            let current = delegate.class();
+            let made = CLASSES.get_or_init(|| {
+                let mut builder = ClassBuilder::new(c"UniPilotIliasNavigationDelegate", current)?;
+                builder.add_method(
+                    sel!(webView:decidePolicyForNavigationResponse:decisionHandler:),
+                    decide as unsafe extern "C-unwind" fn(_, _, _, _, _),
+                );
+                Some((current, builder.register()))
+            });
+            match made {
+                Some((wry, ours)) if std::ptr::eq(current, *wry) => {
+                    AnyObject::set_class(delegate, ours);
+                }
+                // Already ours, or a class we do not know: leave it be.
+                _ => {}
+            }
+        }
+    }
+
+    /// Whether a navigation response says `Content-Disposition: attachment`.
+    ///
+    /// # Safety
+    ///
+    /// `navigation_response` must be a `WKNavigationResponse`.
+    #[cfg(target_os = "macos")]
+    unsafe fn is_attachment(navigation_response: &objc2::runtime::AnyObject) -> bool {
+        use objc2::runtime::AnyObject;
+        use objc2::{msg_send, ClassType};
+        use objc2_foundation::{NSHTTPURLResponse, NSString};
+
+        unsafe {
+            let response: *mut AnyObject = msg_send![navigation_response, response];
+            let Some(response) = response.as_ref() else {
+                return false;
+            };
+            let is_http: bool = msg_send![response, isKindOfClass: NSHTTPURLResponse::class()];
+            if !is_http {
+                return false;
+            }
+            let response = &*(response as *const AnyObject).cast::<NSHTTPURLResponse>();
+            response
+                .valueForHTTPHeaderField(&NSString::from_str("Content-Disposition"))
+                .is_some_and(|value| super::is_attachment(&value.to_string()))
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn honour_attachments(_platform: &PlatformWebview) {}
 }
 
-/// Sets up a freshly created ILIAS webview as a browser: swipe to go back.
+/// Whether a `Content-Disposition` value asks for the file to be saved rather
+/// than shown.
+pub(crate) fn is_attachment(disposition: &str) -> bool {
+    disposition
+        .trim_start()
+        .get(..10)
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("attachment"))
+}
+
+/// Sets up a freshly created ILIAS webview as a browser: swipe to go back,
+/// and attachments downloaded rather than shown.
 pub fn prepare<R: Runtime>(view: &Webview<R>) {
-    if let Err(error) = view.with_webview(native::allow_swipe) {
-        // Only the gesture is lost; the buttons still work.
-        eprintln!("ILIAS swipe navigation: {error}");
+    let result = view.with_webview(|platform| {
+        native::allow_swipe(&platform);
+        native::honour_attachments(&platform);
+    });
+    if let Err(error) = result {
+        eprintln!("ILIAS webview setup: {error}");
     }
 }
 
@@ -541,7 +668,7 @@ pub async fn ilias_history(app: tauri::AppHandle) -> Result<History, String> {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{free_path, is_openable, safe_file_name, Book, State};
+    use super::{free_path, is_attachment, is_openable, safe_file_name, Book, State};
 
     #[test]
     fn keeps_an_ordinary_name() {
@@ -605,6 +732,16 @@ mod tests {
             path == Path::new("/D/notes.v2.pdf")
         });
         assert_eq!(path, PathBuf::from("/D/notes.v2 (1).pdf"));
+    }
+
+    /// A student's own submission comes as an attachment; it must be saved.
+    #[test]
+    fn tells_an_attachment_from_inline() {
+        assert!(is_attachment("attachment; filename=\"Abgabe.pdf\""));
+        assert!(is_attachment("  Attachment"));
+        assert!(!is_attachment("inline; filename=\"Skript.pdf\""));
+        assert!(!is_attachment(""));
+        assert!(!is_attachment("attach"));
     }
 
     #[test]

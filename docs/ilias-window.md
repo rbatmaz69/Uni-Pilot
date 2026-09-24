@@ -27,6 +27,8 @@ A file ILIAS offers for download — slides, exercise sheets, a submission you u
 
 Before this, downloads did not work at all, for two reasons. A webview without a download handler cancels every download, silently. And ILIAS opens every file it shows inline — PDFs above all — in a new window (`target="_blank"`, see `ilObjFileListGUI::getCommandFrame` in ILIAS 9), which a webview without a handler for new windows simply refuses. Clicking a PDF did nothing, and nothing said so.
 
+A third case turned up with a student's own submissions: ILIAS sends those as an attachment (`Content-Disposition: attachment`) through an ordinary link. A browser saves an attachment; the macOS webview, as Tauri sets it up, only asks whether it can display the file type — and for a PDF it can, so the submission was shown instead of saved. Uni Pilot now gives the ILIAS webview's navigation delegate a subclass that answers `attachment` with a download and leaves every other response to Tauri unchanged (`honour_attachments` in `src-tauri/src/ilias_browser.rs`). Only the ILIAS webview is changed, not Uni Pilot's own. WebView2 on Windows honours attachments on its own; WebKitGTK on Linux cannot display PDFs and downloads them anyway.
+
 Links that ask for a new window now go where a browser's new tab would (`src-tauri/src/ilias_links.rs`):
 
 - **To ILIAS itself** (same origin), Uni Pilot asks for the link once, with the ILIAS view's own cookies. A file is saved to Downloads like any other download; a page opens in the ILIAS view.
