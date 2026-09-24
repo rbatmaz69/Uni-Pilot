@@ -24,11 +24,14 @@
 //! lays out both, and again on every resize.
 //!
 //! **Linux is different.** There Tauri packs every webview of a window into a
-//! vertical GTK box and ignores the positions and sizes set on them — so both
-//! got half the window, ILIAS in the lower half. The box already stacks them
-//! the right way round, Uni Pilot above ILIAS, so on Linux `stack` only tells
-//! GTK how to share it: the strip its height, ILIAS the rest. It also sits
-//! below any title bar on its own, so the title bar plays no part there.
+//! vertical GTK box and ignores the positions and sizes set on them. The box
+//! shares its height by what each child would *like* — and a WebKit view would
+//! like the height of its page, so Uni Pilot kept most or all of the window.
+//! On Linux `stack` therefore moves both webviews into a vertical `GtkPaned`,
+//! whose divider stays where it is put: at the strip's height, ILIAS below.
+//! A paned also gives the whole of itself to the one child still visible, so
+//! hiding ILIAS is all leaving takes. The box sits below the title bar by
+//! itself, so the title bar plays no part there.
 //!
 //! It is not an `<iframe>`: ILIAS forbids those (`x-frame-options:
 //! SAMEORIGIN`). It is a second webview attached with `Window::add_child`,
@@ -166,7 +169,7 @@ fn apply<R: Runtime>(app: &tauri::AppHandle<R>, layout: Layout) -> Result<(), St
             .map_err(|error| format!("Uni Pilot could not make room for ILIAS: {error}"))?;
         place(&main, strip_rect)?;
         #[cfg(target_os = "linux")]
-        stack(&main, Some(layout.strip))?;
+        stack(&main, layout.strip)?;
     }
     if let Some(view) = app.get_webview(ILIAS) {
         place(&view, ilias_rect)?;
@@ -198,39 +201,58 @@ fn restore<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
         )?;
         main.set_auto_resize(true)
             .map_err(|error| format!("Uni Pilot could not take the window back: {error}"))?;
-        #[cfg(target_os = "linux")]
-        stack(&main, None)?;
     }
     Ok(())
 }
 
-/// Linux only: shares the window's GTK box between the strip and ILIAS.
+/// Linux only: puts Uni Pilot and ILIAS into a vertical `GtkPaned` in the
+/// window's box, the first time, and sets the divider to the strip's height.
 ///
-/// `Some(height)` holds Uni Pilot to the strip and leaves the rest of the box
-/// to ILIAS, which is packed after it and expands; `None` lets Uni Pilot fill
-/// the box again. A hidden ILIAS takes no room, so leaving needs nothing more.
+/// Uni Pilot is moved in once and stays; an ILIAS webview Tauri has just put
+/// into the box next to it (on entering, or after being closed and made again)
+/// is moved in below. The paned ignores what the pages would like to be, which
+/// is what the box got wrong. Nothing here closes or reloads either page.
 #[cfg(target_os = "linux")]
-fn stack<R: Runtime>(main: &tauri::Webview<R>, strip: Option<f64>) -> Result<(), String> {
+fn stack<R: Runtime>(main: &tauri::Webview<R>, strip: f64) -> Result<(), String> {
     main.with_webview(move |platform| {
         use gtk::prelude::*;
 
         let view = platform.inner();
-        let Some(stack) = view
-            .parent()
-            .and_then(|parent| parent.downcast::<gtk::Box>().ok())
-        else {
+        let Some(parent) = view.parent() else {
             return;
         };
-        match strip {
-            Some(height) => {
-                stack.set_child_packing(&view, false, false, 0, gtk::PackType::Start);
-                view.set_size_request(-1, height.round() as i32);
+        let paned = match parent.downcast::<gtk::Paned>() {
+            Ok(paned) => paned,
+            Err(parent) => {
+                let Ok(stack) = parent.downcast::<gtk::Box>() else {
+                    return;
+                };
+                let paned = gtk::Paned::new(gtk::Orientation::Vertical);
+                // `view` holds its own reference, so taking it out of the box
+                // does not destroy it.
+                stack.remove(&view);
+                paned.pack1(&view, false, false);
+                stack.pack_start(&paned, true, true, 0);
+                paned.show();
+                paned
             }
-            None => {
-                stack.set_child_packing(&view, true, true, 0, gtk::PackType::Start);
-                view.set_size_request(-1, -1);
+        };
+        if paned.child2().is_none() {
+            if let Some(stack) = paned
+                .parent()
+                .and_then(|parent| parent.downcast::<gtk::Box>().ok())
+            {
+                let ilias = stack
+                    .children()
+                    .into_iter()
+                    .find_map(|child| child.downcast::<webkit2gtk::WebView>().ok());
+                if let Some(ilias) = ilias {
+                    stack.remove(&ilias);
+                    paned.pack2(&ilias, true, true);
+                }
             }
         }
+        paned.set_position(strip.round() as i32);
     })
     .map_err(|error| format!("Uni Pilot could not make room for ILIAS: {error}"))
 }
