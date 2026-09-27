@@ -4,6 +4,7 @@ import { afterEach, beforeEach } from 'vitest';
 import { useSourceStore } from '@/features/calendar/store/sourceStore';
 import { useTaskStore } from '@/features/calendar/store/taskStore';
 import { useEventStore } from '@/features/calendar/store/eventStore';
+import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { NO_HISTORY } from '@/features/integrations/lib/iliasBrowser';
 import {
   resetIliasBrowserListening,
@@ -37,4 +38,16 @@ afterEach(() => {
   useTaskStore.setState({ tasks: [] });
   useIliasBrowserStore.setState({ history: NO_HISTORY, downloads: [] });
   resetIliasBrowserListening();
+  useNoteStyleStore.setState({
+    style: 'standard',
+    layout: 'pages',
+    zoom: 1,
+    font: 'inter',
+    textSize: 'm',
+    lineSpacing: 'normal',
+    paper: 'dotted',
+    sound: true,
+    boldColor: 'default',
+    bookmarks: {},
+  });
 });

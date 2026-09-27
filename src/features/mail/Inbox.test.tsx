@@ -16,7 +16,9 @@ import { renderApp } from '@/test/render';
 
 const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>();
 
-vi.mock('@tauri-apps/api/core', () => ({
+// The whole shell renders, and it asks `isTauri` too; only `invoke` is faked.
+vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tauri-apps/api/core')>()),
   invoke: (command: string, args: Record<string, unknown>) => invoke(command, args),
 }));
 

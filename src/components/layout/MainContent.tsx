@@ -9,11 +9,13 @@ import { useUiStore } from '@/store/uiStore';
  * scrolls its list and the open message apart, which needs a column exactly
  * as tall as the window.
  */
-const FULL_BLEED_PATHS = new Set(['/calendar', '/inbox']);
+const FULL_BLEED_PATHS = new Set(['/calendar', '/inbox', '/documents']);
 
 export function MainContent() {
   const { pathname } = useLocation();
   const fullBleed = FULL_BLEED_PATHS.has(pathname);
+  // The notes editor scrolls its own panes and runs to the window's edge.
+  const documents = pathname === '/documents';
   const immersive = useUiStore((state) => state.immersive);
 
   return (
@@ -22,7 +24,11 @@ export function MainContent() {
       tabIndex={-1}
       className={cn(
         'min-h-0 flex-1',
-        immersive ? 'overflow-hidden' : 'scroll-area overflow-y-auto',
+        immersive
+          ? 'overflow-hidden'
+          : documents
+            ? 'scroll-area overflow-hidden'
+            : 'scroll-area overflow-y-auto',
       )}
     >
       <div
@@ -38,9 +44,11 @@ export function MainContent() {
           // is the window rather than one free to grow past it.
           immersive
             ? 'h-full max-w-none'
-            : fullBleed
-              ? 'h-full max-w-none pt-1'
-              : 'min-h-full max-w-[1600px] pt-3.5',
+            : documents
+              ? 'h-full max-w-none !p-0'
+              : fullBleed
+                ? 'h-full max-w-none pt-1'
+                : 'min-h-full max-w-[1600px] pt-3.5',
         )}
       >
         <Outlet />

@@ -1,3 +1,7 @@
+import { PanelLeftOpen } from 'lucide-react';
+import { isTauri } from '@tauri-apps/api/core';
+import { useLocation } from 'react-router-dom';
+import { IconButton } from '@/components/ui';
 import { CourseSync } from '@/features/courses/components/CourseSync';
 import { ReminderService } from '@/features/reminders/components/ReminderService';
 import { cn } from '@/lib/utils';
@@ -8,7 +12,7 @@ import { Sidebar } from './Sidebar';
 
 /**
  * The shell. When a page takes over the window (`immersive`), the sidebar and
- * header step aside and the frame loses its padding and rounding, so the page
+ * header step aside and the frame drops its glass background, so the page
  * runs edge to edge.
  *
  * The tree keeps its shape either way — the absent parts leave empty slots
@@ -17,7 +21,11 @@ import { Sidebar } from './Sidebar';
  * loop.
  */
 export function AppLayout() {
+  const { pathname } = useLocation();
   const immersive = useUiStore((state) => state.immersive);
+  const collapsed = useUiStore((state) => state.sidebarCollapsed);
+  const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const documents = pathname === '/documents';
 
   return (
     <div
@@ -25,6 +33,7 @@ export function AppLayout() {
         'relative flex h-full w-full overflow-hidden',
         immersive ? 'bg-surface' : 'app-shell',
       )}
+      data-macos-desktop={isTauri() && navigator.platform.startsWith('Mac')}
     >
       <ReminderService />
       <CourseSync />
@@ -34,20 +43,24 @@ export function AppLayout() {
       >
         Skip to content
       </a>
-      <div
-        className={cn(
-          'flex min-w-0 flex-1 overflow-hidden',
-          !immersive && 'app-frame rounded-[30px] max-[700px]:rounded-none',
-        )}
-      >
+      <div className={cn('flex min-w-0 flex-1 overflow-hidden', !immersive && 'app-frame')}>
         {immersive ? null : <Sidebar />}
         <div
           className={cn(
             'relative flex min-w-0 flex-1 flex-col overflow-hidden',
-            !immersive && 'workspace rounded-[26px]',
+            !immersive && 'workspace',
           )}
         >
-          {immersive ? null : <Header />}
+          {immersive || documents ? null : <Header />}
+          {!immersive && documents && collapsed ? (
+            <IconButton
+              label="Expand sidebar"
+              className="absolute left-2 top-2 z-40 bg-surface"
+              onClick={toggleSidebar}
+            >
+              <PanelLeftOpen size={16} />
+            </IconButton>
+          ) : null}
           <MainContent />
         </div>
       </div>
