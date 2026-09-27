@@ -1,6 +1,7 @@
 mod ilias_browser;
 mod ilias_links;
 mod ilias_sign_out;
+mod ilias_sync;
 mod ilias_view;
 mod ilias_window;
 mod reminders;
@@ -22,10 +23,16 @@ pub fn run() {
             ilias_browser::open_ilias_download,
             ilias_browser::reveal_ilias_download,
             ilias_links::open_ilias_in_browser,
-            ilias_sign_out::sign_out_of_ilias
+            ilias_sign_out::sign_out_of_ilias,
+            ilias_sync::ilias_sync_courses,
+            ilias_sync::ilias_sync_contents,
+            ilias_sync::ilias_sync_assignments,
+            ilias_sync::ilias_sync_download,
+            ilias_sync::reauth::ilias_sync_reauth
         ])
         .manage(ilias_view::Mode::default())
-        .manage(ilias_browser::Downloads::default());
+        .manage(ilias_browser::Downloads::default())
+        .manage(ilias_sync::Pace::default());
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());
     builder

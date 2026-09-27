@@ -1,6 +1,6 @@
 # ILIAS sync without opening ILIAS — research
 
-> **Status:** Research. No code changed.
+> **Status:** Research, then a first measurement at HHN (§12) and the first readers, in `src-tauri/src/ilias_sync/`.
 > **Date:** 25.09.2026 · **Builds on:** [`ilias-integration-research.md`](ilias-integration-research.md) (issue #14) and [`../ilias-window.md`](../ilias-window.md)
 > **Question:** Can Uni Pilot read a student's ILIAS at Hochschule Heilbronn on its own — new files, lecture notes, exercise sheets, announcements — so the student no longer has to open ILIAS to find out what changed?
 
@@ -16,6 +16,9 @@ Trust markers, as in the first report:
 **Nothing in this report was measured live against `ilias.hs-heilbronn.de`.** The environment it was
 written in could not reach any ILIAS host; GitHub was reachable, so everything rests on source code.
 The measurements in section 9 take about an hour with an HHN account.
+
+> **Update 25.09.2026:** part of §9 has since been looked at with an HHN account. §12 records what
+> was found; where it contradicts a section below, §12 is right.
 
 ---
 
@@ -65,7 +68,7 @@ email to the HHN eLearning team (§9).
 | First report said                                                      | Now                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Scraping with OIDC means storing the password (§13).                   | The student signs in inside Uni Pilot's ILIAS view; Rust reuses that session. No password passes through Uni Pilot. ✅ (`ilias_links.rs`, `ilias_sign_out.rs`)                                                                                                           |
-| Keycloak in an embedded browser: unknown.                              | Works at HHN; the sign-in survives restarting the app. ✅ ([ilias-window.md](../ilias-window.md#confirmed-and-still-open))                                                                                                                                               |
+| Keycloak in an embedded browser: unknown.                              | Works at HHN ✅. It does not survive quitting the app, though (§12). ([ilias-window.md](../ilias-window.md#confirmed-and-still-open))                                                                                                                                    |
 | WebDAV needs HTTP Basic, so a password; not usable at HHN (§4.7, 8.5). | **Not quite.** ILIAS 9 accepts an existing session for WebDAV — for clients it recognises by User-Agent (§5.6). And the HHN measurement used the wrong client id: `/webdav.php/hhn/`, where HHN's client is `iliashhn`. Whether WebDAV is on at HHN is still unknown. 🔴 |
 | Scraping is fragile across releases.                                   | Still true, and now measured: the Rust KIT downloader stopped working with ILIAS 9. PFERD kept up and supports 9 and 10. 🟡                                                                                                                                              |
 
@@ -131,7 +134,7 @@ URL — and write our own code. MIT code (PFERD, ilias-mcp, thetric) may be port
 
 | Piece                            | Where                                                     | What it gives the sync                                                                                                     |
 | -------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| ILIAS view with Keycloak sign-in | `src-tauri/src/ilias_view.rs`                             | The student signs in once; cookies live in the webview's store and survive restarts. ✅                                    |
+| ILIAS view with Keycloak sign-in | `src-tauri/src/ilias_view.rs`                             | The student signs in once per app start; the ILIAS session ends when the app quits (§12). ✅                               |
 | Requests with the view's cookies | `fetch_as_ilias` in `src-tauri/src/ilias_links.rs`        | Cookie read per request, sent only to ILIAS's origin, redirects only within it, nothing stored. ✅                         |
 | Cookie access                    | Tauri 2.11: `cookies_for_url`, `cookies`, `delete_cookie` | Read the session on every request; nothing to persist ourselves. ✅                                                        |
 | Safe file saving                 | `src-tauri/src/ilias_browser.rs`                          | Name sanitising, no overwrites, open-only-documents — reusable for synced downloads. ✅                                    |
@@ -160,7 +163,7 @@ There are two sessions, one behind the other:
    alive, but overnight it will be gone.
 2. **Keycloak's session** decides whether a new ILIAS session costs a password. Keycloak's defaults
    are 30 minutes idle and 10 hours maximum, longer with "remember me". 📘 HHN's values are not
-   public. 🔴 That the sign-in survives restarting Uni Pilot shows the cookie is persistent, not how
+   public. 🔴 (Update 25.09.2026: it does not survive quitting Uni Pilot at all, §12.) That the sign-in survives restarting Uni Pilot shows the cookie is persistent, not how
    long the server honours it.
 3. **ILIAS can force the password anyway.** ILIAS 9's OIDC default is `LOGIN_ENFORCE`, which sends
    `prompt=login` and makes Keycloak ask every time
@@ -224,6 +227,10 @@ ilias.php?baseClass=ilDashboardGUI&cmd=jumpToNews   → redirects to ilPDNewsGUI
 
 One request answers "did anything change, and where?" for every course at once.
 
+> **Update 25.09.2026:** at HHN the timeline offers only "Neuigkeiten zu allen Favoriten". For a
+> student without favourites it is empty — a whole year of it was (§12). It is not the primary
+> signal; the tree walk is.
+
 ### 5.2 Courses
 
 ```text
@@ -235,6 +242,10 @@ Items are `.il-item-title a` or card titles (`.card-title a`). ✅ (`ilDashboard
 The `ref_id` comes from the link: `goto.php/crs/<ref_id>` in ILIAS 9's static URLs, `ref_id=` in
 repository links, or `…_crs_<ref_id>` in old-style `goto` links. Uni Pilot's
 `resolveIliasTarget` already turns a `crs_<ref_id>` shorthand back into a link.
+
+> **Update 25.09.2026:** `jumpToMemberships` lands on the dashboard, which at HHN has no course
+> list. The list is `ilias.php?baseClass=ilmembershipoverviewgui`, and its links are HHN's short
+> `/go/crs/<ref_id>` (§12).
 
 ### 5.3 Course and folder contents, and file changes
 
@@ -494,3 +505,59 @@ what is new in my courses, without opening ILIAS.
 opened from this environment.
 **HHN facts** (release 9.23, client `iliashhn`, Keycloak, iCal): the first report, §8, and
 `docs/ilias-window.md`.
+
+---
+
+## 12. Measured at HHN, 25.09.2026
+
+With a student's account, signed in by the student in a browser, read only: pages were opened, no
+file was downloaded, no forum thread opened, nothing clicked that changes anything. The readers in
+`src-tauri/src/ilias_sync/parse/` are tested against these pages, recorded with invented titles
+and ids (`src-tauri/src/ilias_sync/fixtures/`).
+
+**Sign-in.** ILIAS 9.23 (2026-09-03). The login button goes to `openidconnect.php`, which sends the
+browser to `login.hs-heilbronn.de/realms/hhn/protocol/openid-connect/auth` with
+`client_id=hhn_common_ilias` and **no `prompt=login`** ✅ — so silent re-authentication (§4.2) can
+work while Keycloak remembers the student. Keycloak's form offers no "remember me"; how long it
+remembers is still the open question 🔴.
+
+**Across a restart of Uni Pilot** (macOS, same day): no cookie for `ilias.hs-heilbronn.de` was
+left — ILIAS's session is a session cookie — only cookies for `login.hs-heilbronn.de`. Opening ILIAS
+showed "…steht nur angemeldeten Benutzern zur Verfügung", and signing in again took the password
+**and an authenticator code** ✅. So silent re-authentication (§4.2) does not survive a restart at
+HHN: the student signs in once per start of Uni Pilot, and a sync keeps that session alive while
+the app runs — a request every 15 to 20 minutes stays inside ILIAS's idle timeout.
+
+**The cookie store is shared** ✅: Uni Pilot's own page saw the `login.hs-heilbronn.de` cookies the
+ILIAS view's sign-in had set, so the sync does not need ILIAS mode open. The first live run, after
+signing in again, read all 11 courses of the membership list.
+
+**Signed in or not.** Every signed-in page carried the user menu's `logout.php?…cmd=doLogout&rtoken=…`
+✅, the signed-out login page did not. That is the check `session.rs` makes.
+
+| What           | Where at HHN                                                                                      | What it gives                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| News timeline  | `jumpToNews` → `ilPDNewsGUI`; periods 7 / 30 (default) / 366 days; context: favourites only       | Nothing without favourites ✅ — empty over 366 days for a student with none                                           |
+| Courses        | `ilias.php?baseClass=ilmembershipoverviewgui`                                                     | `.il-std-item` in `.il-item-group` (the study area); online courses link `/go/crs/<id>`; offline ones have no link ✅ |
+| Course, folder | `goto.php?target=crs_<id>` → `ilias.php?baseClass=ilrepositorygui&ref_id=<id>`                    | Older list markup: `.ilContainerBlock` → `.ilObjListRow`, ids in `data-list-item-id="lg_div_<id>_pref_<parent>"` ✅   |
+| File           | a row in a folder                                                                                 | `backup` · `49.89 KB` · `Version: 3` · `15. Sep 2025, 08:41`, exactly §5.3's properties ✅                            |
+| Exercise       | `…baseClass=ilexercisehandlergui&cmdClass=ilObjExerciseGUI&cmd=showOverview&ref_id=<id>&mode=all` | State, "Beendet am", "Anforderung", "Datum der letzten Abgabe", "Type", "Status" per assignment ✅                    |
+| Assignment     | `…cmdClass=ilAssignmentPresentationGUI&ass_id=<id>`                                               | Panels "Arbeitsanweisung" (with start and end), "Team", "Einreichung" (the student's files) ✅                        |
+
+Addresses without `cmdNode` work: ILIAS 9 finds the path from `baseClass` and `cmdClass` alone ✅.
+The sync therefore never copies an installation's `cmdNode` values.
+
+**Surprises that shape the code:**
+
+1. **Leaving a course is a plain link.** `cmd=leave` in the membership list and `cmd=unsubscribe` in
+   a course's tabs, both GET without an `rtoken`, right next to "Info". Also plain: `cmd=download`
+   on a folder (zips all of it) and `cmd=addToDesk`. The sync follows no link it finds and allows
+   only commands that show a page (`links.rs`).
+2. **A file's title is its download** (`cmd=sendfile`). Its ref_id is taken from the row instead.
+3. **Exercises show only running assignments by default.** A finished exercise said "Keine
+   Übungseinheiten vorhanden." until `mode=all` was added.
+4. **Folders empty out.** In a finished course, "Folien" was empty and "Material" held one file. A
+   sync that runs during the semester keeps what it saw; one started afterwards finds less.
+5. **Labels mix languages.** The German interface labels the submission type "Type" (ILIAS 9's
+   German language file leaves `exc_type` untranslated). The readers match labels from both
+   language files.

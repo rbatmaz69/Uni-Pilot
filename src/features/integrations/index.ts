@@ -82,6 +82,19 @@ export {
   navigateIlias,
   overlayIsOpen,
 } from './lib/iliasView';
+export {
+  downloadIliasFile,
+  readIliasAssignments,
+  readIliasContents,
+  readIliasCourses,
+  toIliasError,
+  type IliasAssignment,
+  type IliasContainer,
+  type IliasContentItem,
+  type IliasCourse,
+  type IliasFileFacts,
+  type IliasSavedFile,
+} from './lib/iliasSync';
 export { useIliasStore } from './store/iliasStore';
 export { IliasStrip } from './components/IliasStrip';
 export { IliasWorkspace } from './components/IliasWorkspace';

@@ -3,3 +3,5 @@ coverage
 design
 src-tauri/target
 package-lock.json
+# ILIAS pages as ILIAS sent them; reformatting would test other markup.
+src-tauri/src/ilias_sync/fixtures
