@@ -222,10 +222,10 @@ export function CalendarRightPanel({
                         isFocused &&
                         'ring-2 ring-accent ring-offset-2 ring-offset-surface',
                       isFocused &&
-                        'bg-[#3e5bf6] dark:bg-[#526cf8] font-bold text-white shadow-sm shadow-[#3e5bf6]/30',
+                        'bg-[#3e5bf6] dark:bg-[#526cf8] font-bold text-white shadow-sm shadow-[#3e5bf6]/30 flexoki:bg-accent flexoki:text-accent-foreground flexoki:shadow-accent/30',
                       !isFocused &&
                         isToday &&
-                        'border-2 border-[#3e5bf6] dark:border-[#526cf8] font-bold text-[#3e5bf6] dark:text-[#526cf8]',
+                        'border-2 border-[#3e5bf6] dark:border-[#526cf8] font-bold text-[#3e5bf6] dark:text-[#526cf8] flexoki:border-accent flexoki:text-accent',
                       !isFocused &&
                         !isToday &&
                         cell.isCurrentMonth &&
@@ -255,10 +255,10 @@ export function CalendarRightPanel({
                             className={cn(
                               'absolute bottom-0.5 h-1 w-1 rounded-full',
                               isFocused
-                                ? 'bg-white'
+                                ? 'bg-white flexoki:bg-accent-foreground'
                                 : marker === 'exam'
                                   ? 'bg-coral'
-                                  : 'bg-[#3e5bf6] dark:bg-[#526cf8]',
+                                  : 'bg-[#3e5bf6] dark:bg-[#526cf8] flexoki:bg-accent',
                             )}
                           />
                         ) : null}

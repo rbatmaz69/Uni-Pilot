@@ -23,7 +23,7 @@ import { EventDetailsDialog } from './EventDetailsDialog';
 import { mergeEvents } from '@/features/calendar/lib/icsMapping';
 import { useEventStore } from '@/features/calendar/store/eventStore';
 import { useSourceStore, type CalendarSource } from '@/features/calendar/store/sourceStore';
-import { useTaskStore } from '@/features/calendar/store/taskStore';
+import { useTaskStore, type NewTask } from '@/features/calendar/store/taskStore';
 import {
   EVENT_KIND_ORDER,
   type CalendarEvent,
@@ -154,6 +154,14 @@ export function CalendarWorkspace({
     setActiveKinds((previous) =>
       previous.size && !previous.has(event.kind) ? new Set() : previous,
     );
+  };
+
+  // The composer files the task itself; the calendar only follows it, the same
+  // way it follows a new event onto its day.
+  const addTask = (task: NewTask) => {
+    useTaskStore.getState().addTask(task);
+    setFocusDay(startOfDay(parseDateKey(task.dueDate)));
+    setActiveKinds(new Set());
   };
 
   // Only entries this app owns can be deleted. Removing one occurrence of a
@@ -315,6 +323,7 @@ export function CalendarWorkspace({
           draft={draft}
           onClose={() => setDraft(null)}
           onSubmit={addEvent}
+          onSubmitTask={addTask}
         />
       ) : null}
     </div>

@@ -1,7 +1,57 @@
 import { fileURLToPath, URL } from 'node:url';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+
+const MIME_TYPES: Record<string, string> = {
+  wasm: 'application/wasm',
+  js: 'text/javascript',
+  woff2: 'font/woff2',
+};
+
+/**
+ * Keeps assets that libraries would otherwise fetch at runtime available
+ * offline in both runtimes: PDF fonts, character maps and decoders, and the
+ * drawing board's fonts, which Excalidraw loads from a CDN by default.
+ */
+function offlineAssets(): Plugin {
+  const assets = new Map<string, { bytes: Buffer; mime: string }>();
+  const add = (source: string, target: string, skip?: (file: string) => boolean) => {
+    const root = new URL(source, import.meta.url);
+    for (const file of readdirSync(root, { recursive: true, encoding: 'utf8' })) {
+      const location = new URL(file, root);
+      if (skip?.(file) || !statSync(location).isFile()) continue;
+      assets.set(`${target}${file.replaceAll('\\', '/')}`, {
+        bytes: readFileSync(location),
+        mime: MIME_TYPES[file.split('.').at(-1) ?? ''] ?? 'application/octet-stream',
+      });
+    }
+  };
+  for (const directory of ['cmaps', 'standard_fonts', 'wasm'])
+    add(`./node_modules/pdfjs-dist/${directory}/`, `/pdfjs/${directory}/`);
+  // Xiaolai only covers Chinese, Japanese and Korean handwriting and is 12 MB;
+  // those scripts fall back to a system font instead.
+  add('./node_modules/@excalidraw/excalidraw/dist/prod/fonts/', '/excalidraw/fonts/', (file) =>
+    file.startsWith('Xiaolai'),
+  );
+  return {
+    name: 'uni-pilot:offline-assets',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const asset = assets.get((request.url ?? '').split('?')[0] ?? '');
+        if (!asset) return next();
+        response.setHeader('Content-Type', asset.mime);
+        response.end(asset.bytes);
+      });
+    },
+    generateBundle() {
+      for (const [path, asset] of assets) {
+        this.emitFile({ type: 'asset', fileName: path.slice(1), source: asset.bytes });
+      }
+    },
+  };
+}
 
 /**
  * Dev-only bridge for calendar subscriptions.
@@ -42,7 +92,7 @@ function icsDevProxy(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), icsDevProxy()],
+  plugins: [react(), tailwindcss(), icsDevProxy(), offlineAssets()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

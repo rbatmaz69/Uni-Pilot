@@ -81,7 +81,7 @@ export function AgendaCalendarWidget({ events, onAddEvent }: AgendaCalendarWidge
               className={cn(
                 'relative mx-auto grid h-7 w-7 place-items-center rounded-full transition-colors',
                 selected
-                  ? 'bg-accent font-semibold text-white'
+                  ? 'bg-accent font-semibold text-white flexoki:text-accent-foreground'
                   : key === todayKey
                     ? 'bg-accent-soft text-accent'
                     : 'hover:bg-surface-secondary',

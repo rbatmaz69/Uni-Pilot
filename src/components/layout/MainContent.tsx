@@ -6,14 +6,21 @@ import { cn } from '@/lib/utils';
  * The calendar's right panel is drawn to run off the edge of the screen, so a
  * centred column would strand it in the middle of a wide monitor.
  */
-const FULL_BLEED_PATHS = new Set(['/calendar']);
+const FULL_BLEED_PATHS = new Set(['/calendar', '/documents']);
 
 export function MainContent() {
   const { pathname } = useLocation();
   const fullBleed = FULL_BLEED_PATHS.has(pathname);
 
   return (
-    <main id="main-content" tabIndex={-1} className="scroll-area min-h-0 flex-1 overflow-y-auto">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className={cn(
+        'scroll-area min-h-0 flex-1',
+        pathname === '/documents' ? 'overflow-hidden' : 'overflow-y-auto',
+      )}
+    >
       <div
         key={pathname}
         className={cn(
@@ -21,7 +28,11 @@ export function MainContent() {
           // `h-full` rather than `min-h-full`: a full-bleed page sizes its own
           // panes against the window, which it can only do from a column that
           // is the window rather than one free to grow past it.
-          fullBleed ? 'h-full max-w-none pt-1' : 'min-h-full max-w-[1600px] pt-3.5',
+          pathname === '/documents'
+            ? 'h-full max-w-none !p-0'
+            : fullBleed
+              ? 'h-full max-w-none pt-1'
+              : 'min-h-full max-w-[1600px] pt-3.5',
         )}
       >
         <Outlet />

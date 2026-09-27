@@ -50,7 +50,7 @@ export function AssignmentsCard({
               className={cn(
                 'grid h-5 w-5 flex-none place-items-center rounded-[6px] border transition-colors',
                 assignment.completed
-                  ? 'border-accent bg-accent text-white'
+                  ? 'border-accent bg-accent text-white flexoki:text-accent-foreground'
                   : 'border-line-strong hover:border-accent hover:bg-accent-soft',
               )}
             >
@@ -68,7 +68,7 @@ export function AssignmentsCard({
                 <span
                   className={
                     assignment.priority === 'high' && !assignment.completed
-                      ? 'text-[#b48260] dark:text-orange'
+                      ? 'text-[#b48260] dark:text-orange flexoki:text-orange'
                       : ''
                   }
                 >

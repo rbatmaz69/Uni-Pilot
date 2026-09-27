@@ -22,14 +22,36 @@
   --ev-yellow-ink: #6e5d32;
   color: var(--text-primary);
 }
-[data-theme='dark'] .events-page,
-[data-theme='dark'] .events-dialog {
+[data-theme$='dark'] .events-page,
+[data-theme$='dark'] .events-dialog {
   --ev-green: #b9d9bf;
   --ev-green-soft: #24372e;
   --ev-paper: #202925;
   --ev-ink: #e0eae2;
   --ev-muted: #9daaa2;
   --ev-line: #354139;
+}
+[data-theme^='flexoki'] .events-page,
+[data-theme^='flexoki'] .events-dialog {
+  --ev-green: var(--accent-teal);
+  --ev-green-soft: var(--accent-teal-soft);
+  --ev-paper: var(--surface-secondary);
+  --ev-ink: var(--text-primary);
+  --ev-muted: var(--text-secondary);
+  --ev-line: var(--border);
+  --ev-hero: #164f4a;
+  --ev-lime: #dde2b2;
+  --ev-cream: #fffcf0;
+  --ev-purple: var(--accent-lavender-soft);
+  --ev-purple-ink: var(--accent-lavender);
+  --ev-orange: var(--accent-orange-soft);
+  --ev-orange-ink: var(--accent-orange);
+  --ev-blue: var(--accent-blue-soft);
+  --ev-blue-ink: var(--accent-blue);
+  --ev-mint: var(--accent-green-soft);
+  --ev-mint-ink: var(--accent-green);
+  --ev-yellow: var(--accent-yellow-soft);
+  --ev-yellow-ink: var(--accent-yellow);
 }
 .events-page {
   padding: 0 10px 26px;

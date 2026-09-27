@@ -13,23 +13,23 @@ import { MOCK_COURSES } from '@/features/dashboard/lib/mockData';
 const courseStyles = [
   {
     icon: Code2,
-    surface: 'bg-[#eef2ff] dark:bg-accent-soft',
-    ink: 'text-[#596cce] dark:text-accent',
+    surface: 'bg-[#eef2ff] dark:bg-accent-soft flexoki:bg-accent-soft',
+    ink: 'text-[#596cce] dark:text-accent flexoki:text-accent',
   },
   {
     icon: Database,
-    surface: 'bg-[#edf5f8] dark:bg-blue-soft',
-    ink: 'text-[#4e899e] dark:text-blue',
+    surface: 'bg-[#edf5f8] dark:bg-blue-soft flexoki:bg-blue-soft',
+    ink: 'text-[#4e899e] dark:text-blue flexoki:text-blue',
   },
   {
     icon: Layers,
-    surface: 'bg-[#eff5ef] dark:bg-green-soft',
-    ink: 'text-[#67846a] dark:text-green',
+    surface: 'bg-[#eff5ef] dark:bg-green-soft flexoki:bg-green-soft',
+    ink: 'text-[#67846a] dark:text-green flexoki:text-green',
   },
   {
     icon: MousePointer2,
-    surface: 'bg-[#f9f2eb] dark:bg-orange-soft',
-    ink: 'text-[#b8885b] dark:text-orange',
+    surface: 'bg-[#f9f2eb] dark:bg-orange-soft flexoki:bg-orange-soft',
+    ink: 'text-[#b8885b] dark:text-orange flexoki:text-orange',
   },
 ];
 
