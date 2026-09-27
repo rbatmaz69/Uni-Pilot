@@ -19,6 +19,13 @@ export interface IcsEvent {
   summary: string;
   description: string | null;
   location: string | null;
+  /**
+   * The entry's own web page, when the feed gives one. ILIAS writes a deep link
+   * to the course or exercise the date belongs to; most timetable feeds write
+   * nothing. Only http(s) is kept — a calendar entry has no business carrying
+   * any other kind of link.
+   */
+  url: string | null;
   /** `CANCELLED`, `TENTATIVE` or `CONFIRMED` when the feed says so. */
   status: string | null;
   categories: string[];
@@ -181,6 +188,22 @@ function unescapeText(value: string): string {
   );
 }
 
+/**
+ * A URL property is a URI, not TEXT, so it is not unescaped. ILIAS writes it as
+ * `URL;VALUE=URI:https://…`; the parameter is already split off by the time
+ * the value arrives here.
+ */
+function readUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** `20260907T081500Z`, `20260907T081500` or `20260907`. */
 function parseStamp(value: string, dateOnly: boolean): Date | null {
   const match = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(value.trim());
@@ -258,6 +281,7 @@ function readEvent(block: ContentLine[]): IcsEvent | null {
     summary: unescapeText(findLine(block, 'SUMMARY')?.value ?? '').trim() || 'Untitled',
     description: unescapeText(findLine(block, 'DESCRIPTION')?.value ?? '').trim() || null,
     location: unescapeText(findLine(block, 'LOCATION')?.value ?? '').trim() || null,
+    url: readUrl(findLine(block, 'URL')?.value),
     status: findLine(block, 'STATUS')?.value.trim().toUpperCase() ?? null,
     categories: (findLine(block, 'CATEGORIES')?.value ?? '')
       .split(',')

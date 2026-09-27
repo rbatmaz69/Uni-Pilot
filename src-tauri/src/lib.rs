@@ -1,4 +1,11 @@
+mod apple_mail;
 mod documents;
+mod ilias_browser;
+mod ilias_links;
+mod ilias_sign_out;
+mod ilias_sync;
+mod ilias_view;
+mod ilias_window;
 mod reminders;
 use tauri::Manager;
 
@@ -9,12 +16,50 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             reminders::reminder_request,
             documents::document_request,
-            documents::document_upload
-        ]);
+            documents::document_upload,
+            ilias_window::open_ilias,
+            ilias_view::enter_ilias_mode,
+            ilias_view::leave_ilias_mode,
+            ilias_view::navigate_ilias,
+            ilias_view::close_ilias_view,
+            ilias_browser::travel_ilias,
+            ilias_browser::ilias_history,
+            ilias_browser::open_ilias_download,
+            ilias_browser::reveal_ilias_download,
+            ilias_links::open_ilias_in_browser,
+            ilias_sign_out::sign_out_of_ilias,
+            ilias_sync::ilias_sync_courses,
+            ilias_sync::ilias_sync_contents,
+            ilias_sync::ilias_sync_assignments,
+            ilias_sync::ilias_sync_download,
+            ilias_sync::reauth::ilias_sync_reauth,
+            apple_mail::mail_accounts,
+            apple_mail::mail_inbox,
+            apple_mail::mail_open,
+            apple_mail::mail_launch,
+            apple_mail::mail_previews,
+            apple_mail::mail_message,
+            apple_mail::mail_mark_read,
+            apple_mail::mail_reply,
+            apple_mail::mail_compose
+        ])
+        .manage(ilias_view::Mode::default())
+        .manage(ilias_browser::Downloads::default())
+        .manage(ilias_sync::Pace::default());
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());
     builder
         .on_window_event(|window, event| {
+            // In ILIAS mode the page is only the strip and cannot see the
+            // window, so the layout follows the window from here.
+            if window.label() == "main"
+                && matches!(
+                    event,
+                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+                )
+            {
+                ilias_view::relayout(window.app_handle());
+            }
             #[cfg(target_os = "macos")]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
@@ -22,8 +67,6 @@ pub fn run() {
                     let _ = window.hide();
                 }
             }
-            #[cfg(not(target_os = "macos"))]
-            let _ = (window, event);
         })
         .build(tauri::generate_context!())
         .expect("error while building Uni Pilot")

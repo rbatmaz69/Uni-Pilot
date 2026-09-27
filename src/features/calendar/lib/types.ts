@@ -40,6 +40,11 @@ export interface CalendarEvent {
   room?: string;
   instructor?: string;
   note?: string;
+  /**
+   * The entry's own page in the system it came from. ILIAS feeds link each date
+   * to its course or exercise, which is what "Open in ILIAS" follows.
+   */
+  url?: string;
   /** Optional cover for regular events; special events reuse feature.image. */
   coverImage?: string;
   /** Image-led treatment for student events, independent of their duration. */

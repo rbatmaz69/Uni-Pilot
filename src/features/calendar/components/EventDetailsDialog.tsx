@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { EventReminders } from '@/features/reminders/components/ReminderControls';
+import { OpenInIliasButton } from '@/features/integrations/components/OpenInIliasButton';
 import { CalendarDays, Clock, GraduationCap, MapPin, Rss, Trash2 } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import {
@@ -70,6 +71,7 @@ export function EventDetailsDialog({
               Remove
             </Button>
           )}
+          {event.url ? <OpenInIliasButton url={event.url} /> : null}
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>

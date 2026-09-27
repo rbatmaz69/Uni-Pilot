@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DERIVED, NOT CAPTURED. demo.ilias.de exposes no exercise to an anonymous
+  caller, so this document follows ilExerciseXMLWriter::start() from
+  ILIAS release_9 element for element: Title and Description on the Exercise,
+  then one Assignment per deadline holding Instruction, DueDate (unix seconds)
+  and Files. Replace it with a real getExerciseXML answer once an account on a
+  course with an exercise is available.
+-->
+<Exercise obj_id="il_12895_exc_6021" owner="il_12895_usr_2650">
+  <Title>Programmieren 2 — Abgaben</Title>
+  <Description>Wöchentliche Übungsblätter</Description>
+  <Assignment>
+    <Instruction>Blatt 1: Rekursion. Abgabe als PDF.</Instruction>
+    <DueDate>1730073600</DueDate>
+    <Files>
+      <File size="184320">
+        <Filename>blatt-01.pdf</Filename>
+      </File>
+    </Files>
+  </Assignment>
+  <Assignment>
+    <Instruction>Blatt 2: Listen und Bäume.</Instruction>
+    <DueDate>1730678400</DueDate>
+    <Files>
+      <File size="203776">
+        <Filename>blatt-02.pdf</Filename>
+      </File>
+      <File>
+        <Filename>vorlage.zip</Filename>
+      </File>
+    </Files>
+  </Assignment>
+</Exercise>

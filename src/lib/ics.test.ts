@@ -170,6 +170,55 @@ describe('parsing a single event', () => {
   });
 });
 
+describe('the link an entry carries', () => {
+  const urlOf = (...lines: string[]) =>
+    parseIcs(event('UID:1', 'SUMMARY:Abgabe', 'DTSTART:20260907T091500', ...lines), WINDOW)
+      .events[0]?.url;
+
+  /**
+   * Exactly how ilCalendarExport writes it: a URI-typed URL property pointing
+   * at the object the date belongs to. This is what lets "Open in ILIAS" land
+   * on the exercise instead of the ILIAS start page.
+   */
+  it('reads the deep link ILIAS writes, parameter and all', () => {
+    expect(urlOf('URL;VALUE=URI:https://ilias.hs-heilbronn.de/goto.php?target=exc_4711')).toBe(
+      'https://ilias.hs-heilbronn.de/goto.php?target=exc_4711',
+    );
+  });
+
+  it('reads a plain URL property too', () => {
+    expect(urlOf('URL:https://example.edu/event/1')).toBe('https://example.edu/event/1');
+  });
+
+  it('is null when the feed gives none, as timetables usually do', () => {
+    expect(urlOf()).toBeNull();
+  });
+
+  it('drops anything that is not a web link', () => {
+    expect(urlOf('URL:javascript:alert(1)')).toBeNull();
+    expect(urlOf('URL:file:///etc/passwd')).toBeNull();
+    expect(urlOf('URL:not a link')).toBeNull();
+  });
+
+  it('keeps the link on every occurrence of a repeating entry', () => {
+    const entries = parseIcs(
+      event(
+        'UID:weekly',
+        'SUMMARY:Übung',
+        'DTSTART:20260907T091500',
+        'RRULE:FREQ=WEEKLY;COUNT=3',
+        'URL;VALUE=URI:https://ilias.hs-heilbronn.de/goto.php?target=crs_717',
+      ),
+      WINDOW,
+    ).events;
+
+    expect(entries).toHaveLength(3);
+    expect(new Set(entries.map((entry) => entry.url))).toEqual(
+      new Set(['https://ilias.hs-heilbronn.de/goto.php?target=crs_717']),
+    );
+  });
+});
+
 describe('recurrence', () => {
   it('repeats weekly for a fixed count', () => {
     expect(
