@@ -54,6 +54,7 @@ import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { cn } from '@/lib/utils';
 import { BlockHandle } from './BlockHandle';
 import { DrawingBoard, type DrawingHandle } from './DrawingBoard';
+import { EditorDock } from './EditorDock';
 import { NoteImage } from './NoteImage';
 import { EditableNoteCodeBlock } from './NoteCodeBlock';
 import { EditableNoteBlockMath, EditableNoteInlineMath } from './NoteMath';
@@ -62,7 +63,6 @@ import { NoteToolbar } from './NoteToolbar';
 import { EditableNoteCard, EditableNoteLayout } from './NoteVisual';
 import { NoteTitle } from './NoteTitle';
 import { NotebookView } from './NotebookView';
-import { PageRail } from './PageRail';
 import { PageSheets } from './PageSheets';
 import { PageZoom } from './PageZoom';
 import { SaveStatus } from './SaveStatus';
@@ -462,7 +462,7 @@ export function StudyEditor({
       // The WAI-ARIA shortcut from text to its formatting toolbar.
       const tool =
         document.querySelector<HTMLElement>('.note-bubble [role="toolbar"] [tabindex="0"]') ??
-        document.querySelector<HTMLElement>('.note-rail [data-panel="format"]');
+        document.querySelector<HTMLElement>('.editor-dock [data-panel="text"]');
       if (tool) {
         event.preventDefault();
         tool.focus();
@@ -675,85 +675,88 @@ export function StudyEditor({
             {showSidebar && source ? (
               <NoteSidebar editor={source} scrollRoot={stage} searchRequest={searchRequest} />
             ) : null}
-            {notebook ? (
-              plain ? (
-                <NotebookView title={title} notePath={path} editor={null} flow={false}>
-                  {plainEditor}
-                </NotebookView>
-              ) : source ? (
-                <NotebookView title={title} notePath={path} editor={source} flow>
-                  <EditorContent editor={source} />
-                </NotebookView>
+            {/* The dock floats over the page or the notebook, centred on it, not on the sidebar. */}
+            <div className="note-frame">
+              {notebook ? (
+                plain ? (
+                  <NotebookView title={title} notePath={path} editor={null} flow={false}>
+                    {plainEditor}
+                  </NotebookView>
+                ) : source ? (
+                  <NotebookView title={title} notePath={path} editor={source} flow>
+                    <EditorContent editor={source} />
+                  </NotebookView>
+                ) : (
+                  <div className="study-editor-loading">Opening your note…</div>
+                )
               ) : (
-                <div className="study-editor-loading">Opening your note…</div>
-              )
-            ) : (
-              <div ref={setStage} className="note-stage">
-                {/* Takes the zoomed size of the sheets, which are scaled inside it. */}
-                <div
-                  className="note-zoom"
-                  style={
-                    paged
-                      ? ({
-                          '--note-zoom': zoom,
-                          height: sheets ? stackHeight(sheets) * zoom : undefined,
-                        } as CSSProperties)
-                      : undefined
-                  }
-                >
-                  <article
-                    ref={setPage}
-                    className="note-page"
-                    aria-label="Page"
-                    style={sheets ? sheetStackStyle(sheets) : undefined}
-                    onMouseDown={writeAtEnd}
+                <div ref={setStage} className="note-stage">
+                  {/* Takes the zoomed size of the sheets, which are scaled inside it. */}
+                  <div
+                    className="note-zoom"
+                    style={
+                      paged
+                        ? ({
+                            '--note-zoom': zoom,
+                            height: sheets ? stackHeight(sheets) * zoom : undefined,
+                          } as CSSProperties)
+                        : undefined
+                    }
                   >
-                    {sheets ? <PageSheets layout={sheets} /> : null}
-                    {/* Outside the text layer, whose clip hides the margins it sits in. */}
-                    {source ? <BlockHandle editor={source} container={page} /> : null}
-                    <div ref={setFlow} className="note-page-flow">
-                      {settings.cover !== 'none' ? (
-                        <div
-                          className={cn('note-page-cover', `is-${settings.cover}`)}
-                          aria-hidden="true"
-                        >
-                          <span />
-                          <span />
-                          <span />
+                    <article
+                      ref={setPage}
+                      className="note-page"
+                      aria-label="Page"
+                      style={sheets ? sheetStackStyle(sheets) : undefined}
+                      onMouseDown={writeAtEnd}
+                    >
+                      {sheets ? <PageSheets layout={sheets} /> : null}
+                      {/* Outside the text layer, whose clip hides the margins it sits in. */}
+                      {source ? <BlockHandle editor={source} container={page} /> : null}
+                      <div ref={setFlow} className="note-page-flow">
+                        {settings.cover !== 'none' ? (
+                          <div
+                            className={cn('note-page-cover', `is-${settings.cover}`)}
+                            aria-hidden="true"
+                          >
+                            <span />
+                            <span />
+                            <span />
+                          </div>
+                        ) : null}
+                        <div className="note-page-eyebrow">
+                          <NotebookPen size={14} aria-hidden />
+                          <span>{folders.at(-1) || 'Personal notes'}</span>
                         </div>
-                      ) : null}
-                      <div className="note-page-eyebrow">
-                        <NotebookPen size={14} aria-hidden />
-                        <span>{folders.at(-1) || 'Personal notes'}</span>
+                        <NoteTitle
+                          title={title}
+                          fileName={entry.name}
+                          disabled={renaming}
+                          onRename={rename}
+                          onContinue={continueFromTitle}
+                        />
+                        {plain ? (
+                          plainEditor
+                        ) : source ? (
+                          <EditorContent editor={source} className="note-page-body" />
+                        ) : (
+                          <div className="study-editor-loading">Opening your note…</div>
+                        )}
                       </div>
-                      <NoteTitle
-                        title={title}
-                        fileName={entry.name}
-                        disabled={renaming}
-                        onRename={rename}
-                        onContinue={continueFromTitle}
-                      />
-                      {plain ? (
-                        plainEditor
-                      ) : source ? (
-                        <EditorContent editor={source} className="note-page-body" />
-                      ) : (
-                        <div className="study-editor-loading">Opening your note…</div>
-                      )}
-                    </div>
-                  </article>
+                    </article>
+                  </div>
                 </div>
-              </div>
-            )}
-            <PageRail
-              editor={source}
-              disabled={readOnly || renaming}
-              onInsertImage={() => imageInput.current?.click()}
-              onOpenCanvas={() => selectMode('drawing')}
-              readStats={() => (source ? noteStats(source.state.doc) : plainStats(plainText))}
-              fileName={entry.name}
-              keepsProperties={Boolean(initial.frontMatter)}
-            />
+              )}
+              <EditorDock
+                editor={source}
+                disabled={readOnly || renaming}
+                onInsertImage={() => imageInput.current?.click()}
+                onOpenCanvas={() => selectMode('drawing')}
+                readStats={() => (source ? noteStats(source.state.doc) : plainStats(plainText))}
+                fileName={entry.name}
+                keepsProperties={Boolean(initial.frontMatter)}
+              />
+            </div>
           </div>
           {source ? (
             <>
