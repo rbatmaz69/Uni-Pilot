@@ -1,3 +1,4 @@
+import { CourseSync } from '@/features/courses/components/CourseSync';
 import { ReminderService } from '@/features/reminders/components/ReminderService';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/store/uiStore';
@@ -26,6 +27,7 @@ export function AppLayout() {
       )}
     >
       <ReminderService />
+      <CourseSync />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-raised"

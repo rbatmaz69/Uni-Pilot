@@ -13,6 +13,7 @@ import {
   FocusPage,
   GradesPage,
   IliasPage,
+  InboxPage,
   SettingsPage,
   StudiesPage,
   TasksPage,
@@ -24,6 +25,7 @@ export function AppRoutes() {
       <Route element={<AppLayout />}>
         <Route index element={<Navigate to={DEFAULT_ROUTE} replace />} />
         <Route path={NAV_ITEMS.dashboard.path} element={<DashboardPage />} />
+        <Route path={NAV_ITEMS.inbox.path} element={<InboxPage />} />
         <Route path={NAV_ITEMS.studies.path} element={<StudiesPage />} />
         <Route path={NAV_ITEMS.calendar.path} element={<CalendarPage />} />
         <Route path={NAV_ITEMS.tasks.path} element={<TasksPage />} />

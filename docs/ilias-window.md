@@ -1,6 +1,6 @@
 # ILIAS in Uni Pilot
 
-Open **ILIAS** in the sidebar and choose **Connect Hochschule Heilbronn** (or enter another ILIAS address). In the desktop app the window then switches to **ILIAS mode**: ILIAS fills it, full width, under a slim strip of Uni Pilot's own. The sidebar steps aside while you are there; **Uni Pilot** at the left of the strip takes you back. Sign in exactly as on the website; the sign-in stays on this computer and survives restarting the app.
+Open **ILIAS** in the sidebar and choose **Connect Hochschule Heilbronn** (or enter another ILIAS address). In the desktop app the window then switches to **ILIAS mode**: ILIAS fills it, full width, under a slim strip of Uni Pilot's own. The sidebar steps aside while you are there; **Uni Pilot** at the left of the strip takes you back. Sign in exactly as on the website. The sign-in lasts as long as Uni Pilot runs — on a Mac, closing the window only hides the app — but not past quitting it: ILIAS keeps its session in a session cookie, and after a restart the university's sign-in asks for the password and the authenticator code again (measured 25.09.2026).
 
 Why ILIAS itself rather than native screens: at Heilbronn, ILIAS gives Uni Pilot one data channel — the calendar feed — and nothing for courses, materials, submissions, forums or tests. The research behind this is in [`integrations/ilias-integration-research.md`](integrations/ilias-integration-research.md). Rather than leave all of that out of reach, the app shows ILIAS.
 
@@ -82,7 +82,7 @@ The university sign-in offers **passkeys**: in Safari, Touch ID or your Mac's pa
 
 What works instead:
 
-- **Your HHN user name and password** in Uni Pilot. You sign in rarely: the sign-in is kept across restarts.
+- **Your HHN user name, password and authenticator code** in Uni Pilot, once each time Uni Pilot starts.
 - **Open in your browser** (globe) in the strip, which opens the page ILIAS is on in your default browser, where Touch ID works. That signs in the browser, not Uni Pilot — the two keep their sign-ins apart.
 
 ## What is stored, and what is not
@@ -91,7 +91,7 @@ Stored, in `localStorage` under `uni-pilot.ilias`: the university's name, the IL
 
 **Not stored anywhere by Uni Pilot:** no password, no token, no session id. Your sign-in lives only in ILIAS's own cookies, the same way it would in a browser.
 
-Two exceptions to _reading_ it, both in Rust and both one request long: to fetch a link ILIAS opens in a new window, and to find the sign-out link (below). For each, Rust reads the ILIAS view's cookies for that one request. It sends them only to ILIAS's own origin — same scheme, host and port — follows redirects only within it, keeps nothing, and never hands them to the page.
+Three exceptions to _reading_ it, all in Rust: to fetch a link ILIAS opens in a new window, to find the sign-out link (below), and to read your courses, folders and exercises when Uni Pilot shows them (`src-tauri/src/ilias_sync/`). For each request, Rust reads the ILIAS cookies afresh. It sends them only to ILIAS's own origin — same scheme, host and port — keeps nothing, and never hands them to the page. The first two follow redirects within that origin; the sync follows only to pages that show something, never to one that changes something (`ilias_sync/links.rs`), and it never downloads a file on its own, since ILIAS records a download as reading it. A file is downloaded only when you click **Download** on the Courses page, as a click in ILIAS would; that request may go to `cmd=sendfile` and nowhere else (`may_download`).
 
 ## The rule ILIAS is shown under
 
@@ -125,6 +125,8 @@ Once open, ILIAS navigates freely — it has to, or the university's single sign
 - `src-tauri/src/ilias_sign_out.rs` — **Sign out of ILIAS**, with Rust tests for finding ILIAS's own link and for whose cookie is whose.
 - `src-tauri/src/ilias_links.rs` — links ILIAS opens in a new window, and **Open in your browser**, with Rust tests for where a link goes, telling a file from a page, and file names from headers.
 - `src-tauri/src/ilias_browser.rs` — back, forward and downloads for both, with Rust tests for file names and the download list.
+- `src-tauri/src/ilias_sync/` — reading courses, folders and exercises with your session: the pages it may ask for, telling signed out from empty, and readers tested against recorded HHN pages in `fixtures/`. `src/features/integrations/lib/iliasSync.ts` is its TypeScript side. Background: [`integrations/ilias-sync-research.md`](integrations/ilias-sync-research.md).
+- `src/features/courses/` — the **Courses** page built on the sync: courses by study area, a course's folders, files (size, version, date) and exercises (deadline, hand-in, grade), kept in `store/courseStore.ts` so the last read survives a signed-out start. **Download** on a file saves it to Downloads through the same code as downloads in ILIAS mode, then offers **Open** (documents and media only) and **Show in folder**. `CourseSync` reads the course list every 15 minutes while Uni Pilot runs, which keeps the ILIAS sign-in alive, and stops once ILIAS says it has ended.
 - `src/features/integrations/lib/iliasBrowser.ts` and `store/iliasBrowserStore.ts` — the commands and events, and what the strip shows. Listening starts once and lasts as long as the app, so a download that ends while you are elsewhere is still heard.
 - `src/features/integrations/lib/ilias/endpoints.ts` — `resolveIliasTarget`, `dashboardUrl`; the TypeScript mirror of the rule.
 - `src/features/integrations/lib/ilias/connection.ts` — `discoverInstallation`, which also reads the sign-in options, and `toConnection`.
@@ -145,4 +147,6 @@ Run `npm run check`, then `cargo test --manifest-path src-tauri/Cargo.toml` for 
 - 🔴 **ILIAS mode on every platform.** Rust computes the layout and handles the title bar, but Tauri has open issues about child webviews, and resizing the main webview goes further into its unfinished API than laying one over it did. Check it by eye after a Tauri update, on each platform you ship to — windowed, full screen, and resizing between the two.
 - 🔴 **Back, forward and downloads on Windows and Linux.** Written against each platform's webview and type-checked for Windows, but only tried on macOS. On macOS the webview does not report where a download went, so Uni Pilot chooses the path itself; check the file lands in Downloads on the others.
 - 🔴 **Links ILIAS opens in a new window** are fetched once by Rust to tell a file from a page, and a page is then loaded a second time by the ILIAS view. Harmless for ILIAS's links, which only read; watch for anything that behaves differently when opened twice.
+- ✅ **The sync reads the session without ILIAS mode open (macOS).** Uni Pilot's own page shares the ILIAS view's cookie store: on 25.09.2026 it saw the cookies the sign-in had set for `login.hs-heilbronn.de`. With a valid session the course list loaded, all 11 courses. 🔴 Still to confirm on Windows and Linux.
+- ✅ **The ILIAS session ends when Uni Pilot quits.** After a restart no `ilias.hs-heilbronn.de` cookie was left, only the sign-on's, and signing in again took the password and the authenticator code. A sync can keep a session alive while the app runs; it cannot bring one back after a restart. While Uni Pilot runs, `CourseSync` asks ILIAS every 15 minutes and at once when the computer wakes or the student comes back to the window; if ILIAS has ended the session meanwhile, `ilias_sync/reauth.rs` tries the sign-on in a hidden window — no form, nothing typed — and only when the sign-on wants the password and code again is the student asked. 🔴 How long ILIAS and the sign-on each keep an idle session at HHN is still to be measured.
 - 🔴 **Whether `tauri-plugin-http` honours `redirect: 'manual'`** in a packaged build. Discovery relies on it to tell a blocked SOAP endpoint from a redirect.

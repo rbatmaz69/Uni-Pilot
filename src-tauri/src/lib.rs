@@ -1,3 +1,4 @@
+mod apple_mail;
 mod ilias_browser;
 mod ilias_links;
 mod ilias_sign_out;
@@ -28,7 +29,16 @@ pub fn run() {
             ilias_sync::ilias_sync_contents,
             ilias_sync::ilias_sync_assignments,
             ilias_sync::ilias_sync_download,
-            ilias_sync::reauth::ilias_sync_reauth
+            ilias_sync::reauth::ilias_sync_reauth,
+            apple_mail::mail_accounts,
+            apple_mail::mail_inbox,
+            apple_mail::mail_open,
+            apple_mail::mail_launch,
+            apple_mail::mail_previews,
+            apple_mail::mail_message,
+            apple_mail::mail_mark_read,
+            apple_mail::mail_reply,
+            apple_mail::mail_compose
         ])
         .manage(ilias_view::Mode::default())
         .manage(ilias_browser::Downloads::default())

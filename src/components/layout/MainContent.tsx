@@ -5,9 +5,11 @@ import { useUiStore } from '@/store/uiStore';
 /**
  * Routes that own the whole window instead of sitting in the reading column.
  * The calendar's right panel is drawn to run off the edge of the screen, so a
- * centred column would strand it in the middle of a wide monitor.
+ * centred column would strand it in the middle of a wide monitor. The Inbox
+ * scrolls its list and the open message apart, which needs a column exactly
+ * as tall as the window.
  */
-const FULL_BLEED_PATHS = new Set(['/calendar']);
+const FULL_BLEED_PATHS = new Set(['/calendar', '/inbox']);
 
 export function MainContent() {
   const { pathname } = useLocation();
