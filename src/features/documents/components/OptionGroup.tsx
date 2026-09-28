@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 export interface Option<T extends string> {
   value: T;
   label: string;
+  /** A quieter second line under the label, e.g. "A4 sheets" under "Pages". */
+  detail?: string;
   /** A preview drawn above the label, e.g. "Ag" in the typeface or a swatch. */
   preview?: ReactNode;
 }
@@ -14,15 +16,18 @@ interface OptionGroupProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   columns?: number;
+  /** Tiles show a preview above the label; a segmented control is one pill of words. */
+  variant?: 'tiles' | 'segmented';
 }
 
-/** A labelled radio group of tiles: one Tab stop, arrow keys choose. */
+/** A labelled radio group: one Tab stop, arrow keys choose. */
 export function OptionGroup<T extends string>({
   label,
   options,
   value,
   onChange,
   columns = options.length,
+  variant = 'tiles',
 }: OptionGroupProps<T>) {
   const id = useId();
   const group = useRef<HTMLDivElement>(null);
@@ -44,7 +49,7 @@ export function OptionGroup<T extends string>({
   }
 
   return (
-    <div className="note-option-group">
+    <div className={cn('note-option-group', variant === 'segmented' && 'is-segmented')}>
       <span id={`${id}-label`} className="note-panel-label">
         {label}
       </span>
@@ -63,6 +68,8 @@ export function OptionGroup<T extends string>({
             role="radio"
             data-value={option.value}
             aria-checked={option.value === value}
+            aria-label={option.detail ? option.label : undefined}
+            aria-describedby={option.detail ? `${id}-${option.value}` : undefined}
             tabIndex={option.value === value ? 0 : -1}
             className={cn('note-option', option.value === value && 'is-on')}
             onClick={() => onChange(option.value)}
@@ -72,7 +79,12 @@ export function OptionGroup<T extends string>({
                 {option.preview}
               </span>
             ) : null}
-            <span>{option.label}</span>
+            <span className="note-option-label">{option.label}</span>
+            {option.detail ? (
+              <span id={`${id}-${option.value}`} className="note-option-detail">
+                {option.detail}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

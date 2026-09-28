@@ -226,9 +226,9 @@ describe('Document explorer', () => {
     );
   });
 
-  it('switches a note into the notebook style from the page style panel and remembers it', async () => {
+  it('switches a note into the notebook style from the layout popover and remembers it', async () => {
     const { user } = await openNotes();
-    await user.click(screen.getByRole('button', { name: 'Page style' }));
+    await user.click(screen.getByRole('button', { name: 'Layout' }));
     const layouts = screen.getByRole('radiogroup', { name: 'Page layout' });
     expect(within(layouts).getByRole('radio', { name: 'Pages' })).toBeChecked();
     expect(screen.queryByRole('region', { name: 'Notebook' })).not.toBeInTheDocument();
@@ -256,7 +256,7 @@ describe('Document explorer', () => {
     const { user } = await openNotes();
     const workspace = screen.getByRole('region', { name: 'Edit Notes.md' });
     expect(workspace).toHaveAttribute('data-layout', 'pages');
-    await user.click(screen.getByRole('button', { name: 'Page style' }));
+    await user.click(screen.getByRole('button', { name: 'Layout' }));
     screen.getByRole('radio', { name: 'Pages' }).focus();
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('radio', { name: 'Pageless' })).toHaveFocus();
@@ -275,35 +275,45 @@ describe('Document explorer', () => {
   it('applies font, size, spacing, width and backdrop to every note without touching the file', async () => {
     const { user } = await openNotes();
     const workspace = screen.getByRole('region', { name: 'Edit Notes.md' });
-    await user.click(screen.getByRole('button', { name: 'Page style' }));
-    const panel = screen.getByRole('dialog', { name: 'Page style' });
+    await user.click(screen.getByRole('button', { name: 'Typography' }));
+    const type = screen.getByRole('dialog', { name: 'Typography' });
     await user.click(
-      within(within(panel).getByRole('radiogroup', { name: 'Font' })).getByRole('radio', {
+      within(within(type).getByRole('radiogroup', { name: 'Font' })).getByRole('radio', {
         name: 'Literata',
       }),
     );
-    expect(within(panel).getByText(/Google Play Books/)).toBeInTheDocument();
-    await user.click(within(panel).getByRole('radio', { name: 'Large' }));
-    await user.click(within(panel).getByRole('radio', { name: 'Compact' }));
-    await user.click(within(panel).getByRole('radio', { name: 'Wide' }));
-    await user.click(within(panel).getByRole('radio', { name: 'Dots' }));
+    expect(within(type).getByText(/Google Play Books/)).toBeInTheDocument();
+    await user.click(within(type).getByRole('radio', { name: 'Large' }));
+    await user.click(within(type).getByRole('radio', { name: 'Compact' }));
+    expect(screen.getByRole('button', { name: 'Typography' })).toHaveTextContent('LiterataLarge');
+
+    // Width shapes a page that grows with the text; A4 sheets keep theirs.
+    await user.click(screen.getByRole('button', { name: 'Layout' }));
+    const layout = screen.getByRole('dialog', { name: 'Layout' });
+    await user.click(within(layout).getByRole('radio', { name: 'Pageless' }));
+    await user.click(within(layout).getByRole('radio', { name: 'Wide' }));
+    await user.click(screen.getByRole('button', { name: 'Page appearance' }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Page' })).getByRole('radio', { name: 'Dots' }),
+    );
     expect(workspace).toHaveAttribute('data-font', 'literata');
     expect(workspace).toHaveAttribute('data-text-size', 'l');
     expect(workspace).toHaveAttribute('data-line-spacing', 'compact');
+    expect(workspace).toHaveAttribute('data-layout', 'card');
     expect(workspace).toHaveAttribute('data-width', 'wide');
     expect(workspace).toHaveAttribute('data-backdrop', 'dots');
 
     await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog', { name: 'Page style' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Page style' })).toHaveFocus();
+    expect(screen.queryByRole('dialog', { name: 'Page' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Page appearance' })).toHaveFocus();
     expect(saves()).toEqual([]);
   });
 
-  it('shows word count and reading time in the info panel instead of a footer', async () => {
+  it('shows word count and reading time in the details popover instead of a footer', async () => {
     const { user, editor } = await openNotes();
     await user.type(editor, ' on standard deviation');
-    await user.click(screen.getByRole('button', { name: 'Note info' }));
-    const info = screen.getByRole('dialog', { name: 'Note info' });
+    await user.click(screen.getByRole('button', { name: 'Note details' }));
+    const info = screen.getByRole('dialog', { name: 'Details' });
     expect(within(info).getByText('Words').nextSibling).toHaveTextContent('4');
     expect(within(info).getByText('Reading time').nextSibling).toHaveTextContent('1 min');
     expect(within(info).getByText('Notes.md')).toBeInTheDocument();
@@ -311,13 +321,14 @@ describe('Document explorer', () => {
 
   it('keeps the bold color when switching layouts and reopening a note without saving edits', async () => {
     const { user } = await openNotes();
-    await user.click(screen.getByRole('button', { name: 'Page style' }));
+    await user.click(screen.getByRole('button', { name: 'Typography' }));
     const colors = screen.getByRole('radiogroup', { name: 'Bold text color' });
     await user.click(within(colors).getByRole('radio', { name: 'Blue' }));
     expect(screen.getByRole('region', { name: 'Edit Notes.md' })).toHaveAttribute(
       'data-bold-color',
       'blue',
     );
+    await user.click(screen.getByRole('button', { name: 'Layout' }));
     await user.click(screen.getByRole('radio', { name: 'Notebook' }));
     expect(screen.getByRole('region', { name: 'Notebook' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Edit Notes.md' })).toHaveAttribute(
@@ -334,7 +345,7 @@ describe('Document explorer', () => {
     expect(saves()).toEqual([]);
   });
 
-  it('toggles focus mode from the rail and with ⌘⇧F', async () => {
+  it('toggles focus mode from the dock and with ⌘⇧F', async () => {
     const { user } = await openNotes();
     const workspace = screen.getByRole('region', { name: 'Edit Notes.md' });
     const focus = screen.getByRole('button', { name: 'Focus mode' });
