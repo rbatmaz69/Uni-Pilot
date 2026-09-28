@@ -7,6 +7,7 @@ import { useEventStore } from '@/features/calendar/store/eventStore';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
+import { useSidebarStore } from '@/store/sidebarStore';
 import { useUiStore } from '@/store/uiStore';
 
 // Tests provide their own calendar fixtures, including on the first run.
@@ -24,6 +25,15 @@ afterEach(() => {
     settings: DEFAULT_SETTINGS,
   });
   useUiStore.setState({ sidebarCollapsed: false, studentEventsCollapsed: false, theme: 'light' });
+  useSidebarStore.setState({
+    favorites: [],
+    order: {},
+    hidden: [],
+    collapsedSections: [],
+    documentDrag: null,
+    documentDragOver: false,
+    activeDocument: null,
+  });
   useSourceStore.setState({ sources: [], syncingIds: [] });
   useTaskStore.setState({ tasks: [] });
   useNoteStyleStore.setState({

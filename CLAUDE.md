@@ -39,6 +39,11 @@ Bei Formatierungsfehlern: `npm run format`. Bei Lint-Fehlern: `npm run lint:fix`
   Plugins (Fokusmodus, Suche im Dokument, `/`-Menü) hängt `StudyEditor` an. Sie dürfen den
   Dokumentinhalt nie verändern. Seitenstil (Schrift, Breite, Hintergrund) ist App-Einstellung im
   `noteStyleStore` und wird nie in die Datei geschrieben.
+- **Sidebar-Anpassungen leben im `sidebarStore`** (`src/store/sidebarStore.ts`): Reihenfolge,
+  ausgeblendete Einträge, eingeklappte Abschnitte und Favoriten. `NAV_SECTIONS` bleibt der
+  Standard, `arrangeSections` in `src/lib/sidebar.ts` legt die Nutzeränderungen darüber.
+  Favoriten sind Pfade relativ zu Documents: Wer Dateien verschiebt oder umbenennt, ruft
+  `relocateFavorites`, wer sie löscht, `forgetFavorites` — sonst zeigen Favoriten ins Leere.
 - **TypeScript bleibt bei 5.9.** TypeScript 7 (nativer Compiler) exportiert die klassische
   Compiler-API nicht mehr, `typescript-eslint` verlangt aber `<6.1.0`. Erst hochziehen, wenn
   typescript-eslint TS 7 unterstützt.
@@ -55,17 +60,18 @@ Bei Formatierungsfehlern: `npm run format`. Bei Lint-Fehlern: `npm run lint:fix`
 
 ```
 src/app/          Root, Provider, Routen-Tabelle
-src/components/   ui/ (Button, IconButton, Tooltip, PageHeader)
+src/components/   ui/ (Button, IconButton, ContextMenu, Modal, Tooltip, PageHeader)
                   layout/ (AppLayout, Sidebar, Header, MainContent, Page)
-                  navigation/ (NavigationItem, NavigationSection)
+                  navigation/ (NavigationItem, NavigationSection, FavoritesSection,
+                  CustomizeSidebarDialog)
 src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
                   calendar/  {components,store,lib}/ + index.ts
                   dashboard/ {components,lib}/ + index.ts
                   documents/ {components,lib}/ + index.ts
                   reminders/ {components,store,lib}/
 src/pages/        Eine schlanke Komponente pro Route
-src/lib/          navigation.ts (Quelle der Wahrheit), date.ts, ics.ts, tone.ts, utils.ts
-src/store/        Zustand-Store, nur UI-State (App-weit, nicht feature-spezifisch)
+src/lib/          navigation.ts (Quelle der Wahrheit), sidebar.ts, date.ts, ics.ts, tone.ts, utils.ts
+src/store/        Zustand-Stores, nur UI-State (App-weit, nicht feature-spezifisch): uiStore, sidebarStore
 src/test/         setup.ts, render.tsx
 src-tauri/        Desktop-Hülle (Rust)
 ```

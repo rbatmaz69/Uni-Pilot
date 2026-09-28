@@ -539,6 +539,7 @@
   --shadow-soft: var(--shadow-soft);
   --shadow-raised: var(--shadow-raised);
   --shadow-sidebar: var(--shadow-sidebar);
+  --shadow-float: var(--shadow-float);
 
   --ease-shell: cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -681,9 +682,89 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .nav-link[aria-current='page'] .nav-icon {
-    fill: currentColor;
-    fill-opacity: 0.12;
+
+  /* Finder's drop marker: a line with a ring at its start, where the row will land. */
+  .sidebar-sortable > li {
+    position: relative;
+  }
+  .sidebar-sortable > li[data-dragging] {
+    opacity: 0.45;
+  }
+  .sidebar-sortable > li[data-drop]::before,
+  .sidebar-sortable > li[data-drop]::after {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .sidebar-sortable > li[data-drop]::before {
+    left: 12px;
+    right: 6px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--accent-primary);
+  }
+  .sidebar-sortable > li[data-drop]::after {
+    left: 4px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--accent-primary);
+    border-radius: 999px;
+    background: var(--sidebar);
+  }
+  .sidebar-sortable > li[data-drop='before']::before {
+    top: -1.5px;
+  }
+  .sidebar-sortable > li[data-drop='before']::after {
+    top: -4.5px;
+  }
+  .sidebar-sortable > li[data-drop='after']::before {
+    bottom: -1.5px;
+  }
+  .sidebar-sortable > li[data-drop='after']::after {
+    bottom: -4.5px;
+  }
+
+  .favorites-section {
+    transition:
+      background-color 0.15s var(--ease-shell),
+      box-shadow 0.15s var(--ease-shell);
+  }
+  .favorites-section[data-over] {
+    background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  }
+
+  /* System Settings-style switch on a real checkbox, so forms and tests see a checkbox. */
+  .toggle-switch {
+    position: relative;
+    flex: none;
+    width: 32px;
+    height: 19px;
+    appearance: none;
+    cursor: pointer;
+    border-radius: 999px;
+    background: var(--border-strong);
+    transition: background-color 0.18s var(--ease-shell);
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.18s var(--ease-shell);
+  }
+  .toggle-switch:checked {
+    background: var(--accent-primary);
+  }
+  .toggle-switch:checked::after {
+    transform: translateX(13px);
+    background: var(--accent-primary-foreground);
   }
 
   .welcome-card {

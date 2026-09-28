@@ -51,6 +51,7 @@ import { NoteTypography } from '@/features/documents/lib/typography';
 import { usePageSheets } from '@/features/documents/lib/usePageSheets';
 import { usePageZoom } from '@/features/documents/lib/usePageZoom';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
+import { useSidebarStore } from '@/store/sidebarStore';
 import { cn } from '@/lib/utils';
 import { BlockHandle } from './BlockHandle';
 import { DrawingBoard, type DrawingHandle } from './DrawingBoard';
@@ -418,6 +419,7 @@ export function StudyEditor({
       await documentRequest({ action: 'move', path, destination: folder, name: check.fileName });
       const nextPath = folder ? `${folder}/${check.fileName}` : check.fileName;
       useNoteStyleStore.getState().moveBookmark(path, nextPath);
+      useSidebarStore.getState().relocateFavorites(path, nextPath);
       const content = await documentRequest<string>({ action: 'read', path: nextPath }).catch(() =>
         currentText(),
       );

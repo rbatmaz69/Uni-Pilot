@@ -38,7 +38,9 @@ import {
   type PreviewSize,
   type FolderLayout,
 } from '@/features/documents/lib/folderLayout';
+import { isOverFavorites, toFavorite } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
+import { useSidebarStore } from '@/store/sidebarStore';
 import { DocumentThumbnail } from './DocumentThumbnail';
 import { FolderArtwork } from './FolderArtwork';
 import { NoteVisualPreview } from './NoteVisualPreview';
@@ -422,6 +424,8 @@ export function DocumentCanvas({
   const [pinnedOnlyPath, setPinnedOnlyPath] = useState<string | null>(null);
   const [storageError, setStorageError] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+  const addFavorite = useSidebarStore((state) => state.addFavorite);
+  const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
   const [closingFolder, setClosingFolder] = useState(false);
   const [openedAt, setOpenedAt] = useState<Record<string, Point>>({});
   const viewport = useRef<HTMLDivElement>(null);
@@ -838,12 +842,25 @@ export function DocumentCanvas({
     parentHoldTimer.current = null;
     setParentDropState(null);
   }
-  function finish(event?: PointerEvent<HTMLButtonElement>, cancelled = false) {
+  function finish(event?: PointerEvent<HTMLButtonElement>, abandoned = false) {
     const current = gesture.current;
     if (!current) return;
     gesture.current = null;
     if (event?.currentTarget.hasPointerCapture?.(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
+    setDocumentDrag(null);
+    // Let go over the sidebar: keep it as a favorite, and put the card back.
+    const toSidebar =
+      !abandoned &&
+      current.moved &&
+      canEdit &&
+      !!event &&
+      isOverFavorites(event.clientX, event.clientY);
+    if (toSidebar) {
+      addFavorite(toFavorite(current.entry));
+      setAnnouncement(`${current.entry.name} added to Favorites.`);
+    }
+    const cancelled = abandoned || toSidebar;
     const moveToParent = !cancelled && parentDropRef.current === 'ready' && path;
     const wasOverParent = parentDropRef.current !== null;
     clearParentDrop();
@@ -1278,8 +1295,15 @@ export function DocumentCanvas({
                               y: (event.clientY - bounds.top - cameraRef.current.y) / zoom,
                             }
                           : null;
+                        const overSidebar =
+                          canEdit && isOverFavorites(event.clientX, event.clientY);
+                        if (canEdit) setDocumentDrag(toFavorite(entry), overSidebar);
                         const overParent = Boolean(
-                          path && canEdit && pointer && outsideFolder(pointer, folderLayout.bounds),
+                          path &&
+                          canEdit &&
+                          pointer &&
+                          !overSidebar &&
+                          outsideFolder(pointer, folderLayout.bounds),
                         );
                         if (overParent && !parentDropRef.current) {
                           setParentDropState('pending');
@@ -1319,7 +1343,7 @@ export function DocumentCanvas({
                               );
                             })
                           : null;
-                        setDropTarget(overParent ? null : (target?.path ?? null));
+                        setDropTarget(overParent || overSidebar ? null : (target?.path ?? null));
                       }}
                       onPointerUp={(event) => finish(event)}
                       onPointerCancel={(event) => finish(event, true)}

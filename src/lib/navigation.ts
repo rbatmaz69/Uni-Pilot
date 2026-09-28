@@ -1,15 +1,15 @@
 import {
-  Award,
   BookOpen,
-  CalendarDays,
-  FileText,
-  FolderOpen,
+  Calendar,
+  ChartNoAxesColumn,
+  CircleCheck,
+  ClipboardList,
+  Folder,
   GraduationCap,
-  LayoutDashboard,
-  ListTodo,
-  PartyPopper,
+  House,
   Settings,
   Sparkles,
+  Ticket,
   Timer,
   Users,
 } from 'lucide-react';
@@ -21,7 +21,7 @@ export const NAV_ITEMS = {
     label: 'Dashboard',
     subtitle: 'Your university life at a glance.',
     placeholder: 'This area will hold your customisable dashboard.',
-    icon: LayoutDashboard,
+    icon: House,
     tone: 'accent',
   },
   studies: {
@@ -37,7 +37,7 @@ export const NAV_ITEMS = {
     label: 'Calendar',
     subtitle: 'Lectures, deadlines and everything in between.',
     placeholder: 'This area will show your semester calendar.',
-    icon: CalendarDays,
+    icon: Calendar,
     tone: 'blue',
   },
   tasks: {
@@ -45,7 +45,7 @@ export const NAV_ITEMS = {
     label: 'Tasks',
     subtitle: 'Everything you need to get done.',
     placeholder: 'This area will hold your task lists and boards.',
-    icon: ListTodo,
+    icon: CircleCheck,
     tone: 'green',
   },
   focus: {
@@ -69,7 +69,7 @@ export const NAV_ITEMS = {
     label: 'Exams',
     subtitle: 'Registrations, dates and preparation.',
     placeholder: 'This area will show your exam schedule and registrations.',
-    icon: FileText,
+    icon: ClipboardList,
     tone: 'pink',
   },
   grades: {
@@ -77,7 +77,7 @@ export const NAV_ITEMS = {
     label: 'Grades',
     subtitle: 'Results, averages and credit points.',
     placeholder: 'This area will show your grades and credit progress.',
-    icon: Award,
+    icon: ChartNoAxesColumn,
     tone: 'green',
   },
   events: {
@@ -85,7 +85,7 @@ export const NAV_ITEMS = {
     label: 'Events',
     subtitle: 'What is happening around campus.',
     placeholder: 'This area will show university and student events.',
-    icon: PartyPopper,
+    icon: Ticket,
     tone: 'yellow',
   },
   communities: {
@@ -101,7 +101,7 @@ export const NAV_ITEMS = {
     label: 'Documents',
     subtitle: 'Scripts, notes and files that matter.',
     placeholder: 'This area will hold your documents and lecture materials.',
-    icon: FolderOpen,
+    icon: Folder,
     tone: 'blue',
   },
   ai: {

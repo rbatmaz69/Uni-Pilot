@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   ArrowLeft,
   PanelsTopLeft,
@@ -17,6 +17,7 @@ import {
   Pencil,
   RefreshCw,
   Search,
+  Star,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -28,7 +29,9 @@ import { StudyEditor } from './StudyEditor';
 import { FileTools } from './FileTools';
 import { Button, IconButton, Modal } from '@/components/ui';
 import { isDesktopRuntime } from '@/lib/icsFetch';
+import { toFavorite, writeDocumentDrag, type SidebarFavorite } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
+import { useSidebarStore } from '@/store/sidebarStore';
 import {
   documentRequest,
   editable,
@@ -54,7 +57,17 @@ type DocumentTab = { path: string; name: string; folder: boolean; entry?: Docume
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-primary';
 const EMPTY_ENTRIES: DocumentEntry[] = [];
 
-export function DocumentExplorer() {
+function joinPath(folder: string, name: string) {
+  return folder ? `${folder}/${name}` : name;
+}
+
+/** A favorite in the sidebar asked for this place. The key tells repeated requests apart. */
+export interface OpenRequest {
+  key: string;
+  target: SidebarFavorite;
+}
+
+export function DocumentExplorer({ openRequest = null }: { openRequest?: OpenRequest | null }) {
   const desktop = isDesktopRuntime();
   const [menu, setMenu] = useState<'add' | 'search' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -91,6 +104,16 @@ export function DocumentExplorer() {
   const searchQuery = query.trim();
   const searching = desktop && searchQuery.length >= 2;
   const searchHits = search?.query === searchQuery ? search.hits : null;
+  const shownPath = note?.entry.path ?? path;
+  const favorite = useSidebarStore((state) =>
+    state.favorites.some((item) => item.path === selected),
+  );
+  const addFavorite = useSidebarStore((state) => state.addFavorite);
+  const removeFavorite = useSidebarStore((state) => state.removeFavorite);
+  const relocateFavorites = useSidebarStore((state) => state.relocateFavorites);
+  const forgetFavorites = useSidebarStore((state) => state.forgetFavorites);
+  const setActiveDocument = useSidebarStore((state) => state.setActiveDocument);
+  const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
 
   function rememberTab(tab: DocumentTab) {
     setTabs((current) =>
@@ -159,6 +182,12 @@ export function DocumentExplorer() {
     const timeout = window.setTimeout(() => setNotice(''), 5000);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  // Lets the sidebar light up a favorite while it is the place on screen.
+  useEffect(() => {
+    setActiveDocument(shownPath);
+  }, [shownPath, setActiveDocument]);
+  useEffect(() => () => setActiveDocument(null), [setActiveDocument]);
 
   const refresh = useCallback(async () => {
     if (!desktop) return;
@@ -301,14 +330,17 @@ export function DocumentExplorer() {
         setNotice(`${name.trim()} created on your computer.`);
       } else if (dialog.type === 'trash') {
         await documentRequest({ action: 'trash', path: dialog.entry.path });
+        forgetFavorites(dialog.entry.path);
         setNotice('Moved to Recently deleted. You can restore it at any time.');
       } else {
+        const target = dialog.type === 'move' ? destination : path;
         await documentRequest({
           action: 'move',
           path: dialog.entry.path,
-          destination: dialog.type === 'move' ? destination : path,
+          destination: target,
           name: name.trim(),
         });
+        relocateFavorites(dialog.entry.path, joinPath(target, name.trim()));
         setNotice('Changes saved on your computer.');
       }
       setDialog(null);
@@ -364,6 +396,19 @@ export function DocumentExplorer() {
       setBusy(false);
     }
   }
+  const openFromSidebar = useEffectEvent((target: SidebarFavorite) => {
+    leaveThen(() => {
+      if (target.folder) navigate(target.path);
+      else activate({ ...target, size: 0, modified: 0 });
+    });
+  });
+  const handledRequest = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openRequest || handledRequest.current === openRequest.key) return;
+    handledRequest.current = openRequest.key;
+    openFromSidebar(openRequest.target);
+  }, [openRequest]);
+
   const breadcrumbs = path ? path.split('/') : [];
 
   return (
@@ -776,6 +821,7 @@ export function DocumentExplorer() {
                         destination: target,
                         name: item.name,
                       });
+                      relocateFavorites(item.path, joinPath(target, item.name));
                       moved = true;
                       setSelected(null);
                       setNotice(
@@ -822,6 +868,12 @@ export function DocumentExplorer() {
                             aria-label={`Select ${item.name}`}
                             aria-pressed={selected === item.path}
                             disabled={busy}
+                            draggable={desktop && !inTrash}
+                            onDragStart={(event) => {
+                              writeDocumentDrag(event.dataTransfer, item);
+                              setDocumentDrag(toFavorite(item));
+                            }}
+                            onDragEnd={() => setDocumentDrag(null)}
                             onClick={() => setSelected(item.path)}
                             onDoubleClick={() => activate(item)}
                             onKeyDown={(event) => {
@@ -930,6 +982,18 @@ export function DocumentExplorer() {
                     </Button>
                   ) : (
                     <>
+                      <IconButton
+                        label={favorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                        onClick={() =>
+                          favorite ? removeFavorite(entry.path) : addFavorite(toFavorite(entry))
+                        }
+                      >
+                        <Star
+                          size={15}
+                          fill={favorite ? 'currentColor' : 'none'}
+                          className={favorite ? 'text-yellow' : undefined}
+                        />
+                      </IconButton>
                       <IconButton
                         label="Rename selected item"
                         disabled={busy || loading}

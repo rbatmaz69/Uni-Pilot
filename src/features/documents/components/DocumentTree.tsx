@@ -17,7 +17,9 @@ import {
   type DocumentEntry,
   type SearchHit,
 } from '@/features/documents/lib/files';
+import { toFavorite, writeDocumentDrag } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
+import { useSidebarStore } from '@/store/sidebarStore';
 
 type Props = {
   desktop: boolean;
@@ -43,6 +45,7 @@ export function DocumentTree({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ query: string; hits: SearchHit[] } | null>(null);
   const [error, setError] = useState('');
+  const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
   const openFolders = new Set(expanded);
   if (activePath && activePath !== '.trash') {
     const parts = activePath.split('/');
@@ -129,6 +132,12 @@ export function DocumentTree({
         <div
           className={cn('document-tree-row', current && 'is-active')}
           style={{ paddingLeft: `${12 + depth * 17}px` }}
+          draggable={desktop && !entry.path.startsWith('.trash')}
+          onDragStart={(event) => {
+            writeDocumentDrag(event.dataTransfer, entry);
+            setDocumentDrag(toFavorite(entry));
+          }}
+          onDragEnd={() => setDocumentDrag(null)}
         >
           {entry.folder ? (
             <button
