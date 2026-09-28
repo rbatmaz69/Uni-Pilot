@@ -10,6 +10,7 @@
  */
 
 import { MONTH_NAMES, startOfDay } from '@/lib/date';
+import { NAV_ITEMS } from '@/lib/navigation';
 import type {
   IliasContainer,
   IliasContentItem,
@@ -144,4 +145,14 @@ export function dueLabel(dueAt: string | null, now: Date): string | null {
   if (days === 0) return 'Due today';
   if (days === 1) return 'Due tomorrow';
   return `Due in ${days} days`;
+}
+
+/** Where the document explorer opens a workspace folder. */
+export function documentsLink(path: string): string {
+  return `${NAV_ITEMS.documents.path}?${new URLSearchParams({ path }).toString()}`;
+}
+
+/** The folder a workspace path sits in: `a/b/c.pdf` → `a/b`. */
+export function folderOf(path: string): string {
+  return path.split('/').slice(0, -1).join('/');
 }

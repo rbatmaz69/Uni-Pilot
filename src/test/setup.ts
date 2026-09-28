@@ -10,6 +10,10 @@ import {
   useIliasBrowserStore,
 } from '@/features/integrations/store/iliasBrowserStore';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
+import {
+  resetCourseFilesListening,
+  useCourseFilesStore,
+} from '@/features/courses/store/courseFilesStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
@@ -38,6 +42,15 @@ afterEach(() => {
   useTaskStore.setState({ tasks: [] });
   useIliasBrowserStore.setState({ history: NO_HISTORY, downloads: [] });
   resetIliasBrowserListening();
+  useCourseFilesStore.setState({
+    installation: null,
+    folders: null,
+    syncing: {},
+    reports: {},
+    failures: {},
+    saving: {},
+  });
+  resetCourseFilesListening();
   useNoteStyleStore.setState({
     style: 'standard',
     layout: 'pages',

@@ -58,8 +58,8 @@ pub enum Page {
     /// only running ones, and past deadlines and submissions go missing.
     Assignments(u64),
     /// A file's download — the one page that counts as reading in ILIAS. Only
-    /// the student's own click asks for it (`ilias_sync_download`); the sync
-    /// never does, and `may_fetch` refuses it.
+    /// the student's own click asks for it, or the course sync for a course
+    /// the student switched on (`mirror`); `may_fetch` refuses it.
     File(u64),
 }
 

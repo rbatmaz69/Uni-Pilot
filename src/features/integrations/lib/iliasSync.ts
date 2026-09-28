@@ -83,24 +83,77 @@ export interface IliasAssignment {
   properties: IliasProperty[];
 }
 
-/** A file saved to Downloads; opened or shown by `id` through `iliasBrowser.ts`. */
-export interface IliasSavedFile {
-  id: number;
-  /** The name it was saved under — possibly numbered, `Blatt (1).pdf`. */
-  fileName: string;
-  /** Whether Uni Pilot opens it with its default app: documents and media. */
-  openable: boolean;
+/**
+ * A course whose files Uni Pilot keeps in the Documents workspace — the
+ * `Summary` of `src-tauri/src/ilias_sync/mirror/`. Paths are relative to the
+ * workspace, as the document explorer names them.
+ */
+export interface CourseFolder {
+  courseRefId: string;
+  courseTitle: string;
+  /** The course's `ILIAS` folder, e.g. `Courses/Winter 2026-27/Datenbanken 1/ILIAS`. */
+  root: string;
+  /** Whether Uni Pilot syncs it on its own. */
+  auto: boolean;
+  /** ILIAS folders the student switched off, by ref_id. */
+  excluded: string[];
+  /** When the last complete sync ended, ISO 8601. */
+  syncedAt: string | null;
+  folders: { refId: string; title: string; path: string }[];
+  /** The files Uni Pilot put there, by ILIAS ref_id. */
+  files: Record<string, CourseFile>;
+}
+
+export interface CourseFile {
+  path: string;
+  /** `gone`: ILIAS no longer lists it, the copy stays. `removed`: the student deleted it. */
+  state: 'synced' | 'gone' | 'removed';
+  version: number;
+}
+
+/** What a sync did. */
+export interface CourseSyncReport {
+  summary: CourseFolder;
+  added: string[];
+  updated: string[];
+  /** New versions saved beside a copy the student had changed. */
+  kept: string[];
+  /** Too large to download unasked; one click in Courses fetches them. */
+  tooLarge: { refId: string; title: string; size: number | null }[];
+  /** Files ILIAS stopped listing this time. */
+  gone: number;
+  failed: { title: string; message: string }[];
+}
+
+/** Where a running sync is, from the `ilias-mirror-progress` event. */
+export interface CourseSyncProgress {
+  courseRefId: string;
+  phase: 'reading' | 'downloading' | 'done';
+  done: number;
+  total: number;
+  title: string | null;
+}
+
+/** The course as the sync needs it: which one, and where its folder goes. */
+export interface CourseTarget {
+  refId: string;
+  container: 'crs' | 'grp';
+  /** The course folder's name, e.g. "Datenbanken 1". */
+  title: string;
+  /** The semester folder above it, e.g. "Winter 2026-27"; null for none. */
+  semester: string | null;
 }
 
 /** `SyncError` in `src-tauri/src/ilias_sync/mod.rs`. */
 type SyncFailure =
-  { kind: 'signedOut' } | { kind: 'refused' | 'unreachable' | 'unrecognised'; message: string };
+  | { kind: 'signedOut' }
+  | { kind: 'refused' | 'unreachable' | 'unrecognised' | 'local'; message: string };
 
 function isSyncFailure(value: unknown): value is SyncFailure {
   return (
     typeof value === 'object' &&
     value !== null &&
-    ['signedOut', 'refused', 'unreachable', 'unrecognised'].includes(
+    ['signedOut', 'refused', 'unreachable', 'unrecognised', 'local'].includes(
       (value as { kind?: unknown }).kind as string,
     )
   );
@@ -135,6 +188,9 @@ export function toIliasError(failure: unknown): IliasError {
         'Uni Pilot does not ask ILIAS for that.',
         failure.message,
       );
+    case 'local':
+      // Uni Pilot's own part on this computer: its words are the message.
+      return new IliasError('provider-error', failure.message, failure.message);
   }
 }
 
@@ -189,13 +245,71 @@ export function readIliasAssignments(
   return call('ilias_sync_assignments', { ...installation(connection), exerciseRefId });
 }
 
+/** The courses whose files this computer keeps, for this installation. */
+export function listCourseFolders(connection: IliasConnection): Promise<CourseFolder[]> {
+  return call('ilias_mirror_list', { baseUrl: connection.baseUrl });
+}
+
 /**
- * Saves a file to Downloads. Only on the student's click: ILIAS counts a
- * download as reading the file, as it would a click in ILIAS itself.
+ * Brings a course's `ILIAS` folder up to date — creating it the first time.
+ * Downloads count as reading the files in ILIAS, as a click there would, so
+ * this runs only for courses the student chose.
  */
-export function downloadIliasFile(
+export function syncCourseFiles(
   connection: IliasConnection,
-  fileRefId: string,
-): Promise<IliasSavedFile> {
-  return call('ilias_sync_download', { ...installation(connection), fileRefId });
+  course: CourseTarget,
+): Promise<CourseSyncReport> {
+  return call('ilias_mirror_course', { ...installation(connection), course });
+}
+
+/**
+ * Saves one file the student clicked into the course's `ILIAS` folder, where
+ * the sync would put it. `trail` is the folders it sits in, outermost first.
+ */
+export function saveCourseFile(
+  connection: IliasConnection,
+  course: CourseTarget,
+  trail: { refId: string; title: string }[],
+  file: IliasContentItem,
+): Promise<CourseFile> {
+  return call('ilias_mirror_file', {
+    ...installation(connection),
+    course,
+    trail,
+    file: {
+      refId: file.refId,
+      title: file.title,
+      suffix: file.file?.suffix ?? null,
+      size: file.file?.size ?? null,
+      version: file.file?.version ?? 1,
+      updatedAt: file.file?.updatedAt ?? null,
+    },
+  });
+}
+
+/** Switches automatic syncing, or which ILIAS folders are left out. */
+export function configureCourseFolder(
+  connection: IliasConnection,
+  courseRefId: string,
+  change: { auto?: boolean; excluded?: string[] },
+): Promise<CourseFolder> {
+  return call('ilias_mirror_configure', {
+    baseUrl: connection.baseUrl,
+    courseRefId,
+    auto: change.auto ?? null,
+    excluded: change.excluded ?? null,
+  });
+}
+
+/** Stops syncing a course. Its folder and files stay, as ordinary documents. */
+export function stopSyncingCourse(connection: IliasConnection, courseRefId: string): Promise<void> {
+  return call('ilias_mirror_detach', { baseUrl: connection.baseUrl, courseRefId });
+}
+
+/** Hears how far running syncs are. Resolves to a function that stops listening. */
+export async function listenToCourseSync(
+  onProgress: (progress: CourseSyncProgress) => void,
+): Promise<() => void> {
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen<CourseSyncProgress>('ilias-mirror-progress', (event) => onProgress(event.payload));
 }

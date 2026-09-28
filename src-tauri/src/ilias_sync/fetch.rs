@@ -12,23 +12,24 @@
 //! says who is asking, and no retry on `429` or `5xx` — the caller tries
 //! again later, not now.
 //!
-//! `download` is the one request that is not the sync's: a file the student
-//! clicked, saved to Downloads the way ILIAS mode saves one. It counts as
-//! reading the file in ILIAS, exactly as a click there would, which is why only
-//! a click asks for it. It skips the queue — the student is waiting — and has
-//! its own, narrower check for where it may go (`links::may_download`).
+//! `file_response` asks for a file: one the student clicked, or one the course
+//! sync keeps in the student's Documents (`../mirror/`). Either counts as
+//! reading the file in ILIAS, exactly as a click there would, which is why the
+//! course sync runs only for courses the student switched on. A click skips
+//! the queue — the student is waiting — while the course sync waits its turn
+//! (`Pace::turn`). Files have their own, narrower check for where they may
+//! come from (`links::may_download`).
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::{Manager, Runtime, Url};
 use tauri_plugin_http::reqwest::{self, header, redirect};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 
 use super::links::{may_download, may_fetch};
 use super::session::{signed_in, wants_sign_in};
-use super::{SavedFile, SyncError};
-use crate::ilias_browser::{begin_download, end_download, is_openable};
-use crate::ilias_links::{file_name_from_disposition, is_page, save};
+use super::SyncError;
+use crate::ilias_links::{file_name_from_disposition, is_page};
 use crate::ilias_view::{ILIAS, MAIN};
 
 const PAUSE: Duration = Duration::from_secs(2);
@@ -48,6 +49,23 @@ const USER_AGENT: &str = concat!(
 #[derive(Default)]
 pub struct Pace(Mutex<Option<Instant>>);
 
+impl Pace {
+    /// Waits for the sync's turn: the request before done, and the pause
+    /// after it over. Set the guard to `Some(Instant::now())` once the request
+    /// has ended, so the next one pauses from then.
+    pub async fn turn(&self) -> MutexGuard<'_, Option<Instant>> {
+        let last = self.0.lock().await;
+        if let Some(ended) = *last {
+            let due = ended + PAUSE + jitter();
+            let now = Instant::now();
+            if due > now {
+                tokio::time::sleep(due - now).await;
+            }
+        }
+        last
+    }
+}
+
 pub async fn fetch<R: Runtime>(
     app: &tauri::AppHandle<R>,
     pace: &Pace,
@@ -63,14 +81,7 @@ pub async fn fetch<R: Runtime>(
 
     let cookie = session_cookie(app, &url)?;
 
-    let mut last = pace.0.lock().await;
-    if let Some(ended) = *last {
-        let due = ended + PAUSE + jitter();
-        let now = Instant::now();
-        if due > now {
-            tokio::time::sleep(due - now).await;
-        }
-    }
+    let mut last = pace.turn().await;
     let result = page(&url, &home, cookie).await;
     *last = Some(Instant::now());
     result
@@ -93,21 +104,20 @@ async fn page(url: &Url, home: &Url, cookie: String) -> Result<String, SyncError
     Ok(html)
 }
 
-/// Saves the file at `url` to Downloads. `fallback` names it when ILIAS
-/// suggests no name.
-pub async fn download<R: Runtime>(
+/// Asks ILIAS for the file at `url` and checks a file came back, not a page.
+/// Returns the response to read the file from, and the name ILIAS suggested.
+pub async fn file_response<R: Runtime>(
     app: &tauri::AppHandle<R>,
-    url: Url,
-    fallback: &str,
-) -> Result<SavedFile, SyncError> {
+    url: &Url,
+) -> Result<(reqwest::Response, Option<String>), SyncError> {
     let home = url.clone();
-    if !may_download(&url, &home) {
+    if !may_download(url, &home) {
         return Err(SyncError::Refused(format!(
             "Uni Pilot does not download {url}."
         )));
     }
-    let cookie = session_cookie(app, &url)?;
-    let mut response = send(&url, &home, cookie, may_download, DOWNLOAD_TIMEOUT).await?;
+    let cookie = session_cookie(app, url)?;
+    let response = send(url, &home, cookie, may_download, DOWNLOAD_TIMEOUT).await?;
 
     let text = |name: header::HeaderName| {
         response
@@ -134,31 +144,8 @@ pub async fn download<R: Runtime>(
             SyncError::SignedOut
         });
     }
-
-    let suggested = disposition
-        .as_deref()
-        .and_then(file_name_from_disposition)
-        .unwrap_or_else(|| fallback.to_string());
-    let key = url.as_str();
-    let (path, id) = begin_download(app, key, &suggested)
-        .ok_or_else(|| SyncError::Unreachable("There is no Downloads folder.".into()))?;
-    let saved = save(&mut response, &path).await;
-    if saved.is_err() {
-        // A half-written file would look like the real thing.
-        let _ = std::fs::remove_file(&path);
-    }
-    end_download(app, key, saved.is_ok());
-    saved
-        .map_err(|error| SyncError::Unreachable(format!("The file could not be saved: {error}")))?;
-
-    Ok(SavedFile {
-        id,
-        file_name: path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_default(),
-        openable: is_openable(&path),
-    })
+    let suggested = disposition.as_deref().and_then(file_name_from_disposition);
+    Ok((response, suggested))
 }
 
 /// The student's ILIAS cookies as a `Cookie` header, read afresh.

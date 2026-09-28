@@ -62,6 +62,8 @@ src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
                   calendar/  {components,store,lib}/ + index.ts
                   dashboard/ {components,lib}/ + index.ts
                   documents/ {components,lib}/ + index.ts
+                  courses/   {components,store,lib}/ + index.ts — ILIAS-Kurse; Kursdateien
+                             landen in Documents (siehe docs/integrations/ilias-course-files.md)
                   reminders/ {components,store,lib}/
                   integrations/ {components,store,lib}/ — ILIAS in der App (siehe
                                 docs/ilias-window.md); SOAP-Connector noch Prototyp

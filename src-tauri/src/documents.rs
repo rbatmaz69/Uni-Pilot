@@ -10,6 +10,8 @@ use std::{
 };
 use tauri::Manager;
 
+use crate::ilias_sync::mirror;
+
 const MAX_FILE: usize = 25 * 1024 * 1024;
 const MAX_TEXT: u64 = 2 * 1024 * 1024;
 /// Images pasted into a note live next to it, the way Obsidian, Typora and
@@ -86,6 +88,11 @@ struct Entry {
     folder: bool,
     size: u64,
     modified: u64,
+    /// What the entry is to the ILIAS course sync: `root` for a course's
+    /// `ILIAS` folder, `folder` and `file` for what the sync put inside it,
+    /// `gone` for a file ILIAS no longer lists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ilias: Option<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -134,7 +141,7 @@ fn is_text(path: &Path) -> bool {
 
 // Reject symlinks in every component, including links into the workspace. This
 // keeps opening a document from following an unexpected target outside it.
-fn resolve(root: &Path, relative: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve(root: &Path, relative: &str) -> Result<PathBuf, String> {
     let mut result = root.to_path_buf();
     for part in Path::new(relative).components() {
         match part {
@@ -463,7 +470,69 @@ fn entry(name: String, path: String, meta: &fs::Metadata) -> Entry {
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0),
+        ilias: None,
     }
+}
+
+/// Refused for a course's `ILIAS` folder: the sync finds its files by it.
+const SYNCED_FOLDER: &str =
+    "This folder is kept in sync with ILIAS. Stop syncing the course in Courses to change it.";
+/// Refused for a folder holding one: it would take the synced files along.
+const HOLDS_SYNCED_FOLDER: &str =
+    "This folder holds a course kept in sync with ILIAS. Stop syncing the course in Courses first.";
+
+/// Marks what the ILIAS course sync put in `directory`, and describes the
+/// synced folder the listing is in, if any.
+fn mark_synced(root: &Path, directory: &Path, entries: &mut [Entry]) -> serde_json::Value {
+    let Some((folder, manifest)) = mirror::enclosing(root, directory) else {
+        for entry in entries.iter_mut() {
+            if entry.folder && mirror::is_synced_folder(&directory.join(&entry.name)) {
+                entry.ilias = Some("root");
+            }
+        }
+        return serde_json::Value::Null;
+    };
+    let inside = directory
+        .strip_prefix(&folder)
+        .map(|rest| {
+            rest.components()
+                .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .unwrap_or_default();
+    for entry in entries.iter_mut() {
+        entry.ilias = if entry.folder {
+            Some("folder")
+        } else {
+            let path = if inside.is_empty() {
+                entry.name.clone()
+            } else {
+                format!("{inside}/{}", entry.name)
+            };
+            match manifest.file_at(&path).map(|file| file.state) {
+                Some(mirror::FileState::Synced) => Some("file"),
+                Some(mirror::FileState::Gone) => Some("gone"),
+                _ => None,
+            }
+        };
+    }
+    let relative = folder
+        .strip_prefix(root)
+        .map(|rest| {
+            rest.components()
+                .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .unwrap_or_default();
+    serde_json::json!({
+        "courseRefId": manifest.course_ref_id,
+        "courseTitle": manifest.course_title,
+        "root": relative,
+        "syncedAt": manifest.synced_at,
+        "auto": manifest.auto,
+    })
 }
 
 /// Counts case-insensitive matches and keeps the first matching line.
@@ -563,7 +632,7 @@ fn perform(root: &Path, request: Request) -> Result<serde_json::Value, String> {
         Request::List { path } => {
             let directory = resolve(root, &path)?;
             let mut entries = Vec::new();
-            for item in fs::read_dir(directory).map_err(error)? {
+            for item in fs::read_dir(&directory).map_err(error)? {
                 let item = item.map_err(error)?;
                 let name = item.file_name().to_string_lossy().into_owned();
                 let meta = fs::symlink_metadata(item.path()).map_err(error)?;
@@ -580,7 +649,12 @@ fn perform(root: &Path, request: Request) -> Result<serde_json::Value, String> {
                 };
                 entries.push(entry(name, path, &meta));
             }
-            Ok(serde_json::json!({ "root": root.to_string_lossy(), "entries": entries }))
+            let ilias = mark_synced(root, &directory, &mut entries);
+            Ok(serde_json::json!({
+                "root": root.to_string_lossy(),
+                "entries": entries,
+                "ilias": ilias,
+            }))
         }
         Request::Create { path, name, folder } => {
             let target = destination(root, &path, &name)?;
@@ -637,12 +711,29 @@ fn perform(root: &Path, request: Request) -> Result<serde_json::Value, String> {
             if target.starts_with(&source) {
                 return Err("A folder cannot be moved into itself.".into());
             }
+            if mirror::is_synced_folder(&source) {
+                return Err(SYNCED_FOLDER.into());
+            }
+            // A course folder may move anywhere the sync still finds it: not
+            // into Recently deleted, and not into another course's files.
+            if mirror::holds_synced_folder(&source)
+                && (target.starts_with(root.join(".trash"))
+                    || mirror::enclosing(root, target.parent().unwrap_or(root)).is_some())
+            {
+                return Err(HOLDS_SYNCED_FOLDER.into());
+            }
             fs::rename(&source, &target).map_err(error)?;
             follow_note(root, &source, &target)?;
             Ok(serde_json::Value::Null)
         }
         Request::Trash { path } => {
             let source = mutable_path(root, &path)?;
+            if mirror::is_synced_folder(&source) {
+                return Err(SYNCED_FOLDER.into());
+            }
+            if mirror::holds_synced_folder(&source) {
+                return Err(HOLDS_SYNCED_FOLDER.into());
+            }
             let name = source
                 .file_name()
                 .ok_or("Missing file name")?
@@ -715,7 +806,7 @@ fn perform_upload(root: &Path, upload: Upload, bytes: &[u8]) -> Result<serde_jso
     }
 }
 
-async fn with_workspace<T: Send + 'static>(
+pub(crate) async fn with_workspace<T: Send + 'static>(
     app: tauri::AppHandle,
     task: impl FnOnce(&Path) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -1264,5 +1355,162 @@ mod tests {
                 .unwrap(),
             serde_json::json!([])
         );
+    }
+
+    /// A course folder as the ILIAS sync leaves it: `Courses/Kurs/ILIAS` with
+    /// one synced file, one ILIAS no longer lists, and one of the student's.
+    fn synced_course(workspace: &Workspace) {
+        fs::create_dir_all(workspace.0.join("Courses/Kurs/ILIAS/Folien")).unwrap();
+        workspace.write("Courses/Kurs/Notizen.md", "# Kurs");
+        workspace.write("Courses/Kurs/ILIAS/Folien/Kapitel 1.pdf", "pdf");
+        workspace.write("Courses/Kurs/ILIAS/Folien/Alt.pdf", "pdf");
+        workspace.write("Courses/Kurs/ILIAS/Folien/Meins.pdf", "pdf");
+        let file = |path: &str, state: &str| {
+            serde_json::json!({
+                "path": path, "title": path, "parentRefId": "10", "version": 1,
+                "updatedAt": null, "iliasSize": 3, "localSize": 3, "localModified": 0,
+                "state": state,
+            })
+        };
+        let manifest = serde_json::json!({
+            "format": 1,
+            "installation": "ilias.example",
+            "courseRefId": "7",
+            "courseTitle": "Kurs",
+            "auto": true,
+            "syncedAt": "2026-10-01T08:00:00Z",
+            "folders": { "10": { "title": "Folien", "parentRefId": "7", "path": "Folien" } },
+            "files": {
+                "11": file("Folien/Kapitel 1.pdf", "synced"),
+                "12": file("Folien/Alt.pdf", "gone"),
+            },
+        });
+        workspace.write(
+            "Courses/Kurs/ILIAS/.ilias-sync.json",
+            &serde_json::to_string(&manifest).unwrap(),
+        );
+    }
+
+    fn marks(listing: &serde_json::Value) -> Vec<(String, serde_json::Value)> {
+        listing["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| {
+                (
+                    entry["name"].as_str().unwrap().to_string(),
+                    entry
+                        .get("ilias")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn marks_what_the_ilias_sync_keeps() {
+        let workspace = Workspace::new();
+        synced_course(&workspace);
+
+        let course = workspace
+            .run(Request::List {
+                path: "Courses/Kurs".into(),
+            })
+            .unwrap();
+        let mut found = marks(&course);
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            found,
+            vec![
+                ("ILIAS".into(), serde_json::json!("root")),
+                ("Notizen.md".into(), serde_json::Value::Null),
+            ]
+        );
+        assert_eq!(course["ilias"], serde_json::Value::Null);
+
+        let folder = workspace
+            .run(Request::List {
+                path: "Courses/Kurs/ILIAS".into(),
+            })
+            .unwrap();
+        assert_eq!(
+            marks(&folder),
+            vec![("Folien".into(), serde_json::json!("folder"))]
+        );
+        assert_eq!(
+            folder["ilias"],
+            serde_json::json!({
+                "courseRefId": "7",
+                "courseTitle": "Kurs",
+                "root": "Courses/Kurs/ILIAS",
+                "syncedAt": "2026-10-01T08:00:00Z",
+                "auto": true,
+            })
+        );
+
+        let mut files = marks(
+            &workspace
+                .run(Request::List {
+                    path: "Courses/Kurs/ILIAS/Folien".into(),
+                })
+                .unwrap(),
+        );
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            files,
+            vec![
+                ("Alt.pdf".into(), serde_json::json!("gone")),
+                ("Kapitel 1.pdf".into(), serde_json::json!("file")),
+                ("Meins.pdf".into(), serde_json::Value::Null),
+            ]
+        );
+    }
+
+    #[test]
+    fn keeps_the_synced_folder_where_the_sync_finds_it() {
+        let workspace = Workspace::new();
+        synced_course(&workspace);
+        fs::create_dir_all(workspace.0.join("Archiv")).unwrap();
+
+        for request in [
+            Request::Trash {
+                path: "Courses/Kurs/ILIAS".into(),
+            },
+            Request::Move {
+                path: "Courses/Kurs/ILIAS".into(),
+                destination: "Courses/Kurs".into(),
+                name: "Dateien".into(),
+            },
+        ] {
+            assert!(workspace
+                .run(request)
+                .unwrap_err()
+                .contains("kept in sync with ILIAS"));
+        }
+        assert!(workspace
+            .run(Request::Trash {
+                path: "Courses/Kurs".into(),
+            })
+            .unwrap_err()
+            .contains("Stop syncing the course in Courses first"));
+        assert!(workspace.exists("Courses/Kurs/ILIAS/.ilias-sync.json"));
+
+        // What the sync put there, and the course folder itself, stay the student's.
+        workspace
+            .run(Request::Trash {
+                path: "Courses/Kurs/ILIAS/Folien/Meins.pdf".into(),
+            })
+            .unwrap();
+        workspace.mv("Courses/Kurs", "Archiv", "Kurs 2026");
+        assert!(workspace.exists("Archiv/Kurs 2026/ILIAS/Folien/Kapitel 1.pdf"));
+        assert!(workspace
+            .run(Request::Move {
+                path: "Archiv/Kurs 2026".into(),
+                destination: ".trash".into(),
+                name: "Kurs 2026".into(),
+            })
+            .unwrap_err()
+            .contains("Stop syncing"));
     }
 }

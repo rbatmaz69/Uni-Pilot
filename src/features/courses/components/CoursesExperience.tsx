@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { ArrowUpRight, EyeOff, GraduationCap, School } from 'lucide-react';
+import { ArrowUpRight, EyeOff, FolderSync, GraduationCap, School } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 import { groupCourses, splitCourseTitle } from '@/features/courses/lib/courses';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
 import { CourseView } from '@/features/courses/components/CourseView';
 import { EmptyState, FailureNotice, SyncBar } from '@/features/courses/components/CourseNotices';
 import { NAV_ITEMS } from '@/lib/navigation';
@@ -85,10 +86,13 @@ function CourseOverview({ connection }: { connection: IliasConnection }) {
   const courses = useCourseStore((state) => state.courses);
   const loading = useCourseStore((state) => state.loading.courses === true);
   const loadCourses = useCourseStore((state) => state.loadCourses);
+  const synced = useCourseFilesStore((state) => state.folders);
+  const loadFolders = useCourseFilesStore((state) => state.load);
 
   useEffect(() => {
     void loadCourses(connection);
-  }, [connection, loadCourses]);
+    void loadFolders(connection);
+  }, [connection, loadCourses, loadFolders]);
 
   const refresh = () => void loadCourses(connection);
   const { areas, offline } = groupCourses(courses?.items ?? []);
@@ -140,6 +144,12 @@ function CourseOverview({ connection }: { connection: IliasConnection }) {
                       <span className="mt-2 text-[14px] font-semibold leading-snug tracking-tight text-primary">
                         {name}
                       </span>
+                      {synced?.[course.refId] ? (
+                        <span className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-secondary">
+                          <FolderSync size={12} strokeWidth={1.8} aria-hidden />
+                          Files in Documents
+                        </span>
+                      ) : null}
                       {course.description ? (
                         <span className="mt-auto line-clamp-2 pt-3 text-[11.5px] text-secondary">
                           {course.description}

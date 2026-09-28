@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import { IliasError } from '@/features/integrations/lib/ilias/errors';
 import {
-  downloadIliasFile,
+  configureCourseFolder,
+  listCourseFolders,
   readIliasAssignments,
   readIliasContents,
   readIliasCourses,
   renewIliasSession,
+  saveCourseFile,
+  stopSyncingCourse,
+  syncCourseFiles,
   toIliasError,
+  type CourseTarget,
   type IliasContentItem,
 } from './iliasSync';
 
@@ -39,15 +44,70 @@ describe('what the page asks Rust for', () => {
     await readIliasCourses(HHN);
     await readIliasContents(HHN, 'fold', '967851');
     await readIliasAssignments(HHN, '995478');
-    await downloadIliasFile(HHN, '967852');
     await renewIliasSession(HHN);
     expect(invoke.mock.calls).toEqual([
       ['ilias_sync_courses', INSTALLATION],
       ['ilias_sync_contents', { ...INSTALLATION, container: 'fold', containerRefId: '967851' }],
       ['ilias_sync_assignments', { ...INSTALLATION, exerciseRefId: '995478' }],
-      ['ilias_sync_download', { ...INSTALLATION, fileRefId: '967852' }],
       ['ilias_sync_reauth', INSTALLATION],
     ]);
+  });
+
+  it('asks for course folders by course, and describes a clicked file by what ILIAS listed', async () => {
+    const course: CourseTarget = {
+      refId: '100100',
+      container: 'crs',
+      title: 'Datenbanken 1',
+      semester: 'Winter 2026-27',
+    };
+    const file: IliasContentItem = {
+      refId: '967852',
+      parentRefId: '967851',
+      providerType: 'file',
+      title: 'Blatt 1',
+      description: null,
+      block: null,
+      file: { suffix: 'pdf', size: 51087, version: 2, updatedAt: '2026-10-01T10:00' },
+      properties: [],
+    };
+    await listCourseFolders(HHN);
+    await syncCourseFiles(HHN, course);
+    await saveCourseFile(HHN, course, [{ refId: '967851', title: 'Übungen' }], file);
+    await configureCourseFolder(HHN, '100100', { auto: true });
+    await stopSyncingCourse(HHN, '100100');
+    expect(invoke.mock.calls).toEqual([
+      ['ilias_mirror_list', { baseUrl: HHN.baseUrl }],
+      ['ilias_mirror_course', { ...INSTALLATION, course }],
+      [
+        'ilias_mirror_file',
+        {
+          ...INSTALLATION,
+          course,
+          trail: [{ refId: '967851', title: 'Übungen' }],
+          file: {
+            refId: '967852',
+            title: 'Blatt 1',
+            suffix: 'pdf',
+            size: 51087,
+            version: 2,
+            updatedAt: '2026-10-01T10:00',
+          },
+        },
+      ],
+      [
+        'ilias_mirror_configure',
+        { baseUrl: HHN.baseUrl, courseRefId: '100100', auto: true, excluded: null },
+      ],
+      ['ilias_mirror_detach', { baseUrl: HHN.baseUrl, courseRefId: '100100' }],
+    ]);
+  });
+
+  it('says in its own words what went wrong on this computer', async () => {
+    invoke.mockRejectedValueOnce({ kind: 'local', message: 'This course is already being synced.' });
+    await expect(listCourseFolders(HHN)).rejects.toMatchObject({
+      kind: 'provider-error',
+      message: 'This course is already being synced.',
+    });
   });
 
   it('hands on what Rust read', async () => {
