@@ -21,6 +21,8 @@ const ask = (mail: unknown, command: string, input: unknown = {}) =>
   JSON.parse(JSON.stringify(handle(mail, command, input))) as Record<string, unknown>;
 
 interface FakeMessage {
+  /** Mail's own number for the message. */
+  mailId: number;
   messageId: string;
   subject: string;
   sender: string;
@@ -46,6 +48,12 @@ interface Outgoing {
   send: () => never;
 }
 
+interface FakeOptions {
+  running?: boolean;
+  /** Whether Mail filters by date — when not, the script has to list the slow way. */
+  filtersByDate?: boolean;
+}
+
 /** JXA element arrays can be called for their items and still have a length. */
 function elements<T>(items: T[]) {
   const call = () => items;
@@ -53,13 +61,27 @@ function elements<T>(items: T[]) {
   return call;
 }
 
-function scripted(message: FakeMessage) {
+/**
+ * Every Apple Event the script sent, in order: `message.subject` for one
+ * message's subject, `every subject of 56` for the subjects of 56 messages at
+ * once.
+ */
+type Events = string[];
+
+function scripted(message: FakeMessage, events: Events) {
+  const read =
+    <T>(name: string, value: () => T) =>
+    () => {
+      events.push(`message.${name}`);
+      return value();
+    };
   return {
-    messageId: () => message.messageId,
-    subject: () => message.subject,
-    sender: () => message.sender,
-    dateReceived: () => message.dateReceived,
-    content: () => message.content,
+    id: read('id', () => message.mailId),
+    messageId: read('messageId', () => message.messageId),
+    subject: read('subject', () => message.subject),
+    sender: read('sender', () => message.sender),
+    dateReceived: read('dateReceived', () => message.dateReceived),
+    content: read('content', () => message.content),
     toRecipients: () => message.to.map((address) => ({ address: () => address })),
     ccRecipients: () => [],
     mailAttachments: elements(
@@ -70,7 +92,7 @@ function scripted(message: FakeMessage) {
     ),
     // Read as a call, written as a property — as JXA does it.
     get readStatus(): () => boolean {
-      return () => message.readStatus;
+      return read('readStatus', () => message.readStatus);
     },
     set readStatus(value: boolean) {
       message.readStatus = value;
@@ -78,7 +100,67 @@ function scripted(message: FakeMessage) {
   };
 }
 
-function fakeMail(accounts: FakeAccount[], running = true) {
+/** `message id 42` when Mail has no message 42: every property fails (-1728). */
+function missing(events: Events) {
+  return {
+    messageId: () => {
+      events.push('message.messageId');
+      throw new Error("Can't get message id 42. (-1728)");
+    },
+  };
+}
+
+/** `messages` of a mailbox, or of a `whose` filter on them: called for their items, indexed like an array, asked in bulk — as in JXA. */
+function messageArray(list: FakeMessage[], events: Events, options: FakeOptions) {
+  const objects = list.map((message) => scripted(message, events));
+  const every =
+    <T>(name: string, read: (message: FakeMessage) => T) =>
+    () => {
+      events.push(`every ${name} of ${list.length}`);
+      return list.map(read);
+    };
+  return Object.assign(
+    () => {
+      events.push(`every message of ${list.length}`);
+      return objects;
+    },
+    { ...objects },
+    {
+      id: every('id', (message) => message.mailId),
+      messageId: every('messageId', (message) => message.messageId),
+      subject: every('subject', (message) => message.subject),
+      sender: every('sender', (message) => message.sender),
+      dateReceived: every('dateReceived', (message) => message.dateReceived),
+      readStatus: every('readStatus', (message) => message.readStatus),
+      whose: (filter: { messageId?: string; dateReceived?: { _greaterThan: Date } }) => {
+        if (filter.messageId !== undefined) {
+          const { messageId } = filter;
+          return messageArray(
+            list.filter((message) => message.messageId === messageId),
+            events,
+            options,
+          );
+        }
+        const after = filter.dateReceived?._greaterThan;
+        if (after && options.filtersByDate !== false) {
+          return messageArray(
+            list.filter((message) => message.dateReceived > after),
+            events,
+            options,
+          );
+        }
+        throw new Error('Mail cannot filter by that. (-1700)');
+      },
+      byId: (mailId: number) => {
+        const found = list.find((message) => message.mailId === mailId);
+        return found ? scripted(found, events) : missing(events);
+      },
+    },
+  );
+}
+
+function fakeMail(accounts: FakeAccount[], options: FakeOptions = {}) {
+  const events: Events = [];
   const outgoingMessages: Outgoing[] = [];
   const replies: { message: ReturnType<typeof scripted>; options: unknown; text: string }[] = [];
   const accountObjects = accounts.map((account) => ({
@@ -86,28 +168,12 @@ function fakeMail(accounts: FakeAccount[], running = true) {
     emailAddresses: () => account.addresses,
     mailboxes: () => [],
   }));
-  const inboxes = accounts.map((account, index) => {
-    const objects = account.messages.map(scripted);
-    // Called for its items, indexed like an array, asked in bulk — as in JXA.
-    const messages = Object.assign(
-      () => objects,
-      { ...objects },
-      {
-        messageId: () => account.messages.map((message) => message.messageId),
-        subject: () => account.messages.map((message) => message.subject),
-        sender: () => account.messages.map((message) => message.sender),
-        dateReceived: () => account.messages.map((message) => message.dateReceived),
-        readStatus: () => account.messages.map((message) => message.readStatus),
-        whose:
-          ({ messageId }: { messageId: string }) =>
-          () =>
-            objects.filter((object) => object.messageId() === messageId),
-      },
-    );
-    return { account: () => accountObjects[index], messages };
-  });
+  const inboxes = accounts.map((account, index) => ({
+    account: () => accountObjects[index],
+    messages: messageArray(account.messages, events, options),
+  }));
   const mail = {
-    running: () => running,
+    running: () => options.running ?? true,
     accounts: () => accountObjects,
     inbox: { mailboxes: () => inboxes },
     activate: () => undefined,
@@ -140,10 +206,11 @@ function fakeMail(accounts: FakeAccount[], running = true) {
     }),
     ToRecipient: (properties: { address: string }) => properties,
   };
-  return { mail, outgoingMessages, replies };
+  return { mail, events, outgoingMessages, replies };
 }
 
 const newMessage = (): FakeMessage => ({
+  mailId: 2,
   messageId: 'new@hs-heilbronn.de',
   subject: 'Blatt 4 ist online',
   sender: 'Prof. Beispiel <prof@hs-heilbronn.de>',
@@ -155,6 +222,7 @@ const newMessage = (): FakeMessage => ({
 });
 
 const oldMessage = (): FakeMessage => ({
+  mailId: 1,
   messageId: 'old@hs-heilbronn.de',
   subject: 'Willkommen',
   sender: 'Studienbüro <sb@hs-heilbronn.de>',
@@ -173,9 +241,37 @@ const hhn = (): FakeAccount => ({
 
 const PRIVATE: FakeAccount = { name: 'Privat', addresses: ['me@example.org'], messages: [] };
 
+const HOUR = 60 * 60 * 1000;
+
+/** An inbox with a message every six hours, going back `count` of them. */
+function busyAccount(count: number): FakeAccount {
+  const now = Date.now();
+  return {
+    name: 'stud.hs-heilbronn.de',
+    addresses: ['student@stud.hs-heilbronn.de'],
+    // Mail keeps no order the script could rely on; the oldest come first here.
+    messages: Array.from({ length: count }, (_, index) => ({
+      mailId: 1000 + index,
+      messageId: `m${index}@hs-heilbronn.de`,
+      subject: `Nachricht ${index}`,
+      sender: 'Studienbüro <sb@hs-heilbronn.de>',
+      dateReceived: new Date(now - (count - index) * 6 * HOUR),
+      readStatus: index % 2 === 0,
+      content: `Text ${index}`,
+      to: ['student@stud.hs-heilbronn.de'],
+      attachments: [],
+    })),
+  };
+}
+
+const listedIds = (answer: Record<string, unknown>) =>
+  (answer.messages as { id: string }[]).map((message) => message.id);
+
 describe('asking Apple Mail', () => {
   it('does not start Mail on its own', () => {
-    expect(ask(fakeMail([hhn()], false).mail, 'accounts')).toEqual({ error: 'notRunning' });
+    expect(ask(fakeMail([hhn()], { running: false }).mail, 'accounts')).toEqual({
+      error: 'notRunning',
+    });
   });
 
   it('lists the accounts with their addresses', () => {
@@ -196,6 +292,7 @@ describe('asking Apple Mail', () => {
       messages: [
         {
           id: 'new@hs-heilbronn.de',
+          mailId: 2,
           subject: 'Blatt 4 ist online',
           sender: 'Prof. Beispiel <prof@hs-heilbronn.de>',
           receivedAt: '2026-09-25T09:12:00.000Z',
@@ -205,6 +302,7 @@ describe('asking Apple Mail', () => {
         },
         {
           id: 'old@hs-heilbronn.de',
+          mailId: 1,
           subject: 'Willkommen',
           sender: 'Studienbüro <sb@hs-heilbronn.de>',
           receivedAt: '2026-09-01T08:00:00.000Z',
@@ -216,11 +314,58 @@ describe('asking Apple Mail', () => {
     });
   });
 
+  /** Each Apple Event is a round trip, and Mail answers one at a time. */
+  it('reads a busy inbox in a handful of Apple Events, none per message', () => {
+    const account = busyAccount(400);
+    const { mail, events } = fakeMail([account]);
+    const answer = ask(mail, 'inbox', { account: account.name, limit: 50 });
+
+    expect(listedIds(answer)).toEqual(
+      Array.from({ length: 50 }, (_, index) => `m${399 - index}@hs-heilbronn.de`),
+    );
+    expect((answer.messages as { mailId: number }[])[0]?.mailId).toBe(1399);
+    expect(events.filter((event) => event.startsWith('message.'))).toEqual([]);
+    expect(events.length).toBeLessThanOrEqual(10);
+    // Only about the last fortnight — never all 400.
+    const sizes = events.map((event) => Number(/ of (\d+)$/.exec(event)?.[1] ?? 0));
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(56);
+  });
+
+  it('looks further back when the last weeks hold too few', () => {
+    const account = busyAccount(60);
+    // All but ten are from long ago.
+    account.messages.slice(0, 50).forEach((message, index) => {
+      message.dateReceived = new Date(Date.now() - (400 - index) * 24 * HOUR);
+    });
+    const answer = ask(fakeMail([account]).mail, 'inbox', { account: account.name, limit: 20 });
+    expect(listedIds(answer)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `m${59 - index}@hs-heilbronn.de`),
+    );
+  });
+
+  it('lists the slow way when Mail will not filter by date', () => {
+    const account = busyAccount(30);
+    const { mail, events } = fakeMail([account], { filtersByDate: false });
+    const answer = ask(mail, 'inbox', { account: account.name, limit: 5 });
+    expect(listedIds(answer)).toEqual([
+      'm29@hs-heilbronn.de',
+      'm28@hs-heilbronn.de',
+      'm27@hs-heilbronn.de',
+      'm26@hs-heilbronn.de',
+      'm25@hs-heilbronn.de',
+    ]);
+    expect((answer.messages as { mailId: number }[])[0]?.mailId).toBe(1029);
+    expect(events).toContain('message.subject');
+  });
+
   it('fetches previews for the messages asked about', () => {
     const account = hhn();
     const answer = ask(fakeMail([account]).mail, 'previews', {
       account: account.name,
-      ids: ['new@hs-heilbronn.de', 'gone@hs-heilbronn.de'],
+      messages: [
+        { id: 'new@hs-heilbronn.de', mailId: 2 },
+        { id: 'gone@hs-heilbronn.de', mailId: 9 },
+      ],
     });
     expect(answer).toEqual({
       previews: {
@@ -228,6 +373,8 @@ describe('asking Apple Mail', () => {
           snippet: 'Guten Tag, Blatt 4 ist jetzt online. Viele Grüße',
           attachments: 1,
         },
+        // Gone from the inbox: answered, so it is not asked about again.
+        'gone@hs-heilbronn.de': { snippet: '', attachments: 0 },
       },
     });
   });
@@ -235,7 +382,7 @@ describe('asking Apple Mail', () => {
   it('stops at the limit, and listing marks nothing read', () => {
     const account = hhn();
     const answer = ask(fakeMail([account]).mail, 'inbox', { account: account.name, limit: 1 });
-    expect((answer.messages as unknown[]).length).toBe(1);
+    expect(listedIds(answer)).toEqual(['new@hs-heilbronn.de']);
     expect(account.messages.map((message) => message.readStatus)).toEqual([true, false]);
   });
 
@@ -244,6 +391,7 @@ describe('asking Apple Mail', () => {
     const answer = ask(fakeMail([account]).mail, 'message', {
       account: account.name,
       id: 'new@hs-heilbronn.de',
+      mailId: 2,
     });
     expect(answer.message).toMatchObject({
       id: 'new@hs-heilbronn.de',
@@ -256,12 +404,34 @@ describe('asking Apple Mail', () => {
     expect(account.messages[1]?.readStatus).toBe(false);
   });
 
+  it("finds a message by Mail's own id, without searching the inbox", () => {
+    const account = hhn();
+    const { mail, events } = fakeMail([account]);
+    ask(mail, 'message', { account: account.name, id: 'new@hs-heilbronn.de', mailId: 2 });
+    expect(events.some((event) => event.startsWith('every message'))).toBe(false);
+  });
+
+  it('searches by Message-ID when the id is missing or names another message', () => {
+    const account = hhn();
+    const { mail } = fakeMail([account]);
+    for (const mailId of [null, 1, 42]) {
+      const answer = ask(mail, 'message', {
+        account: account.name,
+        id: 'new@hs-heilbronn.de',
+        mailId,
+      });
+      expect(answer.message).toMatchObject({ id: 'new@hs-heilbronn.de' });
+    }
+  });
+
   it('marks read or unread only when asked', () => {
     const account = hhn();
     const { mail } = fakeMail([account]);
-    ask(mail, 'markRead', { account: account.name, id: 'new@hs-heilbronn.de', read: true });
+    const message = { account: account.name, id: 'new@hs-heilbronn.de', mailId: 2 };
+    ask(mail, 'markRead', { ...message, read: true });
     expect(account.messages[1]?.readStatus).toBe(true);
-    ask(mail, 'markRead', { account: account.name, id: 'new@hs-heilbronn.de', read: false });
+    expect(account.messages[0]?.readStatus).toBe(true);
+    ask(mail, 'markRead', { ...message, read: false });
     expect(account.messages[1]?.readStatus).toBe(false);
   });
 
@@ -272,7 +442,9 @@ describe('asking Apple Mail', () => {
     ).toEqual({
       error: 'noAccount',
     });
-    expect(ask(mail, 'message', { account: 'stud.hs-heilbronn.de', id: 'gone@x.de' })).toEqual({
+    expect(
+      ask(mail, 'message', { account: 'stud.hs-heilbronn.de', id: 'gone@x.de', mailId: 7 }),
+    ).toEqual({
       error: 'noMessage',
     });
   });
@@ -286,6 +458,7 @@ describe('writing through Apple Mail', () => {
       ask(mail, 'reply', {
         account: account.name,
         id: 'new@hs-heilbronn.de',
+        mailId: 2,
         text: 'Danke, ich schaue es mir an.',
       }),
     ).toEqual({ ok: true, placed: true });
@@ -297,7 +470,12 @@ describe('writing through Apple Mail', () => {
   it('opens a plain reply when nothing was typed', () => {
     const account = hhn();
     const { mail, replies } = fakeMail([account]);
-    ask(mail, 'reply', { account: account.name, id: 'new@hs-heilbronn.de', text: null });
+    ask(mail, 'reply', {
+      account: account.name,
+      id: 'new@hs-heilbronn.de',
+      mailId: 2,
+      text: null,
+    });
     expect(replies[0]?.text.startsWith('Am 25.09.2026')).toBe(true);
   });
 

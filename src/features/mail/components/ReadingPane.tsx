@@ -13,7 +13,12 @@ import { Link } from 'react-router-dom';
 import { Button, IconButton } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
-import { openInMail, replyInMail, type MailFailure } from '@/features/mail/lib/appleMail';
+import {
+  openInMail,
+  replyInMail,
+  type MailFailure,
+  type MessageRef,
+} from '@/features/mail/lib/appleMail';
 import {
   CATEGORY_LABELS,
   TRIAGE_LABELS,
@@ -118,7 +123,9 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
   };
 
   return (
-    <article key={selectedId} className="animate-page-enter flex min-h-full flex-col">
+    // No entrance animation: moving between messages is instant, and one read
+    // before is shown as it is — not as if it were being loaded again.
+    <article key={selectedId} className="flex min-h-full flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-line-soft px-5 py-2.5">
         <Button
           variant="ghost"
@@ -305,7 +312,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
         ) : null}
       </div>
 
-      <ReplyBox messageId={selectedId} to={sender.name} />
+      <ReplyBox message={{ id: selectedId, mailId: listed?.mailId ?? null }} to={sender.name} />
     </article>
   );
 }
@@ -315,7 +322,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
  * window above the quote, and onto the clipboard in case Mail keeps the
  * window as it opened it.
  */
-function ReplyBox({ messageId, to }: { messageId: string; to: string }) {
+function ReplyBox({ message, to }: { message: MessageRef; to: string }) {
   const account = useMailStore((state) => state.account);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -331,7 +338,7 @@ function ReplyBox({ messageId, to }: { messageId: string; to: string }) {
     setNote(null);
     try {
       if (text.trim()) await navigator.clipboard?.writeText(text).catch(() => undefined);
-      const placed = await replyInMail(account, messageId, text);
+      const placed = await replyInMail(account, message, text);
       setNote({
         tone: 'ok',
         text:

@@ -20,6 +20,7 @@ import {
 function message(overrides: Partial<MailMessage>): MailMessage {
   return {
     id: 'x@hs-heilbronn.de',
+    mailId: null,
     subject: '',
     sender: 'Prof. Beispiel <prof@hs-heilbronn.de>',
     receivedAt: '2026-09-25T09:12:00.000Z',

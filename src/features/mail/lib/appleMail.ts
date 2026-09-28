@@ -17,6 +17,11 @@ export interface MailAccount {
 export interface MailMessage {
   /** The Message-ID, without angle brackets. */
   id: string;
+  /**
+   * Mail's own number for the message, which finds it again in one step. Null
+   * when Mail gave none; the Message-ID is searched for then.
+   */
+  mailId: number | null;
   subject: string;
   /** As Mail gives it: `Name <address>` or just the address. */
   sender: string;
@@ -28,6 +33,12 @@ export interface MailMessage {
   /** How many files are attached. */
   attachments: number;
 }
+
+/** Which message: its Message-ID, and Mail's own number when the list had one. */
+export type MessageRef = Pick<MailMessage, 'id' | 'mailId'>;
+
+/** Just the two — a listed message carries more than Mail needs to be told. */
+const refOf = ({ id, mailId }: MessageRef): MessageRef => ({ id, mailId });
 
 export interface MailAttachment {
   name: string;
@@ -98,8 +109,18 @@ export function toMailFailure(cause: unknown): MailFailure {
   return new MailFailure('failed', typeof cause === 'string' ? cause : MESSAGES.failed);
 }
 
+const loadCore = () => import('@tauri-apps/api/core');
+/**
+ * Tauri's bridge, loaded on first use and shared: calls come several at a
+ * time (previews beside an opened message), and two imports at once can each
+ * resolve it anew — vitest 5 then hands one of them the real module, not the
+ * test's stand-in.
+ */
+let core: ReturnType<typeof loadCore> | undefined;
+
 async function call<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core');
+  core ??= loadCore();
+  const { invoke } = await core;
   try {
     return await invoke<T>(command, args);
   } catch (cause) {
@@ -134,26 +155,29 @@ export interface MailPreview {
  * Previews for listed messages, by id. Mail fetches an Exchange message's text
  * when asked, so this answers with those it got within its time budget.
  */
-export function readPreviews(account: string, ids: string[]): Promise<Record<string, MailPreview>> {
-  return call('mail_previews', { account, ids });
+export function readPreviews(
+  account: string,
+  messages: readonly MessageRef[],
+): Promise<Record<string, MailPreview>> {
+  return call('mail_previews', { account, messages: messages.map(refOf) });
 }
 
 /** The text of one message, and its attachments. Held in memory only. */
-export function readMessage(account: string, id: string): Promise<MailBody> {
-  return call('mail_message', { account, id });
+export function readMessage(account: string, message: MessageRef): Promise<MailBody> {
+  return call('mail_message', { account, message: refOf(message) });
 }
 
 /** Marks a message read or unread in Mail. */
-export function markRead(account: string, id: string, read: boolean): Promise<void> {
-  return call('mail_mark_read', { account, id, read });
+export function markRead(account: string, message: MessageRef, read: boolean): Promise<void> {
+  return call('mail_mark_read', { account, message: refOf(message), read });
 }
 
 /**
  * Opens a reply in Mail, with `text` above the quote where Mail takes it.
  * Answers whether it did; the student sends.
  */
-export function replyInMail(account: string, id: string, text?: string): Promise<boolean> {
-  return call('mail_reply', { account, id, text: text?.trim() ? text : null });
+export function replyInMail(account: string, message: MessageRef, text?: string): Promise<boolean> {
+  return call('mail_reply', { account, message: refOf(message), text: text?.trim() ? text : null });
 }
 
 /** Opens a filled-in message in Mail. The student sends it. */

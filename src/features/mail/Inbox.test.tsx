@@ -37,6 +37,7 @@ const ACCOUNTS = [
 const MESSAGES = [
   {
     id: 'new@hs-heilbronn.de',
+    mailId: 301,
     subject: 'Datenbanken 1: Blatt 4 ist online',
     sender: 'Prof. Beispiel <prof@hs-heilbronn.de>',
     receivedAt: '2026-09-25T09:12:00.000Z',
@@ -46,6 +47,7 @@ const MESSAGES = [
   },
   {
     id: 'ilias@hs-heilbronn.de',
+    mailId: 302,
     subject: '[ILIAS] Neue Datei in Material',
     sender: 'ILIAS HHN <noreply-ilias@hs-heilbronn.de>',
     receivedAt: '2026-09-24T18:00:00.000Z',
@@ -55,6 +57,7 @@ const MESSAGES = [
   },
   {
     id: 'mia@stud.hs-heilbronn.de',
+    mailId: 303,
     subject: 'Lerngruppe morgen?',
     sender: 'Mia <mia@stud.hs-heilbronn.de>',
     receivedAt: '2026-09-20T10:00:00.000Z',
@@ -131,6 +134,7 @@ beforeEach(() => {
     checkedAt: null,
     loading: false,
     failure: null,
+    previews: {},
     selectedId: null,
     bodies: {},
     bodyLoading: null,
@@ -179,6 +183,19 @@ describe('the inbox', () => {
     expect(asked).toHaveLength(1);
   });
 
+  it('does not ask Mail again when the Inbox is opened again soon after', async () => {
+    pretendDesktop();
+    const first = renderApp('/inbox');
+    await row(/Blatt 4/);
+    first.unmount();
+
+    renderApp('/inbox');
+    expect(await row(/Blatt 4/)).toBeInTheDocument();
+    const asked = (command: string) => invoke.mock.calls.filter(([name]) => name === command);
+    expect(asked('mail_inbox')).toHaveLength(1);
+    expect(asked('mail_accounts')).toHaveLength(1);
+  });
+
   it('knows which course a message is about', async () => {
     pretendDesktop();
     renderApp('/inbox');
@@ -208,16 +225,37 @@ describe('the inbox', () => {
       '/courses?course=967849',
     );
 
+    const message = { id: 'new@hs-heilbronn.de', mailId: 301 };
     expect(invoke).toHaveBeenCalledWith('mail_message', {
       account: 'stud.hs-heilbronn.de',
-      id: 'new@hs-heilbronn.de',
+      message,
     });
     expect(invoke).toHaveBeenCalledWith('mail_mark_read', {
       account: 'stud.hs-heilbronn.de',
-      id: 'new@hs-heilbronn.de',
+      message,
       read: true,
     });
     expect(await row('Datenbanken 1: Blatt 4 ist online, from Prof. Beispiel')).toBeInTheDocument();
+  });
+
+  it('shows a message read before at once, without asking Mail again', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/inbox');
+
+    await user.click(await row(/Blatt 4/));
+    await within(await screen.findByRole('article')).findByText(/Blatt 4 ist jetzt online\./);
+    await user.click(await row(/Lerngruppe/));
+    await user.click(await row(/Blatt 4/));
+
+    const pane = screen.getByRole('article');
+    expect(within(pane).getByText(/Blatt 4 ist jetzt online\./)).toBeInTheDocument();
+    expect(within(pane).queryByLabelText('Reading the message')).not.toBeInTheDocument();
+    const asked = invoke.mock.calls.filter(
+      ([command, args]) =>
+        command === 'mail_message' && (args.message as { id: string }).id === 'new@hs-heilbronn.de',
+    );
+    expect(asked).toHaveLength(1);
   });
 
   it('keeps earlier messages of a thread folded away until asked', async () => {
@@ -247,7 +285,7 @@ describe('the inbox', () => {
 
     expect(invoke).toHaveBeenCalledWith('mail_reply', {
       account: 'stud.hs-heilbronn.de',
-      id: 'new@hs-heilbronn.de',
+      message: { id: 'new@hs-heilbronn.de', mailId: 301 },
       text: 'Danke, schaue ich mir an.',
     });
     expect(

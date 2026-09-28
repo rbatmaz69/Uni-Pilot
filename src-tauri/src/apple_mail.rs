@@ -75,6 +75,9 @@ pub struct MailAccount {
 pub struct MailMessage {
     /// The Message-ID, without angle brackets.
     pub id: String,
+    /// Mail's own number for the message, which finds it again in one step.
+    #[serde(default)]
+    pub mail_id: Option<u64>,
     pub subject: String,
     /// As Mail gives it: `Name <address>` or just the address.
     pub sender: String,
@@ -122,6 +125,17 @@ pub struct MailBody {
 pub struct MailPreview {
     pub snippet: String,
     pub attachments: u32,
+}
+
+/// Which message the page means: its Message-ID, and Mail's own number for it
+/// when the list had one. The number finds the message at once; the
+/// Message-ID confirms it, and is searched for when the number is gone.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageRef {
+    pub id: String,
+    #[serde(default)]
+    pub mail_id: Option<u64>,
 }
 
 /// A new message for Mail to open, never to send.
@@ -257,6 +271,14 @@ fn is_message_id(value: &str) -> bool {
     !value.is_empty() && value.len() <= MESSAGE_ID_MAX && !value.chars().any(char::is_control)
 }
 
+/// The message as the script takes it: `account`, `id` and `mailId` side by side.
+fn message_input(account: &str, message: &MessageRef) -> Result<Value, MailError> {
+    if !is_message_id(&message.id) {
+        return Err(MailError::Invalid("That is not a message.".into()));
+    }
+    Ok(serde_json::json!({ "account": account, "id": message.id, "mailId": message.mail_id }))
+}
+
 fn is_address(value: &str) -> bool {
     let value = value.trim();
     value.len() <= 254
@@ -357,15 +379,15 @@ pub async fn mail_launch() -> Result<(), MailError> {
 #[tauri::command]
 pub async fn mail_previews(
     account: String,
-    ids: Vec<String>,
+    messages: Vec<MessageRef>,
 ) -> Result<std::collections::HashMap<String, MailPreview>, MailError> {
-    if ids.len() > PREVIEWS_MAX || !ids.iter().all(|id| is_message_id(id)) {
+    if messages.len() > PREVIEWS_MAX || !messages.iter().all(|m| is_message_id(&m.id)) {
         return Err(MailError::Invalid("Those are not messages.".into()));
     }
     field(
         ask(
             "previews",
-            serde_json::json!({ "account": account, "ids": ids }),
+            serde_json::json!({ "account": account, "messages": messages }),
         )
         .await?,
         "previews",
@@ -374,28 +396,21 @@ pub async fn mail_previews(
 
 /// The text of the message the student opened, and its attachments.
 #[tauri::command]
-pub async fn mail_message(account: String, id: String) -> Result<MailBody, MailError> {
-    if !is_message_id(&id) {
-        return Err(MailError::Invalid("That is not a message.".into()));
-    }
-    field(
-        ask(
-            "message",
-            serde_json::json!({ "account": account, "id": id }),
-        )
-        .await?,
-        "message",
-    )
+pub async fn mail_message(account: String, message: MessageRef) -> Result<MailBody, MailError> {
+    let input = message_input(&account, &message)?;
+    field(ask("message", input).await?, "message")
 }
 
 /// Marks a message read or unread in Mail — when the student opened it here,
 /// or asked.
 #[tauri::command]
-pub async fn mail_mark_read(account: String, id: String, read: bool) -> Result<(), MailError> {
-    if !is_message_id(&id) {
-        return Err(MailError::Invalid("That is not a message.".into()));
-    }
-    let input = serde_json::json!({ "account": account, "id": id, "read": read });
+pub async fn mail_mark_read(
+    account: String,
+    message: MessageRef,
+    read: bool,
+) -> Result<(), MailError> {
+    let mut input = message_input(&account, &message)?;
+    input["read"] = Value::Bool(read);
     ask("markRead", input).await.map(|_| ())
 }
 
@@ -405,12 +420,10 @@ pub async fn mail_mark_read(account: String, id: String, read: bool) -> Result<(
 #[tauri::command]
 pub async fn mail_reply(
     account: String,
-    id: String,
+    message: MessageRef,
     text: Option<String>,
 ) -> Result<bool, MailError> {
-    if !is_message_id(&id) {
-        return Err(MailError::Invalid("That is not a message.".into()));
-    }
+    let mut input = message_input(&account, &message)?;
     if text
         .as_deref()
         .is_some_and(|text| text.chars().count() > REPLY_MAX)
@@ -419,7 +432,7 @@ pub async fn mail_reply(
             "The reply is too long for a draft.".into(),
         ));
     }
-    let input = serde_json::json!({ "account": account, "id": id, "text": text });
+    input["text"] = serde_json::json!(text);
     let answer = ask("reply", input).await?;
     Ok(answer
         .get("placed")
@@ -443,7 +456,8 @@ pub async fn mail_compose(draft: Draft) -> Result<(), MailError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        check_draft, message_url, read_answer, Draft, MailBody, MailError, MailMessage, MailPreview,
+        check_draft, message_input, message_url, read_answer, Draft, MailBody, MailError,
+        MailMessage, MailPreview, MessageRef,
     };
 
     fn draft(to: &[&str]) -> Draft {
@@ -467,6 +481,47 @@ mod tests {
             serde_json::from_value(answer["messages"].clone()).unwrap();
         assert_eq!(messages[0].subject, "Blatt 4");
         assert!(!messages[0].read);
+        assert_eq!(messages[0].mail_id, None);
+    }
+
+    /// Mail's own number comes with each listed message, and goes back with it.
+    #[test]
+    fn carries_mails_own_number_for_a_message() {
+        let answer = read_answer(
+            true,
+            r#"{"messages":[{"id":"a@b.de","mailId":48213,"subject":"x","sender":"y","receivedAt":null,"read":true}]}"#,
+            "",
+        )
+        .unwrap();
+        let messages: Vec<MailMessage> =
+            serde_json::from_value(answer["messages"].clone()).unwrap();
+        assert_eq!(messages[0].mail_id, Some(48213));
+        assert_eq!(serde_json::to_value(&messages[0]).unwrap()["mailId"], 48213);
+
+        let asked: MessageRef = serde_json::from_str(r#"{"id":"a@b.de","mailId":48213}"#).unwrap();
+        assert_eq!(
+            message_input("HHN", &asked).unwrap(),
+            serde_json::json!({ "account": "HHN", "id": "a@b.de", "mailId": 48213 })
+        );
+        let without: MessageRef = serde_json::from_str(r#"{"id":"a@b.de","mailId":null}"#).unwrap();
+        assert_eq!(
+            message_input("HHN", &without).unwrap()["mailId"],
+            serde_json::Value::Null
+        );
+    }
+
+    #[test]
+    fn refuses_a_message_that_is_not_one() {
+        for id in ["", "a\nb@c.de"] {
+            let message = MessageRef {
+                id: id.into(),
+                mail_id: Some(1),
+            };
+            assert!(matches!(
+                message_input("HHN", &message),
+                Err(MailError::Invalid(_))
+            ));
+        }
     }
 
     /// An older answer without a preview still reads.

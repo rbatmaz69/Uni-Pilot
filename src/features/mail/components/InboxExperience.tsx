@@ -34,7 +34,7 @@ import { ComposeDialog } from '@/features/mail/components/ComposeDialog';
 import { MessageList, TriageBoard } from '@/features/mail/components/MessageList';
 import { ReadingPane } from '@/features/mail/components/ReadingPane';
 
-/** Coming back to the window asks Mail again only after this long. */
+/** Opening the page or coming back to the window asks Mail again only after this long. */
 const REFRESH_GAP_MS = 60_000;
 
 /**
@@ -51,17 +51,24 @@ export function InboxExperience() {
 
   useEffect(() => {
     if (!isDesktopRuntime()) return;
-    void refresh(domain);
-    // Mail may have new messages whenever the student comes back to Uni Pilot —
-    // but not so often that Mail spends its time answering.
+    // Mail may have new messages whenever the student opens the Inbox or comes
+    // back to Uni Pilot — but a list from a moment ago stands: Mail answers one
+    // question at a time, and a click on a message would wait behind it.
     const again = () => {
-      const { loading, checkedAt } = useMailStore.getState();
-      if (loading || (checkedAt && Date.now() - Date.parse(checkedAt) < REFRESH_GAP_MS)) return;
+      const { loading, checkedAt, account, messages, failure } = useMailStore.getState();
+      const recent =
+        account !== null &&
+        messages !== null &&
+        failure === null &&
+        checkedAt !== null &&
+        Date.now() - Date.parse(checkedAt) < REFRESH_GAP_MS;
+      if (loading || recent) return;
       void useMailStore.getState().refresh(domain);
     };
+    again();
     window.addEventListener('focus', again);
     return () => window.removeEventListener('focus', again);
-  }, [domain, refresh]);
+  }, [domain]);
 
   if (!isDesktopRuntime()) {
     return (

@@ -20,6 +20,7 @@ export {
   type MailFailure,
   type MailFailureKind,
   type MailMessage,
+  type MessageRef,
 } from './lib/appleMail';
 export {
   formatReceived,
