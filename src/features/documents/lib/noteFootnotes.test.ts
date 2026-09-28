@@ -1,7 +1,17 @@
 import { Editor } from '@tiptap/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { composeNote, noteExtensions } from './markdown';
 import { footnoteOrder, insertFootnote, jumpToFootnote } from './noteFootnotes';
+
+// jsdom has no layout. ProseMirror asks `elementFromPoint` where a press
+// landed; without it every press in these tests throws after the test ends.
+// Only here: the note editor reads its absence to pick its test surface.
+beforeEach(() => {
+  document.elementFromPoint = () => null;
+});
+afterEach(() => {
+  Reflect.deleteProperty(document, 'elementFromPoint');
+});
 
 let editor: Editor | null = null;
 afterEach(() => {

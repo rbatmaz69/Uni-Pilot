@@ -2,10 +2,20 @@ import { Editor, type JSONContent } from '@tiptap/core';
 import { NodeSelection } from '@tiptap/pm/state';
 import { EditorContent } from '@tiptap/react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { composeNote, noteExtensions } from '@/features/documents/lib/markdown';
 import { insertFormula } from '@/features/documents/lib/noteMath';
 import { EditableNoteBlockMath, EditableNoteInlineMath } from './NoteMath';
+
+// jsdom has no layout. ProseMirror asks `elementFromPoint` where a press
+// landed; without it every press in these tests throws after the test ends.
+// Only here: the note editor reads its absence to pick its test surface.
+beforeEach(() => {
+  document.elementFromPoint = () => null;
+});
+afterEach(() => {
+  Reflect.deleteProperty(document, 'elementFromPoint');
+});
 
 let editor: Editor;
 afterEach(async () => {

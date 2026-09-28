@@ -103,7 +103,10 @@ describe('what the page asks Rust for', () => {
   });
 
   it('says in its own words what went wrong on this computer', async () => {
-    invoke.mockRejectedValueOnce({ kind: 'local', message: 'This course is already being synced.' });
+    invoke.mockRejectedValueOnce({
+      kind: 'local',
+      message: 'This course is already being synced.',
+    });
     await expect(listCourseFolders(HHN)).rejects.toMatchObject({
       kind: 'provider-error',
       message: 'This course is already being synced.',
