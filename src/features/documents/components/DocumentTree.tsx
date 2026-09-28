@@ -17,6 +17,7 @@ import {
   type DocumentEntry,
   type SearchHit,
 } from '@/features/documents/lib/files';
+import { IliasBadge } from '@/features/integrations';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -156,6 +157,7 @@ export function DocumentTree({
           >
             <Icon size={17} strokeWidth={1.8} aria-hidden />
             <span>{entry.name}</span>
+            {entry.ilias === 'root' && <IliasBadge size="sm" showLabel={false} />}
           </button>
         </div>
         {entry.folder && open && (

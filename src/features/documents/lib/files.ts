@@ -1,15 +1,36 @@
 import { invoke } from '@tauri-apps/api/core';
 
+/** What an entry is to the ILIAS course sync; absent/null for everything else. */
+export type IliasMark =
+  | 'root' // the managed ILIAS folder itself (holds the sync manifest)
+  | 'folder' // a folder inside a managed ILIAS folder (mirrors an ILIAS folder)
+  | 'file' // a file downloaded from ILIAS and tracked by the sync
+  | 'gone'; // a file downloaded from ILIAS that ILIAS no longer lists (kept locally)
+
+export interface IliasFolderInfo {
+  courseRefId: string;
+  courseTitle: string;
+  /** Workspace-relative path of the managed ILIAS folder, e.g. "Courses/Summer 2026/Datenbanken/ILIAS". */
+  root: string;
+  /** ISO 8601 of the last completed sync, or null. */
+  syncedAt: string | null;
+  /** Whether Uni Pilot syncs it automatically. */
+  auto: boolean;
+}
+
 export interface DocumentEntry {
   name: string;
   path: string;
   folder: boolean;
   size: number;
   modified: number;
+  ilias?: IliasMark | null;
 }
 export interface DirectoryListing {
   root: string;
   entries: DocumentEntry[];
+  /** Set when the listed folder is the managed ILIAS folder, or anywhere inside it. */
+  ilias?: IliasFolderInfo | null;
 }
 export interface DocumentPreviewData {
   mime: string;
@@ -73,6 +94,12 @@ export function fileKind(entry: DocumentEntry) {
   if (entry.folder) return 'Folder';
   if (editable(entry)) return /\.txt$/i.test(entry.name) ? 'Plain text' : 'Markdown';
   return `${entry.name.includes('.') ? entry.name.split('.').at(-1)?.toUpperCase() : 'Document'} file`;
+}
+/** Why an entry cannot be renamed, moved or deleted, or null when it can. */
+export function lockedReason(entry: DocumentEntry): string | null {
+  if (entry.ilias === 'root')
+    return 'This folder is kept in sync with ILIAS. Stop syncing the course in Courses to change it.';
+  return null;
 }
 export function sortEntries(entries: DocumentEntry[], query: string, sort: string) {
   return entries

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentExplorer } from '@/features/documents/components/DocumentExplorer';
 import {
@@ -834,4 +835,133 @@ it('imports files dropped onto the canvas into the current folder', async () => 
     ),
   );
   expect(await screen.findByText(/1 file imported/)).toBeInTheDocument();
+});
+
+describe('ILIAS sync', () => {
+  const iliasFolder: DocumentEntry = {
+    name: 'ILIAS',
+    path: 'ILIAS',
+    folder: true,
+    size: 0,
+    modified: 1000,
+    ilias: 'root',
+  };
+  const goneFile: DocumentEntry = {
+    name: 'Handout.docx',
+    path: 'ILIAS/Handout.docx',
+    folder: false,
+    size: 2048,
+    modified: 1000,
+    ilias: 'gone',
+  };
+  const iliasInfo = {
+    courseRefId: 'crs_42',
+    courseTitle: 'Datenbanken',
+    root: 'ILIAS',
+    syncedAt: '2026-09-27T10:00:00.000Z',
+    auto: true,
+  };
+
+  it('marks the managed ILIAS folder with a badge and locks rename, move and delete', async () => {
+    const user = userEvent.setup();
+    request.mockImplementation((action) => {
+      if (action.action === 'list')
+        return Promise.resolve({ root: '/workspace', entries: action.path ? [] : [iliasFolder] });
+      return Promise.resolve();
+    });
+    render(<DocumentExplorer />);
+    await user.click(screen.getByLabelText('Canvas options'));
+    await user.click(screen.getByRole('button', { name: 'List view' }));
+    const card = await screen.findByRole('button', { name: 'Select ILIAS' });
+    expect(within(card).getByRole('img', { name: 'Synced from ILIAS' })).toBeInTheDocument();
+
+    await user.click(card);
+    expect(
+      screen.getByText(
+        'This folder is kept in sync with ILIAS. Stop syncing the course in Courses to change it.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename selected item' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move to Recently deleted' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Open' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Show in file manager' })).toBeEnabled();
+  });
+
+  it('shows a banner with the course title, sync time and a link to open the course', async () => {
+    request.mockImplementation((action) => {
+      if (action.action === 'list')
+        return Promise.resolve({ root: '/workspace', entries: [], ilias: iliasInfo });
+      return Promise.resolve();
+    });
+    render(
+      <MemoryRouter>
+        <DocumentExplorer />
+      </MemoryRouter>,
+    );
+    const banner = await screen.findByRole('status', { name: 'ILIAS sync' });
+    expect(within(banner).getByText(/Datenbanken/)).toBeInTheDocument();
+    expect(within(banner).getByText(/Last synced/)).toBeInTheDocument();
+    expect(within(banner).getByRole('link', { name: 'Open course' })).toHaveAttribute(
+      'href',
+      '/courses?course=crs_42',
+    );
+  });
+
+  it('shows "Not synced yet" for a folder that has never finished syncing', async () => {
+    request.mockImplementation((action) => {
+      if (action.action === 'list')
+        return Promise.resolve({
+          root: '/workspace',
+          entries: [],
+          ilias: { ...iliasInfo, syncedAt: null },
+        });
+      return Promise.resolve();
+    });
+    render(
+      <MemoryRouter>
+        <DocumentExplorer />
+      </MemoryRouter>,
+    );
+    const banner = await screen.findByRole('status', { name: 'ILIAS sync' });
+    expect(within(banner).getByText('Not synced yet')).toBeInTheDocument();
+  });
+
+  it('marks a file ILIAS no longer lists as "No longer on ILIAS"', async () => {
+    const user = userEvent.setup();
+    request.mockImplementation((action) => {
+      if (action.action === 'list')
+        return Promise.resolve({ root: '/workspace', entries: action.path ? [] : [goneFile] });
+      return Promise.resolve();
+    });
+    render(<DocumentExplorer />);
+    await user.click(screen.getByLabelText('Canvas options'));
+    await user.click(screen.getByRole('button', { name: 'List view' }));
+    const card = await screen.findByRole('button', { name: 'Select Handout.docx' });
+    expect(within(card).getByText('No longer on ILIAS')).toBeInTheDocument();
+    expect(within(card).getByRole('img', { name: 'Downloaded from ILIAS' })).toBeInTheDocument();
+  });
+  it('opens at a course folder linked from Courses, as a list', async () => {
+    const root = 'Courses/Winter 2025-26/Datenbanken/ILIAS';
+    request.mockImplementation((action) => {
+      if (action.action === 'list')
+        return Promise.resolve({
+          root: '/workspace',
+          entries:
+            action.path === root
+              ? [{ ...goneFile, path: `${root}/Handout.docx`, ilias: 'file' as const }]
+              : [],
+          ilias: action.path === root ? { ...iliasInfo, root } : null,
+        });
+      return Promise.resolve();
+    });
+    render(
+      <MemoryRouter>
+        <DocumentExplorer initialPath={root} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('button', { name: 'Select Handout.docx' })).toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith({ action: 'list', path: root });
+    expect(screen.getByRole('status', { name: 'ILIAS sync' })).toBeInTheDocument();
+  });
 });

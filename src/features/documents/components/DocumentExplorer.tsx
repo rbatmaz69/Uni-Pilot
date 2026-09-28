@@ -20,6 +20,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { DocumentCanvas } from './DocumentCanvas';
 import { DocumentPreview } from './DocumentPreview';
 import { DocumentTree } from './DocumentTree';
@@ -27,6 +28,8 @@ import { SearchResults } from './SearchResults';
 import { StudyEditor } from './StudyEditor';
 import { FileTools } from './FileTools';
 import { Button, IconButton, Modal } from '@/components/ui';
+import { IliasBadge } from '@/features/integrations';
+import { formatTimeAgo } from '@/lib/date';
 import { isDesktopRuntime } from '@/lib/icsFetch';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +37,7 @@ import {
   editable,
   fileKind,
   fileSize,
+  lockedReason,
   MAX_UPLOAD_BYTES,
   previewable,
   sortEntries,
@@ -54,11 +58,20 @@ type DocumentTab = { path: string; name: string; folder: boolean; entry?: Docume
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-primary';
 const EMPTY_ENTRIES: DocumentEntry[] = [];
 
-export function DocumentExplorer() {
+interface DocumentExplorerProps {
+  /**
+   * A workspace folder to open at, e.g. a course's `ILIAS` folder linked from
+   * Courses. It opens as a list: the canvas lays a folder out over its parents,
+   * which a folder opened straight from a link has not been through.
+   */
+  initialPath?: string;
+}
+
+export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
   const desktop = isDesktopRuntime();
   const [menu, setMenu] = useState<'add' | 'search' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [path, setPath] = useState('');
+  const [path, setPath] = useState(initialPath);
   const [listing, setListing] = useState<DirectoryListing>({ root: '', entries: [] });
   const [rootEntries, setRootEntries] = useState<DocumentEntry[]>([]);
   const [loading, setLoading] = useState(desktop);
@@ -67,7 +80,7 @@ export function DocumentExplorer() {
   const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('name');
-  const [view, setView] = useState<'list' | 'grid' | 'canvas'>('canvas');
+  const [view, setView] = useState<'list' | 'grid' | 'canvas'>(initialPath ? 'list' : 'canvas');
   const [canvasParents, setCanvasParents] = useState<Record<string, DocumentEntry[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -76,7 +89,12 @@ export function DocumentExplorer() {
   const [movePath, setMovePath] = useState('');
   const [moveFolders, setMoveFolders] = useState<DocumentEntry[]>([]);
   const [note, setNote] = useState<OpenNote | null>(null);
-  const [tabs, setTabs] = useState<DocumentTab[]>([{ path: '', name: 'Documents', folder: true }]);
+  const [tabs, setTabs] = useState<DocumentTab[]>(() => [
+    { path: '', name: 'Documents', folder: true },
+    ...(initialPath
+      ? [{ path: initialPath, name: initialPath.split('/').at(-1) ?? 'Documents', folder: true }]
+      : []),
+  ]);
   const [leaveRequest, setLeaveRequest] = useState(0);
   const afterLeave = useRef<(() => void) | null>(null);
   const [treeRevision, setTreeRevision] = useState(0);
@@ -88,6 +106,7 @@ export function DocumentExplorer() {
   const canvas = view === 'canvas' && !inTrash;
   const visible = sortEntries(listing.entries, query, sort);
   const entry = listing.entries.find((item) => item.path === selected);
+  const locked = entry ? lockedReason(entry) : null;
   const searchQuery = query.trim();
   const searching = desktop && searchQuery.length >= 2;
   const searchHits = search?.query === searchQuery ? search.hits : null;
@@ -693,6 +712,33 @@ export function DocumentExplorer() {
                   ) : null}
                 </div>
               )}
+              {listing.ilias ? (
+                <div
+                  role="status"
+                  aria-label="ILIAS sync"
+                  className={cn(
+                    'mx-5 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-blue-soft px-3 py-2 text-xs text-primary',
+                    canvas && 'canvas-message',
+                  )}
+                >
+                  <IliasBadge size="sm" />
+                  <span>
+                    Kept in sync with ILIAS ·{' '}
+                    <strong className="font-semibold">{listing.ilias.courseTitle}</strong>
+                  </span>
+                  <span className="text-muted">
+                    {listing.ilias.syncedAt
+                      ? `Last synced ${formatTimeAgo(new Date(listing.ilias.syncedAt), new Date())}`
+                      : 'Not synced yet'}
+                  </span>
+                  <Link
+                    to={`/courses?course=${encodeURIComponent(listing.ilias.courseRefId)}`}
+                    className="ml-auto font-medium text-blue hover:underline"
+                  >
+                    Open course
+                  </Link>
+                </div>
+              ) : null}
               {error && !dialog && !note ? (
                 <p
                   role="alert"
@@ -768,6 +814,11 @@ export function DocumentExplorer() {
                   onCreate={() => showDialog({ type: 'document' })}
                   onImport={(files) => void importFiles(files)}
                   onMove={async (item, target) => {
+                    const reason = lockedReason(item);
+                    if (reason) {
+                      setError(reason);
+                      return false;
+                    }
                     let moved = false;
                     await run(async () => {
                       await documentRequest({
@@ -850,11 +901,22 @@ export function DocumentExplorer() {
                               )}
                             />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-xs font-medium">
-                                {item.name}
+                              <span className="inline-flex min-w-0 max-w-full items-center gap-1 text-xs font-medium">
+                                <span className="truncate">{item.name}</span>
+                                {item.ilias === 'root' ? (
+                                  <IliasBadge size="sm" />
+                                ) : item.ilias === 'file' ||
+                                  item.ilias === 'folder' ||
+                                  item.ilias === 'gone' ? (
+                                  <IliasBadge
+                                    size="sm"
+                                    showLabel={false}
+                                    title="Downloaded from ILIAS"
+                                  />
+                                ) : null}
                               </span>
                               <span className="mt-0.5 block text-[10px] text-muted">
-                                {fileKind(item)}
+                                {item.ilias === 'gone' ? 'No longer on ILIAS' : fileKind(item)}
                               </span>
                             </span>
                             {view === 'list' ? (
@@ -908,6 +970,9 @@ export function DocumentExplorer() {
                   <span className="mr-auto max-w-40 truncate pr-3 text-xs font-medium">
                     {entry.name}
                   </span>
+                  {locked ? (
+                    <span className="max-w-52 text-[10px] text-muted">{locked}</span>
+                  ) : null}
                   <Button size="sm" disabled={busy || loading} onClick={() => activate(entry)}>
                     Open
                   </Button>
@@ -932,21 +997,24 @@ export function DocumentExplorer() {
                     <>
                       <IconButton
                         label="Rename selected item"
-                        disabled={busy || loading}
+                        {...(locked ? { title: locked } : {})}
+                        disabled={busy || loading || !!locked}
                         onClick={() => showDialog({ type: 'rename', entry })}
                       >
                         <Pencil size={15} />
                       </IconButton>
                       <Button
                         size="sm"
-                        disabled={busy || loading}
+                        title={locked ?? undefined}
+                        disabled={busy || loading || !!locked}
                         onClick={() => showDialog({ type: 'move', entry })}
                       >
                         Move
                       </Button>
                       <IconButton
                         label="Move to Recently deleted"
-                        disabled={busy || loading}
+                        {...(locked ? { title: locked } : {})}
+                        disabled={busy || loading || !!locked}
                         onClick={() => showDialog({ type: 'trash', entry })}
                       >
                         <Trash2 size={15} />
