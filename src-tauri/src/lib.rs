@@ -1,4 +1,5 @@
 mod apple_mail;
+mod documents;
 mod ilias_browser;
 mod ilias_links;
 mod ilias_sign_out;
@@ -14,6 +15,8 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             reminders::reminder_request,
+            documents::document_request,
+            documents::document_upload,
             ilias_window::open_ilias,
             ilias_view::enter_ilias_mode,
             ilias_view::leave_ilias_mode,

@@ -1,14 +1,18 @@
 @import 'tailwindcss';
 
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant dark (&:where([data-theme$='dark'], [data-theme$='dark'] *));
+@custom-variant flexoki (&:where([data-theme^='flexoki'], [data-theme^='flexoki'] *));
 
 /* ------------------------------------------------------------------
    Design tokens
-   Light and dark appearances share semantic tokens. Components
+   All appearances share semantic tokens. Components
    inherit the selected palette through the data-theme selector.
    ------------------------------------------------------------------ */
 :root,
 [data-theme='light'] {
+  /* Native date pickers, select popups and scrollbars follow the theme too. */
+  color-scheme: light;
+
   --app-background: #deedf5;
   --surface: #ffffff;
   --surface-secondary: #f5f7fa;
@@ -70,6 +74,28 @@
   --shadow-soft: 0 2px 8px #294d7410;
   --shadow-raised: 0 2px 4px oklch(0.3 0.02 70 / 0.06), 0 20px 44px -24px oklch(0.3 0.03 70 / 0.3);
   --shadow-sidebar: 0 2px 6px oklch(0.2 0.02 70 / 0.14), 0 24px 48px -26px oklch(0.2 0.03 70 / 0.4);
+
+  /* Note pages: the sheet, what lies behind it, and the tools floating over it. */
+  --page: #ffffff;
+  --page-backdrop: #eef2f6;
+  --page-paper: #ebe4d8;
+  --page-grain-blend: multiply;
+  --page-search-match: oklch(0.93 0.09 92);
+  --page-search-current: oklch(0.85 0.15 85);
+  /* Bold ink follows the writing surface, including paper in dark mode. */
+  --note-bold-blue-light: #245caa;
+  --note-bold-teal-light: #16705e;
+  --note-bold-rose-light: #a43156;
+  --note-bold-blue-dark: #8cbcff;
+  --note-bold-teal-dark: #7edbc5;
+  --note-bold-rose-dark: #ffa6bb;
+  --note-highlight-dark: oklch(0.32 0.05 88);
+  --note-highlight-dark-strong: oklch(0.84 0.115 88);
+  --note-bold-blue: var(--note-bold-blue-light);
+  --note-bold-teal: var(--note-bold-teal-light);
+  --note-bold-rose: var(--note-bold-rose-light);
+  --shadow-page: 0 1px 2px oklch(0.3 0.02 255 / 0.08), 0 28px 64px -34px oklch(0.3 0.03 255 / 0.38);
+  --shadow-float: 0 1px 2px oklch(0.3 0.02 255 / 0.1), 0 14px 34px -12px oklch(0.3 0.03 255 / 0.32);
 }
 
 /* Image-derived colour stays dark enough for the same foreground in both themes. */
@@ -168,6 +194,8 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
+
   --app-background: oklch(0.18 0.012 255);
   --surface: oklch(0.22 0.012 255);
   --surface-secondary: oklch(0.26 0.014 255);
@@ -220,6 +248,229 @@
   --shadow-raised:
     0 2px 6px oklch(0.08 0.01 255 / 0.4), 0 18px 36px -16px oklch(0.05 0.01 255 / 0.6);
   --shadow-sidebar: 0 2px 8px oklch(0.05 0.01 255 / 0.5);
+
+  --page: oklch(0.235 0.012 255);
+  --page-backdrop: oklch(0.155 0.01 255);
+  --page-paper: oklch(0.3 0.006 70);
+  --page-grain-blend: multiply;
+  --page-search-match: oklch(0.42 0.08 88);
+  --page-search-current: oklch(0.62 0.13 85);
+  --shadow-page:
+    0 1px 2px oklch(0.05 0.01 255 / 0.5), 0 30px 70px -30px oklch(0.02 0.01 255 / 0.85);
+  --shadow-float:
+    0 1px 2px oklch(0.05 0.01 255 / 0.55), 0 14px 36px -12px oklch(0.02 0.01 255 / 0.8);
+}
+
+/*
+ * Flexoki by Steph Ango — https://stephango.com/flexoki
+ * Copyright (c) 2023 Steph Ango. MIT License (licenses/flexoki-LICENSE).
+ * Warm monochrome surfaces and the original pigment-inspired accent palette.
+ */
+[data-theme='flexoki-light'] {
+  color-scheme: light;
+
+  --app-background: #f2f0e5;
+  --surface: #fffcf0;
+  --surface-secondary: #f2f0e5;
+  --surface-hover: #e6e4d9;
+
+  --sidebar: #f2f0e5;
+  --sidebar-elevated: #fffcf0;
+  --sidebar-hover: #e6e4d9;
+  --sidebar-active: #dad8ce;
+  --sidebar-border: #dad8ce;
+  --sidebar-foreground: #100f0f;
+  --sidebar-muted: #6f6e69;
+
+  --text-primary: #100f0f;
+  --text-secondary: #6f6e69;
+  --text-muted: #6f6e69;
+  --text-inverted: #fffcf0;
+
+  --border: #e6e4d9;
+  --border-soft: #f2f0e5;
+  --border-strong: #cecdc3;
+
+  --accent-primary: #1c6c66;
+  --accent-primary-hover: #164f4a;
+  --accent-primary-soft: #ddf1e4;
+  --accent-primary-foreground: #fffcf0;
+
+  --accent-pink: #a02f6f;
+  --accent-pink-soft: #fee4e5;
+  --accent-yellow: #ad8301;
+  --accent-yellow-soft: #faeec6;
+  --accent-blue: #205ea6;
+  --accent-blue-soft: #e1eceb;
+  --accent-green: #66800b;
+  --accent-green-soft: #edeecf;
+  --accent-lavender: #5e409d;
+  --accent-lavender-soft: #f0eaec;
+  --accent-orange: #bc5215;
+  --accent-orange-soft: #ffe7ce;
+  --accent-teal: #24837b;
+  --accent-teal-soft: #ddf1e4;
+  --accent-coral: #af3029;
+  --accent-coral-soft: #ffe1d5;
+
+  --focus-ring: #24837b;
+  --overlay: #100f0f52;
+  --text-danger: #af3029;
+  --special-event-paper: #fffcf0;
+
+  --shadow-soft: 0 2px 8px #100f0f0a;
+  --shadow-raised: 0 2px 4px #100f0f0d, 0 20px 44px -24px #100f0f33;
+  --shadow-sidebar: 0 2px 6px #100f0f0d, 0 24px 48px -26px #100f0f26;
+
+  --page: #fffcf0;
+  --page-backdrop: #f2f0e5;
+  --page-paper: #e6e4d9;
+  --page-grain-blend: multiply;
+  --page-search-match: #faeec6;
+  --page-search-current: #f6e2a0;
+  --shadow-page: 0 1px 2px #100f0f0d, 0 28px 64px -34px #100f0f40;
+  --shadow-float: 0 1px 2px #100f0f14, 0 14px 34px -12px #100f0f33;
+}
+
+[data-theme='flexoki-dark'] {
+  color-scheme: dark;
+
+  --app-background: #100f0f;
+  --surface: #1c1b1a;
+  --surface-secondary: #282726;
+  --surface-hover: #343331;
+
+  --sidebar: #100f0f;
+  --sidebar-elevated: #1c1b1a;
+  --sidebar-hover: #282726;
+  --sidebar-active: #343331;
+  --sidebar-border: #282726;
+  --sidebar-foreground: #cecdc3;
+  --sidebar-muted: #9f9d96;
+
+  --text-primary: #cecdc3;
+  --text-secondary: #b7b5ac;
+  --text-muted: #9f9d96;
+  --text-inverted: #100f0f;
+
+  --border: #343331;
+  --border-soft: #282726;
+  --border-strong: #403e3c;
+
+  --accent-primary: #3aa99f;
+  --accent-primary-hover: #5abdac;
+  --accent-primary-soft: #122f2c;
+  --accent-primary-foreground: #100f0f;
+
+  --accent-pink: #ce5d97;
+  --accent-pink-soft: #39172b;
+  --accent-yellow: #d0a215;
+  --accent-yellow-soft: #3a2d04;
+  --accent-blue: #4385be;
+  --accent-blue-soft: #12253b;
+  --accent-green: #879a39;
+  --accent-green-soft: #252d09;
+  --accent-lavender: #8b7ec8;
+  --accent-lavender-soft: #261c39;
+  --accent-orange: #da702c;
+  --accent-orange-soft: #40200d;
+  --accent-teal: #3aa99f;
+  --accent-teal-soft: #122f2c;
+  --accent-coral: #d14d41;
+  --accent-coral-soft: #3e1715;
+
+  --focus-ring: #3aa99f;
+  --overlay: #100f0fa6;
+  --text-danger: #d14d41;
+  --special-event-paper: #fffcf0;
+
+  --shadow-soft: 0 1px 3px #100f0f66, 0 8px 20px -8px #100f0f80;
+  --shadow-raised: 0 2px 6px #100f0f80, 0 18px 36px -16px #100f0fa6;
+  --shadow-sidebar: 0 2px 8px #100f0f80;
+
+  --page: #1c1b1a;
+  --page-backdrop: #100f0f;
+  --page-paper: #282726;
+  --page-grain-blend: multiply;
+  --page-search-match: #503d02;
+  --page-search-current: #8e6b01;
+  --shadow-page: 0 1px 2px #100f0f80, 0 30px 70px -30px #100f0fd9;
+  --shadow-float: 0 1px 2px #100f0f8c, 0 14px 36px -12px #100f0fcc;
+}
+
+/* All dark theme families use bright bold ink; paper surfaces override it locally. */
+[data-theme$='dark'] {
+  --note-bold-blue: var(--note-bold-blue-dark);
+  --note-bold-teal: var(--note-bold-teal-dark);
+  --note-bold-rose: var(--note-bold-rose-dark);
+}
+
+/* ------------------------------------------------------------------
+   Notebook page style — physical materials (desk, paper, binder).
+   Paper stays paper in either theme, so these are shared by both.
+   ------------------------------------------------------------------ */
+:root {
+  --notebook-desk: #18130f;
+  --notebook-desk-glow: #241b13;
+  --notebook-desk-raised: #221a13;
+  --notebook-desk-hover: #33281e;
+  --notebook-desk-line: #3a2e24;
+  --notebook-desk-text: #f1e9de;
+  --notebook-desk-muted: #a99d8f;
+
+  --notebook-paper: #fbf9f3;
+  --notebook-paper-back: #f3f0e8;
+  --notebook-paper-edge: #efece4;
+  --notebook-paper-edge-alt: #f6f3ec;
+  --notebook-paper-tint: #f1ede4;
+  --notebook-ink: #36332e;
+  --notebook-ink-muted: #7d776f;
+  --notebook-ink-faint: #b8b2a8;
+  --notebook-rule: #d8d3cb;
+  --notebook-highlight: #f4e7ad;
+  --notebook-highlight-strong: #e7d17a;
+  --notebook-link: #4f6f94;
+  --notebook-link-soft: #e6ecf2;
+  --notebook-accent: #e36c4d;
+  --notebook-shade: #1d140c;
+  --notebook-hole: #140f0b;
+
+  --notebook-spine: #d6a29a;
+  --notebook-spine-light: #f3cdc5;
+  --notebook-spine-dark: #965a50;
+  --notebook-ring-light: #fdf0ec;
+  --notebook-ring: #e0a598;
+  --notebook-ring-dark: #9b5449;
+  --notebook-ring-back: #6b352c;
+  --notebook-ring-shine: #ffffffa6;
+
+  /* Divider tabs, in the order the note's sections appear. */
+  --notebook-tab-1: #e7ddc9;
+  --notebook-tab-2: #cfd2cf;
+  --notebook-tab-3: #e8a08b;
+  --notebook-tab-4: #a9cfcb;
+  --notebook-tab-5: #e7c9a7;
+  --notebook-tab-6: #c4bcd6;
+
+  /* Leather cover with an elastic band, and the ribbon bookmark. */
+  --notebook-cover: #b8705f;
+  --notebook-cover-light: #d4917f;
+  --notebook-cover-dark: #8d4f41;
+  --notebook-cover-band: #3b2a24;
+  --notebook-cover-band-dark: #241914;
+  --notebook-cover-inside: #e9dccb;
+  --notebook-ribbon: #c9573f;
+  --notebook-ribbon-dark: #9a3f2d;
+
+  --notebook-radius: 4px;
+  --notebook-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --notebook-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --shadow-notebook-book:
+    0 2px 4px color-mix(in srgb, var(--notebook-shade) 30%, transparent),
+    0 34px 60px -28px color-mix(in srgb, black 70%, transparent);
+  --shadow-notebook-tab: 0 2px 6px -2px color-mix(in srgb, var(--notebook-shade) 45%, transparent);
+  --shadow-notebook-float: 0 10px 30px -14px color-mix(in srgb, black 70%, transparent);
 }
 
 /* ------------------------------------------------------------------
@@ -275,6 +526,8 @@
 
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  /* System serifs only, so the app stays offline: Iowan and Charter ship with macOS. */
+  --font-serif: 'Iowan Old Style', Charter, 'Bitstream Charter', Cambria, Georgia, serif;
 
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
@@ -369,11 +622,7 @@
   }
 
   .app-shell {
-    padding: 18px;
-    background:
-      radial-gradient(ellipse at 10% 0%, #72b9ee80, transparent 55%),
-      radial-gradient(ellipse at 0% 100%, #c8d8b780, transparent 48%),
-      linear-gradient(125deg, #cfe7f5, #e8eff7 68%, #dce8f4);
+    background: var(--surface);
   }
 
   .app-frame {
@@ -391,9 +640,7 @@
   }
 
   .workspace {
-    border: 1px solid #ffffffa6;
     background: var(--surface);
-    box-shadow: 0 12px 60px -25px #365c8133;
   }
 
   /* Quiet, neutral surfaces keep the calendar grid distinct from event colours. */
@@ -407,7 +654,7 @@
     background: var(--calendar-surface);
   }
 
-  [data-theme='dark'] .calendar-grid {
+  [data-theme$='dark'] .calendar-grid {
     --calendar-surface: var(--surface);
     --calendar-header: var(--surface);
     --calendar-weekend: var(--surface);
@@ -447,14 +694,16 @@
     );
   }
 
-  [data-theme='dark'] .app-shell {
-    background: radial-gradient(ellipse at 0% 0%, #263755, transparent 70%), #131a25;
-  }
   [data-theme='dark'] .app-frame {
     background: linear-gradient(160deg, #1f3043ce, #1b2530d9);
   }
-  [data-theme='dark'] .workspace {
-    border-color: #ffffff0a;
+
+  [data-theme^='flexoki'] .app-frame {
+    background: var(--app-background);
+  }
+
+  [data-theme^='flexoki'] .calendar-grid {
+    --calendar-today: var(--accent-coral);
   }
 
   @media (max-height: 880px) {
@@ -467,13 +716,15 @@
     .sidebar-glass {
       width: 214px;
     }
-    .app-shell {
-      padding: 10px;
-    }
   }
 }
 
 @layer utilities {
+  /* Leave room for the native macOS window controls over the sidebar. */
+  [data-macos-desktop='true'] .sidebar-glass {
+    padding-top: 36px;
+  }
+
   @keyframes page-enter {
     from {
       opacity: 0;
@@ -555,9 +806,6 @@
   .sidebar-profile {
     justify-content: center;
     padding: 6px 0;
-  }
-  .workspace {
-    border-radius: 22px 0 0 22px;
   }
 }
 

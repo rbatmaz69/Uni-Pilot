@@ -9,6 +9,7 @@ import {
   resetIliasBrowserListening,
   useIliasBrowserStore,
 } from '@/features/integrations/store/iliasBrowserStore';
+import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
@@ -37,4 +38,16 @@ afterEach(() => {
   useTaskStore.setState({ tasks: [] });
   useIliasBrowserStore.setState({ history: NO_HISTORY, downloads: [] });
   resetIliasBrowserListening();
+  useNoteStyleStore.setState({
+    style: 'standard',
+    layout: 'pages',
+    zoom: 1,
+    font: 'inter',
+    textSize: 'm',
+    lineSpacing: 'normal',
+    paper: 'dotted',
+    sound: true,
+    boldColor: 'default',
+    bookmarks: {},
+  });
 });
