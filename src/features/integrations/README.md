@@ -10,15 +10,17 @@ own university, which changes what a connector should even attempt.
 
 ## What is here
 
-| File                     | What it does                                               |
-| ------------------------ | ---------------------------------------------------------- |
-| `lib/types.ts`           | Provider-agnostic read models. ILIAS never reaches the UI. |
-| `lib/ilias/endpoints.ts` | URL building, including the path that moved in ILIAS 10.   |
-| `lib/ilias/errors.ts`    | Provider answers to failures the UI can act on.            |
-| `lib/ilias/envelope.ts`  | SOAP request building and response unwrapping.             |
-| `lib/ilias/xml.ts`       | Shared reading helpers, `DOMParser`-based, no dependency.  |
-| `lib/ilias/parse*.ts`    | Pure mappers: ILIAS XML or RSS in, read models out.        |
-| `lib/ilias/fixtures/`    | Recorded and derived payloads the tests run against.       |
+| File                        | What it does                                                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lib/types.ts`              | Provider-agnostic read models. ILIAS never reaches the UI.                                                                                                                     |
+| `lib/ilias/endpoints.ts`    | URL building, including the path that moved in ILIAS 10.                                                                                                                       |
+| `lib/ilias/errors.ts`       | Provider answers to failures the UI can act on.                                                                                                                                |
+| `lib/ilias/envelope.ts`     | SOAP request building and response unwrapping.                                                                                                                                 |
+| `lib/ilias/xml.ts`          | Shared reading helpers, `DOMParser`-based, no dependency.                                                                                                                      |
+| `lib/ilias/parse*.ts`       | Pure mappers: ILIAS XML or RSS in, read models out.                                                                                                                            |
+| `lib/ilias/fixtures/`       | Recorded and derived payloads the tests run against.                                                                                                                           |
+| `lib/iliasSync.ts`          | Courses, folders, exercises read by Rust with the student's session (`src-tauri/src/ilias_sync/`); course files kept in Documents (`docs/integrations/ilias-course-files.md`). |
+| `components/IliasBadge.tsx` | The ILIAS mark on synced folders and files. A placeholder until the official logo is cleared.                                                                                  |
 
 ## What is deliberately missing
 

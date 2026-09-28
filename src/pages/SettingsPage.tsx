@@ -4,6 +4,7 @@ import { Page } from '@/components/layout';
 import { NAV_ITEMS } from '@/lib/navigation';
 import { useUiStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
+import { isDarkTheme, THEMES } from '@/lib/theme';
 
 export function SettingsPage() {
   const { theme, setTheme, sidebarCollapsed, toggleSidebar } = useUiStore();
@@ -16,45 +17,62 @@ export function SettingsPage() {
         </p>
         <h3 className="mb-3 mt-7 text-xs font-medium text-secondary">Appearance</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          {(['light', 'dark'] as const).map((option) => (
+          {THEMES.map((option) => (
             <button
-              key={option}
+              key={option.name}
               type="button"
-              aria-pressed={theme === option}
-              onClick={() => setTheme(option)}
+              aria-label={option.label}
+              aria-pressed={theme === option.name}
+              onClick={() => setTheme(option.name)}
               className={cn(
                 'overflow-hidden rounded-2xl border p-3 text-left transition-colors',
-                theme === option
+                theme === option.name
                   ? 'border-accent bg-accent-soft'
                   : 'border-line hover:border-line-strong',
               )}
             >
               <span
                 aria-hidden
-                className={cn(
-                  'flex h-28 gap-3 rounded-xl p-3',
-                  option === 'light' ? 'bg-[#dceef6]' : 'bg-[#1d2c40]',
-                )}
+                data-theme={option.name}
+                className="flex h-28 gap-3 rounded-xl border border-line bg-app p-3"
               >
-                <span className="w-1/4 rounded-md bg-white/15" />
-                <span
-                  className={cn(
-                    'flex-1 rounded-lg p-4',
-                    option === 'light' ? 'bg-white' : 'bg-[#2d3440]',
-                  )}
-                >
-                  <span className="block h-2 w-2/3 rounded-full bg-[#9babc0]/30" />
-                  <span className="mt-3 block h-8 rounded-lg bg-[#9babc0]/15" />
+                <span className="flex w-1/4 flex-col gap-2 rounded-md bg-sidebar p-2">
+                  <span className="mb-1 block h-3 w-3 rounded-md bg-accent" />
+                  <span className="block h-1.5 w-full rounded-full bg-sidebar-active" />
+                  <span className="block h-1.5 w-2/3 rounded-full bg-sidebar-muted/25" />
+                  <span className="block h-1.5 w-3/4 rounded-full bg-sidebar-muted/25" />
+                </span>
+                <span className="flex-1 rounded-lg bg-surface p-3">
+                  <span className="block h-2 w-2/3 rounded-full bg-primary/30" />
+                  <span className="mt-2 block h-1 w-1/2 rounded-full bg-muted/25" />
+                  <span className="mt-3 flex gap-1.5">
+                    <span className="h-6 flex-1 rounded-md border-l-2 border-teal bg-teal-soft" />
+                    <span className="h-6 flex-1 rounded-md border-l-2 border-orange bg-orange-soft" />
+                    <span className="h-6 flex-1 rounded-md border-l-2 border-lavender bg-lavender-soft" />
+                  </span>
                 </span>
               </span>
               <span className="mt-3 flex items-center gap-2 text-sm font-medium">
-                {option === 'light' ? <Sun size={16} /> : <Moon size={16} />}
-                {option === 'light' ? 'Light & airy' : 'After hours'}
-                {theme === option && <Check size={16} className="ml-auto text-accent" />}
+                {isDarkTheme(option.name) ? <Moon size={16} /> : <Sun size={16} />}
+                {option.label}
+                {theme === option.name && <Check size={16} className="ml-auto text-accent" />}
               </span>
+              <span className="mt-1 block text-xs text-secondary">{option.description}</span>
             </button>
           ))}
         </div>
+        <p className="mt-4 text-xs leading-relaxed text-secondary">
+          Flexoki is an inky color scheme by{' '}
+          <a
+            href="https://stephango.com/flexoki"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent"
+          >
+            Steph Ango
+          </a>
+          . Your choice is saved for your next visit.
+        </p>
         <div className="mt-7 flex items-center justify-between gap-4 border-t border-line-soft pt-6">
           <div className="flex items-center gap-3">
             <PanelLeft size={19} className="text-muted" />

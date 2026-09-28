@@ -1,12 +1,12 @@
 import {
   Award,
-  BookOpen,
   CalendarDays,
   FileText,
   FolderOpen,
   GraduationCap,
   LayoutDashboard,
   ListTodo,
+  Mail,
   PartyPopper,
   School,
   Settings,
@@ -24,6 +24,14 @@ export const NAV_ITEMS = {
     placeholder: 'This area will hold your customisable dashboard.',
     icon: LayoutDashboard,
     tone: 'accent',
+  },
+  inbox: {
+    path: '/inbox',
+    label: 'Inbox',
+    subtitle: 'Your university mail, without leaving Uni Pilot.',
+    placeholder: 'This area shows your university mail.',
+    icon: Mail,
+    tone: 'lavender',
   },
   studies: {
     path: '/studies',
@@ -56,14 +64,6 @@ export const NAV_ITEMS = {
     placeholder: 'This area will hold your focus timer and session history.',
     icon: Timer,
     tone: 'pink',
-  },
-  courses: {
-    path: '/courses',
-    label: 'Courses',
-    subtitle: 'Every module you are enrolled in.',
-    placeholder: 'This area will list your enrolled courses.',
-    icon: BookOpen,
-    tone: 'yellow',
   },
   ilias: {
     path: '/ilias',
@@ -135,7 +135,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'overview',
     label: 'Overview',
-    items: [NAV_ITEMS.dashboard, NAV_ITEMS.studies],
+    items: [NAV_ITEMS.dashboard, NAV_ITEMS.inbox, NAV_ITEMS.studies],
   },
   {
     id: 'planning',
@@ -145,7 +145,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'academics',
     label: 'Academics',
-    items: [NAV_ITEMS.courses, NAV_ITEMS.ilias, NAV_ITEMS.exams, NAV_ITEMS.grades],
+    items: [NAV_ITEMS.ilias, NAV_ITEMS.exams, NAV_ITEMS.grades],
   },
   {
     id: 'campus',

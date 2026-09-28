@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Shown when macOS asks whether Uni Pilot may control Mail (src/apple_mail.rs). -->
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Uni Pilot shows your university inbox by asking Apple Mail, on this Mac only, and opens drafts in Mail for you to send. It never stores your mail, never passes it on and never sends mail itself.</string>
+</dict>
+</plist>

@@ -218,7 +218,7 @@ fn free_path(dir: &Path, name: &str, taken: impl Fn(&Path) -> bool) -> PathBuf {
         .unwrap_or(first)
 }
 
-fn is_openable(path: &Path) -> bool {
+pub(crate) fn is_openable(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .map(|extension| OPENABLE.contains(&extension.to_ascii_lowercase().as_str()))
@@ -250,7 +250,7 @@ pub fn on_download<R: Runtime>(view: Webview<R>, event: DownloadEvent<'_>) -> bo
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_default();
             match begin_download(app, url.as_str(), &suggested) {
-                Some(path) => {
+                Some((path, _)) => {
                     *destination = path;
                     true
                 }
@@ -266,13 +266,14 @@ pub fn on_download<R: Runtime>(view: Webview<R>, event: DownloadEvent<'_>) -> bo
 }
 
 /// Picks where a download goes — in Downloads, under a checked name, never
-/// over an existing file — and tells the strip it has started. `None` when
-/// there is nowhere to put it.
+/// over an existing file — and tells the strip it has started. Returns the
+/// path and the id the download is opened by later; `None` when there is
+/// nowhere to put it.
 pub(crate) fn begin_download<R: Runtime>(
     app: &tauri::AppHandle<R>,
     url: &str,
     suggested: &str,
-) -> Option<PathBuf> {
+) -> Option<(PathBuf, u64)> {
     let Ok(dir) = app.path().download_dir() else {
         eprintln!("ILIAS download: there is no Downloads folder.");
         return None;
@@ -285,8 +286,9 @@ pub(crate) fn begin_download<R: Runtime>(
         let report = book.start(url.to_string(), path.clone());
         (path, report)
     };
+    let id = report.id;
     tell(app, DOWNLOAD_EVENT, report);
-    Some(path)
+    Some((path, id))
 }
 
 /// Marks the download from `url` as ended and tells the strip.

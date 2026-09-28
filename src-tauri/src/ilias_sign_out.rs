@@ -44,7 +44,7 @@ pub enum SignedOut {
 
 /// ILIAS's own sign-out link in a page, with its token. `None` when the page
 /// has none, which is what a signed-out page looks like.
-fn find_sign_out_link(html: &str, page: &Url) -> Option<Url> {
+pub(crate) fn find_sign_out_link(html: &str, page: &Url) -> Option<Url> {
     let mut rest = html;
     while let Some(at) = rest.find("logout.php") {
         let before = &rest[..at];

@@ -54,7 +54,7 @@ use crate::ilias_links;
 use crate::ilias_window::resolve_target;
 
 pub(crate) const ILIAS: &str = "ilias-view";
-const MAIN: &str = "main";
+pub(crate) const MAIN: &str = "main";
 
 /// The strip is a bar, not a page. Anything outside this range means the page
 /// measured something other than the strip.

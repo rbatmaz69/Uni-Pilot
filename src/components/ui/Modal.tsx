@@ -11,6 +11,12 @@ interface ModalProps {
   description?: string;
   /** Pinned under the scrollable body — put the confirming action last. */
   footer?: ReactNode;
+  /**
+   * Drops the visible heading so the body can own the top edge, for dialogs
+   * whose first field already says what they are. The title keeps naming the
+   * dialog for assistive tech, and the close button stays where it was.
+   */
+  titleHidden?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -33,6 +39,7 @@ export function Modal({
   title,
   description,
   footer,
+  titleHidden = false,
   className,
   children,
 }: ModalProps) {
@@ -118,8 +125,13 @@ export function Modal({
           className,
         )}
       >
-        <div className="flex items-start gap-4 px-6 pb-4 pt-6">
-          <div className="min-w-0 flex-1">
+        <div
+          className={cn(
+            'flex items-start gap-4',
+            titleHidden ? 'justify-end px-5 pb-0 pt-4' : 'px-6 pb-4 pt-6',
+          )}
+        >
+          <div className={cn('min-w-0 flex-1', titleHidden && 'sr-only')}>
             <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-primary">
               {title}
             </h2>
@@ -134,7 +146,13 @@ export function Modal({
           </IconButton>
         </div>
 
-        <div data-modal-body className="scroll-area min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+        <div
+          data-modal-body
+          className={cn(
+            'scroll-area min-h-0 flex-1 overflow-y-auto px-6',
+            titleHidden ? 'pb-5' : 'pb-6',
+          )}
+        >
           {children}
         </div>
 

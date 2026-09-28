@@ -14,10 +14,13 @@ export function ReminderControls({
   value,
   onChange,
   onPreview,
+  /** `cn` only joins, so spacing is passed in whole rather than overridden. */
+  className = 'mt-5',
 }: {
   value: ReminderRule;
   onChange: (rule: ReminderRule) => void;
   onPreview: () => void;
+  className?: string;
 }) {
   const id = useId();
   const [amount, setAmount] = useState('4');
@@ -33,7 +36,7 @@ export function ReminderControls({
 
   return (
     <section
-      className="mt-5 rounded-xl border border-line bg-surface-secondary p-4"
+      className={cn('rounded-xl border border-line bg-surface-secondary p-4', className)}
       aria-label="Event reminders"
     >
       <div className="flex items-center justify-between gap-3">

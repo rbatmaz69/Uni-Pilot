@@ -1,6 +1,9 @@
+mod apple_mail;
+mod documents;
 mod ilias_browser;
 mod ilias_links;
 mod ilias_sign_out;
+mod ilias_sync;
 mod ilias_view;
 mod ilias_window;
 mod reminders;
@@ -12,6 +15,8 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             reminders::reminder_request,
+            documents::document_request,
+            documents::document_upload,
             ilias_window::open_ilias,
             ilias_view::enter_ilias_mode,
             ilias_view::leave_ilias_mode,
@@ -22,10 +27,29 @@ pub fn run() {
             ilias_browser::open_ilias_download,
             ilias_browser::reveal_ilias_download,
             ilias_links::open_ilias_in_browser,
-            ilias_sign_out::sign_out_of_ilias
+            ilias_sign_out::sign_out_of_ilias,
+            ilias_sync::ilias_sync_courses,
+            ilias_sync::ilias_sync_contents,
+            ilias_sync::ilias_sync_assignments,
+            ilias_sync::mirror::ilias_mirror_list,
+            ilias_sync::mirror::ilias_mirror_course,
+            ilias_sync::mirror::ilias_mirror_file,
+            ilias_sync::mirror::ilias_mirror_configure,
+            ilias_sync::mirror::ilias_mirror_detach,
+            ilias_sync::reauth::ilias_sync_reauth,
+            apple_mail::mail_accounts,
+            apple_mail::mail_inbox,
+            apple_mail::mail_open,
+            apple_mail::mail_launch,
+            apple_mail::mail_previews,
+            apple_mail::mail_message,
+            apple_mail::mail_mark_read,
+            apple_mail::mail_reply,
+            apple_mail::mail_compose
         ])
         .manage(ilias_view::Mode::default())
-        .manage(ilias_browser::Downloads::default());
+        .manage(ilias_browser::Downloads::default())
+        .manage(ilias_sync::Pace::default());
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());
     builder

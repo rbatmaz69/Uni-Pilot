@@ -22,4 +22,10 @@ describe('MainContent', () => {
 
     expect(column()).toHaveClass('max-w-none');
   });
+
+  it('hands the Inbox a column as tall as the window, so list and message scroll apart', () => {
+    renderApp(NAV_ITEMS.inbox.path);
+
+    expect(column()).toHaveClass('h-full');
+  });
 });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AppWindow } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
 import { belongsToIlias, openIlias } from '@/features/integrations/lib/iliasWindow';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -10,6 +10,8 @@ import { NAV_ITEMS } from '@/lib/navigation';
 interface OpenInIliasButtonProps {
   /** A link from a calendar entry — for ILIAS feeds, the course or exercise. */
   url: string;
+  /** Just the icon, beside a more important action — a file's Download. */
+  compact?: boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ interface OpenInIliasButtonProps {
  * Lives here rather than in the calendar so that everything ILIAS-shaped stays
  * in this feature; the calendar only knows that an entry may have a link.
  */
-export function OpenInIliasButton({ url }: OpenInIliasButtonProps) {
+export function OpenInIliasButton({ url, compact = false }: OpenInIliasButtonProps) {
   const connection = useIliasStore((state) => state.connection);
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -56,14 +58,20 @@ export function OpenInIliasButton({ url }: OpenInIliasButtonProps) {
           {error}
         </span>
       ) : null}
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => void open()}
-        leadingIcon={<AppWindow size={14} strokeWidth={1.8} aria-hidden />}
-      >
-        Open in ILIAS
-      </Button>
+      {compact ? (
+        <IconButton label="Open in ILIAS" size="sm" onClick={() => void open()}>
+          <AppWindow size={15} strokeWidth={1.8} aria-hidden />
+        </IconButton>
+      ) : (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void open()}
+          leadingIcon={<AppWindow size={14} strokeWidth={1.8} aria-hidden />}
+        >
+          Open in ILIAS
+        </Button>
+      )}
     </>
   );
 }

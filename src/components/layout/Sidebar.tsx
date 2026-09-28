@@ -4,6 +4,7 @@ import { NavigationItem, NavigationSection } from '@/components/navigation';
 import { IconButton, Tooltip } from '@/components/ui';
 import { NAV_ITEMS, NAV_SECTIONS } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
+import { isDarkTheme } from '@/lib/theme';
 import { useUiStore } from '@/store/uiStore';
 import { AppLogo } from './AppLogo';
 
@@ -16,6 +17,7 @@ export function Sidebar() {
 
   return (
     <aside
+      data-tauri-drag-region
       aria-label="Main navigation"
       data-collapsed={collapsed}
       className={cn(
@@ -24,6 +26,7 @@ export function Sidebar() {
       )}
     >
       <div
+        data-tauri-drag-region
         className={cn(
           'sidebar-brand flex h-[64px] flex-none items-center gap-2 px-3 pb-3',
           collapsed && 'justify-center px-0',
@@ -78,7 +81,7 @@ export function Sidebar() {
               onClick={toggleTheme}
               className="sidebar-label text-sidebar-muted hover:bg-sidebar-hover"
             >
-              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+              {isDarkTheme(theme) ? <Sun size={17} /> : <Moon size={17} />}
             </IconButton>
           )}
         </div>
@@ -94,7 +97,7 @@ export function Sidebar() {
               collapsed && 'justify-center px-0',
             )}
           >
-            <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-[#c8dbd7] text-[12px] font-semibold text-[#3f6860] ring-2 ring-white/70">
+            <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-[#c8dbd7] text-[12px] font-semibold text-[#3f6860] ring-2 ring-white/70 flexoki:bg-teal-soft flexoki:text-teal flexoki:ring-sidebar-border">
               AM
             </span>
             {!collapsed && (

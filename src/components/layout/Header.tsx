@@ -7,6 +7,7 @@ import { useCurrentNavItem } from '@/hooks/useCurrentNavItem';
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut';
 import { useUiStore } from '@/store/uiStore';
 import { NAV_ITEMS } from '@/lib/navigation';
+import { isDarkTheme } from '@/lib/theme';
 import { ReminderHistoryPanel } from '@/features/reminders/components/ReminderHistoryPanel';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { SearchTrigger } from './SearchTrigger';
@@ -52,7 +53,7 @@ export function Header() {
         </div>
         <span aria-hidden className="hidden h-5 w-px bg-line sm:block" />
         <IconButton label="Toggle color theme" size="sm" onClick={toggleTheme}>
-          {theme === 'dark' ? (
+          {isDarkTheme(theme) ? (
             <Sun size={18} strokeWidth={1.7} aria-hidden />
           ) : (
             <Moon size={18} strokeWidth={1.7} aria-hidden />
@@ -73,7 +74,7 @@ export function Header() {
           onClick={() => {
             void navigate('/settings');
           }}
-          className="hidden h-8 w-8 flex-none place-items-center rounded-full bg-[#e5ede9] text-[10px] font-semibold text-[#4e7268] sm:grid"
+          className="hidden h-8 w-8 flex-none place-items-center rounded-full bg-[#e5ede9] text-[10px] font-semibold text-[#4e7268] flexoki:bg-teal-soft flexoki:text-teal sm:grid"
         >
           AM
         </button>
