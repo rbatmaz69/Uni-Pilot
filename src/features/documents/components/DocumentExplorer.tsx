@@ -23,10 +23,12 @@ import {
 import { Link } from 'react-router-dom';
 import { DocumentCanvas } from './DocumentCanvas';
 import { DocumentPreview } from './DocumentPreview';
-import { DocumentTree } from './DocumentTree';
 import { SearchResults } from './SearchResults';
+import { SpaceSidebar } from './SpaceSidebar';
 import { StudyEditor } from './StudyEditor';
 import { FileTools } from './FileTools';
+import { IliasOverview } from './IliasOverview';
+import { NewBadge } from './NewBadge';
 import { Button, IconButton, Modal } from '@/components/ui';
 import { IliasBadge } from '@/features/integrations';
 import { formatTimeAgo } from '@/lib/date';
@@ -44,43 +46,80 @@ import {
   uploadDocument,
   type DirectoryListing,
   type DocumentEntry,
+  type IliasCourse,
   type SearchHit,
 } from '@/features/documents/lib/files';
 import { runDocumentTool, type DocumentTool } from '@/features/documents/lib/documentTools';
+import {
+  courseName,
+  inIliasSpace,
+  looksSynced,
+  type IliasCourseView,
+} from '@/features/documents/lib/iliasSpace';
+import { addCourseToDocuments } from '@/features/documents/lib/addCourse';
+import { iliasSpaceLink } from '@/features/courses/lib/courses';
+import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
+import { ILIAS_SPACE, type Space } from '@/features/documents/lib/spaces';
+import { useSpaceStore } from '@/features/documents/store/spaceStore';
+import { useIliasCourses } from '@/features/documents/lib/useIliasCourses';
 
 type Dialog =
   | { type: 'folder' }
-  | { type: 'document' }
+  /** Adds a space to the dock, or edits the one given. */
+  | { type: 'space'; space?: Space }
+  /** `folder` when the note goes somewhere other than the open folder, e.g. a space. */
+  | { type: 'document'; folder?: string }
   | { type: 'rename' | 'move' | 'trash'; entry: DocumentEntry };
 type OpenNote = { entry: DocumentEntry; content: string };
 type SearchResult = { query: string; hits: SearchHit[] };
 type DocumentTab = { path: string; name: string; folder: boolean; entry?: DocumentEntry };
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-primary';
+
+/** The tab name of a folder, of the ILIAS space, or of a course's synced folder. */
+function folderName(path: string, courses: IliasCourse[] | null = null) {
+  if (path === '.trash') return 'Recently deleted';
+  if (path === ILIAS_SPACE) return 'ILIAS';
+  const course = courses?.find((item) => item.root === path);
+  if (course) return `${courseName(course)} · ILIAS`;
+  return path.split('/').at(-1) || 'Documents';
+}
 const EMPTY_ENTRIES: DocumentEntry[] = [];
 
 interface DocumentExplorerProps {
   /**
-   * A workspace folder to open at, e.g. a course's `ILIAS` folder linked from
-   * Courses. It opens as a list: the canvas lays a folder out over its parents,
-   * which a folder opened straight from a link has not been through.
+   * A workspace folder to open at, e.g. a course's `ILIAS` folder linked from a
+   * course, or the ILIAS space. Linked folders are ILIAS folders, which list
+   * rather than lie on the canvas.
    */
   initialPath?: string;
+  /** A course to open in the ILIAS space. */
+  initialCourse?: IliasCourseView | null;
+  /**
+   * Changes with every link followed to Documents. The open explorer then goes
+   * to `initialPath` and `initialCourse`, keeping its view and tabs.
+   */
+  request?: string;
 }
 
-export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
+export function DocumentExplorer({
+  initialPath = '',
+  initialCourse = null,
+  request,
+}: DocumentExplorerProps) {
   const desktop = isDesktopRuntime();
   const [menu, setMenu] = useState<'add' | 'search' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [path, setPath] = useState(initialPath);
   const [listing, setListing] = useState<DirectoryListing>({ root: '', entries: [] });
-  const [rootEntries, setRootEntries] = useState<DocumentEntry[]>([]);
   const [loading, setLoading] = useState(desktop);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('name');
-  const [view, setView] = useState<'list' | 'grid' | 'canvas'>(initialPath ? 'list' : 'canvas');
+  const [view, setView] = useState<'list' | 'grid' | 'canvas'>('canvas');
+  const [iliasCourse, setIliasCourse] = useState<IliasCourseView | null>(initialCourse);
+  const followed = useRef(request);
   const [canvasParents, setCanvasParents] = useState<Record<string, DocumentEntry[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -88,12 +127,13 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
   const [destination, setDestination] = useState('');
   const [movePath, setMovePath] = useState('');
   const [moveFolders, setMoveFolders] = useState<DocumentEntry[]>([]);
+  /** The folder a space shows; `null` makes a new folder named like the space. */
+  const [spaceFolder, setSpaceFolder] = useState<string | null>(null);
+  const [spaceChoices, setSpaceChoices] = useState<DocumentEntry[]>([]);
   const [note, setNote] = useState<OpenNote | null>(null);
   const [tabs, setTabs] = useState<DocumentTab[]>(() => [
     { path: '', name: 'Documents', folder: true },
-    ...(initialPath
-      ? [{ path: initialPath, name: initialPath.split('/').at(-1) ?? 'Documents', folder: true }]
-      : []),
+    ...(initialPath ? [{ path: initialPath, name: folderName(initialPath), folder: true }] : []),
   ]);
   const [leaveRequest, setLeaveRequest] = useState(0);
   const afterLeave = useRef<(() => void) | null>(null);
@@ -103,7 +143,16 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
   const upload = useRef<HTMLInputElement>(null);
   const generation = useRef(0);
   const inTrash = path === '.trash' || path.startsWith('.trash/');
-  const canvas = view === 'canvas' && !inTrash;
+  const inIlias = path === ILIAS_SPACE;
+  const iliasCourses = useIliasCourses(desktop, treeRevision);
+  // What ILIAS sends is listed, not laid out: the canvas is for the student's own things.
+  // The chosen view stays as it is, so the student's folders return to the canvas.
+  const canvas =
+    view === 'canvas' &&
+    !inTrash &&
+    !looksSynced(path) &&
+    !inIliasSpace(path, iliasCourses ?? []) &&
+    !listing.ilias;
   const visible = sortEntries(listing.entries, query, sort);
   const entry = listing.entries.find((item) => item.path === selected);
   const locked = entry ? lockedReason(entry) : null;
@@ -182,12 +231,19 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
   const refresh = useCallback(async () => {
     if (!desktop) return;
     const id = ++generation.current;
+    if (path === ILIAS_SPACE) {
+      // No folder to list: the ILIAS space reads its courses itself.
+      setListing({ root: '', entries: [] });
+      setError('');
+      setLoading(false);
+      setTreeRevision((current) => current + 1);
+      return;
+    }
     setLoading(true);
     try {
       const result = await documentRequest<DirectoryListing>({ action: 'list', path });
       if (id === generation.current) {
         setListing(result);
-        if (!path) setRootEntries(result.entries);
         setError('');
         setTreeRevision((current) => current + 1);
       }
@@ -220,6 +276,22 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
       window.removeEventListener('focus', focus);
     };
   }, [refresh, invalidateRequests]);
+
+  // A space shows one of the folders at the top of the workspace.
+  useEffect(() => {
+    if (dialog?.type !== 'space' || !desktop) return;
+    let cancelled = false;
+    documentRequest<DirectoryListing>({ action: 'list', path: '' })
+      .then((result) => {
+        if (!cancelled) setSpaceChoices(result.entries.filter((item) => item.folder));
+      })
+      .catch(() => {
+        if (!cancelled) setSpaceChoices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dialog, desktop]);
 
   useEffect(() => {
     if (dialog?.type !== 'move') return;
@@ -257,11 +329,7 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
     }
   }
   function navigate(next: string) {
-    rememberTab({
-      path: next,
-      name: next === '.trash' ? 'Recently deleted' : next.split('/').at(-1) || 'Documents',
-      folder: true,
-    });
+    rememberTab({ path: next, name: folderName(next, iliasCourses), folder: true });
     if (next === path) {
       void refresh();
       return;
@@ -276,20 +344,80 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
     setNotice('');
     setError('');
   }
+  /** The ILIAS space, or a course's synced folder; both show as a list whatever the view. */
+  function openIlias(next: string) {
+    leaveThen(() => {
+      if (next === ILIAS_SPACE) setIliasCourse(null);
+      navigate(next);
+    });
+  }
+  /** A course in the ILIAS space, as ILIAS has it: folders, exercises, sync. */
+  function openIliasCourse(courseId: string) {
+    leaveThen(() => {
+      setIliasCourse({ courseId, trail: [], exerciseId: null });
+      navigate(ILIAS_SPACE);
+    });
+  }
+
+  // A link followed while Documents is open: go where it points.
+  useEffect(() => {
+    if (request === followed.current) return;
+    followed.current = request;
+    const target = initialPath;
+    const course = initialCourse;
+    leaveThen(() => {
+      setIliasCourse(course);
+      navigate(target);
+    });
+  });
+
+  // A course's first sync makes its folder; the ILIAS space and sidebar read it then.
+  useEffect(
+    () =>
+      useCourseFilesStore.subscribe((state, before) => {
+        if (state.folders !== before.folders) setTreeRevision((current) => current + 1);
+      }),
+    [],
+  );
   function showDialog(next: Dialog) {
     setMenu(null);
-    setName('entry' in next ? next.entry.name : next.type === 'document' ? 'Untitled.md' : '');
+    setName(
+      'entry' in next
+        ? next.entry.name
+        : next.type === 'document'
+          ? 'Untitled.md'
+          : next.type === 'space'
+            ? (next.space?.name ?? '')
+            : '',
+    );
+    setSpaceFolder(next.type === 'space' ? (next.space?.folder ?? null) : null);
     setDestination('');
     setMovePath('');
     setMoveFolders([]);
     setError('');
     setDialog(next);
   }
+  /** Opening a file from ILIAS takes its new mark away, here and in the sidebar. */
+  function markSeen(item: DocumentEntry) {
+    if (!item.unseen) return;
+    setListing((current) => ({
+      ...current,
+      entries: current.entries.map((other) =>
+        other.path === item.path ? { ...other, unseen: 0 } : other,
+      ),
+    }));
+    // If it fails, the mark simply stays until the file is opened again.
+    void documentRequest({ action: 'seen', path: item.path }).then(
+      () => setTreeRevision((current) => current + 1),
+      () => undefined,
+    );
+  }
   function activate(item: DocumentEntry) {
     if (item.folder) {
       navigate(item.path);
       return;
     }
+    markSeen(item);
     if (previewable(item)) {
       setPreview(item);
       return;
@@ -310,10 +438,28 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
   async function submitDialog() {
     if (!dialog) return;
     await run(async () => {
+      if (dialog.type === 'space') {
+        const { spaces, addSpace, updateSpace } = useSpaceStore.getState();
+        const other = spaces.find(
+          (space) => space.folder === spaceFolder && space.id !== dialog.space?.id,
+        );
+        if (other) {
+          setError(`${other.name} already shows this folder.`);
+          return;
+        }
+        const folder = spaceFolder ?? name.trim();
+        if (spaceFolder === null)
+          await documentRequest({ action: 'create', path: '', name: folder, folder: true });
+        if (dialog.space) updateSpace(dialog.space.id, { name: name.trim(), folder });
+        else addSpace({ name: name.trim(), folder });
+        setDialog(null);
+        navigate(folder);
+        return;
+      }
       if (dialog.type === 'folder' || dialog.type === 'document') {
         await documentRequest({
           action: 'create',
-          path,
+          path: dialog.type === 'document' && dialog.folder !== undefined ? dialog.folder : path,
           name: name.trim(),
           folder: dialog.type === 'folder',
         });
@@ -430,16 +576,31 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
         })}
       </div>
       <div className="document-body">
-        <DocumentTree
+        <SpaceSidebar
           desktop={desktop}
-          rootEntries={rootEntries}
           activePath={path}
           activeFile={note?.entry.path ?? null}
           revision={treeRevision}
           onFolder={(next) => leaveThen(() => navigate(next))}
           onFile={(item) => leaveThen(() => activate(item))}
+          onNewNote={(folder) => showDialog({ type: 'document', folder })}
+          onNewSpace={() => showDialog({ type: 'space' })}
+          onEditSpace={(space) => showDialog({ type: 'space', space })}
+          iliasCourses={iliasCourses}
+          onIlias={openIlias}
+          iliasCourseId={inIlias ? (iliasCourse?.courseId ?? null) : null}
+          onIliasCourse={openIliasCourse}
+          onAddCourse={(courseId) => void addCourseToDocuments(courseId)}
         />
-        <div className={cn('document-content', note && 'has-open-note')}>
+        <div className={cn('document-content', note && 'has-open-note', inIlias && 'is-ilias')}>
+          {inIlias && (
+            <IliasOverview
+              courses={iliasCourses}
+              course={iliasCourse}
+              onOpen={activate}
+              onAddCourse={(courseId) => void addCourseToDocuments(courseId)}
+            />
+          )}
           {canvas && (
             <div ref={menuRef} className="canvas-floating-controls">
               <IconButton
@@ -579,46 +740,6 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
             </div>
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-            <aside
-              aria-label="Document locations"
-              className={cn(
-                'flex shrink-0 gap-1 border-b border-line bg-surface-secondary/60 p-3 md:w-44 md:flex-col md:border-b-0 md:border-r',
-                view === 'canvas' && !inTrash && 'hidden',
-              )}
-            >
-              <span className="mb-2 hidden px-3 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted md:block">
-                On this computer
-              </span>
-              <button
-                disabled={busy}
-                onClick={() => navigate('')}
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium',
-                  !inTrash ? 'bg-blue-soft text-blue' : 'text-secondary hover:bg-surface-hover',
-                )}
-              >
-                <FolderOpen size={16} />
-                All documents
-              </button>
-              <button
-                disabled={!desktop || busy}
-                onClick={() => navigate('.trash')}
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium',
-                  inTrash ? 'bg-blue-soft text-blue' : 'text-secondary hover:bg-surface-hover',
-                )}
-              >
-                <Trash2 size={16} />
-                Recently deleted
-              </button>
-              <div className="mt-auto hidden px-3 pb-2 pt-10 md:block">
-                <HardDrive size={17} className="mb-2 text-muted" />
-                <p className="text-xs font-medium">Stored locally</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  Your documents, available offline.
-                </p>
-              </div>
-            </aside>
             <div className="flex min-w-0 flex-1 flex-col">
               {!canvas && (
                 <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-3">
@@ -660,19 +781,21 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
                   >
                     <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                   </IconButton>
-                  <IconButton
-                    label="Canvas view"
-                    aria-pressed={view === 'canvas'}
-                    onClick={() => setView('canvas')}
-                    className={view === 'canvas' ? 'bg-surface-hover' : ''}
-                  >
-                    <PanelsTopLeft size={16} />
-                  </IconButton>
+                  {listing.ilias ? null : (
+                    <IconButton
+                      label="Canvas view"
+                      aria-pressed={view === 'canvas'}
+                      onClick={() => setView('canvas')}
+                      className={view === 'canvas' ? 'bg-surface-hover' : ''}
+                    >
+                      <PanelsTopLeft size={16} />
+                    </IconButton>
+                  )}
                   <IconButton
                     label="List view"
-                    aria-pressed={view === 'list'}
+                    aria-pressed={view !== 'grid'}
                     onClick={() => setView('list')}
-                    className={view === 'list' ? 'bg-surface-hover' : ''}
+                    className={view !== 'grid' ? 'bg-surface-hover' : ''}
                   >
                     <List size={16} />
                   </IconButton>
@@ -732,7 +855,7 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
                       : 'Not synced yet'}
                   </span>
                   <Link
-                    to={`/courses?course=${encodeURIComponent(listing.ilias.courseRefId)}`}
+                    to={iliasSpaceLink(listing.ilias.courseRefId)}
                     className="ml-auto font-medium text-blue hover:underline"
                   >
                     Open course
@@ -767,7 +890,7 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
                   the system Trash.
                 </p>
               ) : null}
-              {view === 'canvas' && !inTrash ? (
+              {canvas ? (
                 <DocumentCanvas
                   options={
                     <>
@@ -914,6 +1037,8 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
                                     title="Downloaded from ILIAS"
                                   />
                                 ) : null}
+                                {item.unseen ? ' ' : null}
+                                <NewBadge count={item.unseen} file={!item.folder} />
                               </span>
                               <span className="mt-0.5 block text-[10px] text-muted">
                                 {item.ilias === 'gone' ? 'No longer on ILIAS' : fileKind(item)}
@@ -1067,15 +1192,19 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
             title={
               dialog?.type === 'folder'
                 ? 'New folder'
-                : dialog?.type === 'document'
-                  ? 'New document'
-                  : dialog?.type === 'rename'
-                    ? 'Rename item'
-                    : dialog?.type === 'move'
-                      ? inTrash
-                        ? 'Restore item'
-                        : 'Move item'
-                      : 'Move to Recently deleted?'
+                : dialog?.type === 'space'
+                  ? dialog.space
+                    ? 'Edit space'
+                    : 'New space'
+                  : dialog?.type === 'document'
+                    ? 'New document'
+                    : dialog?.type === 'rename'
+                      ? 'Rename item'
+                      : dialog?.type === 'move'
+                        ? inTrash
+                          ? 'Restore item'
+                          : 'Move item'
+                        : 'Move to Recently deleted?'
             }
             footer={
               <>
@@ -1131,6 +1260,31 @@ export function DocumentExplorer({ initialPath = '' }: DocumentExplorerProps) {
                   ) : null}
                 </label>
               )}
+              {dialog?.type === 'space' ? (
+                <label className="block text-xs font-medium">
+                  Folder
+                  <select
+                    className={`${inputClass} mt-2`}
+                    value={spaceFolder ?? ''}
+                    onChange={(event) => setSpaceFolder(event.target.value || null)}
+                    disabled={busy}
+                  >
+                    <option value="">{`A new folder named “${name.trim() || '…'}”`}</option>
+                    {spaceChoices.map((item) => (
+                      <option key={item.path} value={item.path}>
+                        {item.name}
+                      </option>
+                    ))}
+                    {spaceFolder && !spaceChoices.some((item) => item.path === spaceFolder) ? (
+                      <option value={spaceFolder}>{spaceFolder}</option>
+                    ) : null}
+                  </select>
+                  <span className="mt-2 block font-normal text-muted">
+                    The space shows this folder in the sidebar. Removing the space later keeps the
+                    folder and its files.
+                  </span>
+                </label>
+              ) : null}
               {dialog?.type === 'move' ? (
                 <div className="rounded-md border border-line p-3">
                   <p className="mb-2 text-xs text-secondary">

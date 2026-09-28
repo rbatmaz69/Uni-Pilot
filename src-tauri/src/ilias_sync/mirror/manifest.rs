@@ -76,6 +76,11 @@ pub struct Tracked {
     pub local_size: u64,
     pub local_modified: u64,
     pub state: FileState,
+    /// Arrived, or arrived in a new version, and not opened in Uni Pilot
+    /// since: what the explorer counts as new. Files synced before this was
+    /// remembered read as seen, so an update does not flag a whole semester.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unseen: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -197,6 +202,62 @@ pub fn enclosing(root: &Path, dir: &Path) -> Option<(PathBuf, Manifest)> {
         current = current.parent()?;
     }
     None
+}
+
+/// Files the sync brought into or below `dir` that are still unseen and still
+/// there. A file the student deleted since is not counted before the next
+/// sync notices.
+pub fn unseen_below(root: &Path, dir: &Path) -> Vec<PathBuf> {
+    let synced = match enclosing(root, dir) {
+        Some(found) => vec![found],
+        None => find_all(dir),
+    };
+    synced
+        .iter()
+        .flat_map(|(folder, manifest)| {
+            manifest
+                .files
+                .values()
+                .filter(|file| file.unseen && file.state != FileState::Removed)
+                .map(|file| folder.join(&file.path))
+        })
+        .filter(|path| path.starts_with(dir) && path.is_file())
+        .collect()
+}
+
+/// Marks the file at `target`, or everything below the folder at `target`,
+/// as seen. Nothing to do outside a synced folder.
+pub fn mark_seen(root: &Path, target: &Path) -> Result<(), String> {
+    let dir = if target.is_dir() {
+        target
+    } else {
+        target.parent().unwrap_or(root)
+    };
+    let Some((folder, mut manifest)) = enclosing(root, dir) else {
+        return Ok(());
+    };
+    let Ok(inside) = target.strip_prefix(&folder) else {
+        return Ok(());
+    };
+    let inside = inside
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/");
+    let mut changed = false;
+    for file in manifest.files.values_mut() {
+        let below = inside.is_empty()
+            || file.path == inside
+            || file.path.starts_with(&format!("{inside}/"));
+        if file.unseen && below {
+            file.unseen = false;
+            changed = true;
+        }
+    }
+    if changed {
+        write(&folder, &manifest)?;
+    }
+    Ok(())
 }
 
 /// Whether `dir` is, or holds, a synced folder.
@@ -470,6 +531,7 @@ mod tests {
             local_size: 100,
             local_modified: 1,
             state,
+            unseen: false,
         }
     }
 

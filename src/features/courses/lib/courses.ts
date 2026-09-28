@@ -10,6 +10,7 @@
  */
 
 import { MONTH_NAMES, startOfDay } from '@/lib/date';
+import { ILIAS_SPACE } from '@/features/documents/lib/spaces';
 import { NAV_ITEMS } from '@/lib/navigation';
 import type {
   IliasContainer,
@@ -164,6 +165,24 @@ export function dueLabel(dueAt: string | null, now: Date): string | null {
 /** Where the document explorer opens a workspace folder. */
 export function documentsLink(path: string): string {
   return `${NAV_ITEMS.documents.path}?${new URLSearchParams({ path }).toString()}`;
+}
+
+/**
+ * Where a course opens: the ILIAS space in Documents, at its overview or at a
+ * course, one of its folders (`trail`, outermost first) or an exercise.
+ */
+export function iliasSpaceLink(
+  courseId?: string | null,
+  trail: string[] = [],
+  exerciseId?: string | null,
+): string {
+  const params = new URLSearchParams({ path: ILIAS_SPACE });
+  if (courseId) {
+    params.set('course', courseId);
+    if (trail.length > 0) params.set('trail', trail.join(','));
+    if (exerciseId) params.set('exercise', exerciseId);
+  }
+  return `${NAV_ITEMS.documents.path}?${params.toString()}`;
 }
 
 /** The folder a workspace path sits in: `a/b/c.pdf` → `a/b`. */

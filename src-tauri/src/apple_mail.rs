@@ -119,12 +119,14 @@ pub struct MailBody {
     pub attachments: Vec<MailAttachment>,
 }
 
-/// The start of a message's text and how many files it carries, for the list.
+/// A message's one-line text preview and a few attachment names, for the list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailPreview {
     pub snippet: String,
     pub attachments: u32,
+    #[serde(default)]
+    pub attachment_names: Vec<String>,
 }
 
 /// Which message the page means: its Message-ID, and Mail's own number for it
@@ -551,6 +553,7 @@ mod tests {
             serde_json::from_value(answer["previews"].clone()).unwrap();
         assert_eq!(previews["a@b.de"].snippet, "Guten Tag,");
         assert_eq!(previews["a@b.de"].attachments, 1);
+        assert!(previews["a@b.de"].attachment_names.is_empty());
     }
 
     #[test]

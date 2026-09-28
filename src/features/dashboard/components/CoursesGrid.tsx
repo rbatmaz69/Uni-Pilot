@@ -8,6 +8,7 @@ import {
   MousePointer2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { iliasSpaceLink } from '@/features/courses/lib/courses';
 import { MOCK_COURSES } from '@/features/dashboard/lib/mockData';
 
 const courseStyles = [
@@ -47,7 +48,7 @@ export function CoursesGrid({ all = false }: { all?: boolean }) {
         </div>
         {!all && (
           <Link
-            to="/courses"
+            to={iliasSpaceLink()}
             className="inline-flex items-center gap-1.5 text-[11px] font-medium text-secondary transition-colors hover:text-accent"
           >
             All courses <ArrowRight size={13} />

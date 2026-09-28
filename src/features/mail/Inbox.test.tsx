@@ -222,7 +222,7 @@ describe('the inbox', () => {
     expect(within(pane).getByText('Blatt4.pdf')).toBeInTheDocument();
     expect(within(pane).getByRole('link', { name: /About your course/ })).toHaveAttribute(
       'href',
-      '/courses?course=967849',
+      '/documents?path=%3Ailias&course=967849',
     );
 
     const message = { id: 'new@hs-heilbronn.de', mailId: 301 };
@@ -316,6 +316,7 @@ describe('the inbox', () => {
 
     await row(/Blatt 4/);
     const chips = screen.getByRole('group', { name: 'Show' });
+    await user.click(screen.getByLabelText('Filter by sender or course'));
     await user.click(within(chips).getByRole('button', { name: /^ILIAS/ }));
     const list = screen.getByRole('region', { name: 'Messages' });
     expect(within(list).getAllByRole('button')).toHaveLength(1);
@@ -324,6 +325,60 @@ describe('the inbox', () => {
     await user.click(within(chips).getByRole('button', { name: 'All' }));
     await user.type(screen.getByRole('searchbox', { name: 'Search mail' }), 'lerngruppe');
     expect(within(list).getAllByRole('button')).toHaveLength(1);
+  });
+
+  it('clears a search and restores the message list', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/inbox');
+    await row(/Blatt 4/);
+    await user.type(screen.getByRole('searchbox', { name: 'Search mail' }), 'not in this inbox');
+    expect(screen.getByText('Nothing here with this filter.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(
+      within(screen.getByRole('region', { name: 'Messages' })).getAllByRole('button'),
+    ).toHaveLength(3);
+    expect(screen.getByRole('searchbox', { name: 'Search mail' })).toHaveValue('');
+  });
+
+  it('closes the filter menu, returns focus, and lets a course filter be cleared', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/inbox');
+    await row(/Blatt 4/);
+    const trigger = screen.getByLabelText('Filter by sender or course');
+    await user.click(trigger);
+    await user.click(screen.getByRole('button', { name: /Datenbanken 1\s*1/ }));
+    expect(trigger.closest('details')).not.toHaveAttribute('open');
+    expect(trigger).toHaveFocus();
+    expect(
+      within(screen.getByRole('region', { name: 'Messages' })).getAllByRole('button'),
+    ).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: /Datenbanken 1.*Clear filter/ }));
+    expect(
+      within(screen.getByRole('region', { name: 'Messages' })).getAllByRole('button'),
+    ).toHaveLength(3);
+    await user.click(trigger);
+    await user.keyboard('{Escape}');
+    expect(trigger.closest('details')).not.toHaveAttribute('open');
+  });
+
+  it('starts a different message with a fresh reply and folded quote', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/inbox');
+    await user.click(await row(/Blatt 4/));
+    await user.type(
+      await screen.findByRole('textbox', { name: 'Reply to Prof. Beispiel' }),
+      'A reply for this message only.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Show earlier messages' }));
+    await user.click(await row(/Lerngruppe/));
+    expect(await screen.findByRole('textbox', { name: 'Reply to Prof. Beispiel' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Show earlier messages' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
   });
 
   it('hands a new message to Mail as a draft from the university address', async () => {

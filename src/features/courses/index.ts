@@ -8,7 +8,7 @@
  * (`docs/integrations/ilias-course-files.md`).
  */
 
-export { CoursesExperience } from './components/CoursesExperience';
+export { CourseView } from './components/CourseView';
 export { CourseSync, KEEP_ALIVE_MS } from './components/CourseSync';
 export { CourseFiles } from './components/CourseFiles';
 export { useCourseStore, type CourseFailure, type Loaded } from './store/courseStore';
@@ -32,6 +32,7 @@ export {
   formatSize,
   groupByBlock,
   groupCourses,
+  iliasSpaceLink,
   iliasTarget,
   itemKind,
   parseIliasDate,

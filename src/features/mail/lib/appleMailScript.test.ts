@@ -372,9 +372,10 @@ describe('asking Apple Mail', () => {
         'new@hs-heilbronn.de': {
           snippet: 'Guten Tag, Blatt 4 ist jetzt online. Viele Grüße',
           attachments: 1,
+          attachmentNames: ['Blatt4.pdf'],
         },
         // Gone from the inbox: answered, so it is not asked about again.
-        'gone@hs-heilbronn.de': { snippet: '', attachments: 0 },
+        'gone@hs-heilbronn.de': { snippet: '', attachments: 0, attachmentNames: [] },
       },
     });
   });

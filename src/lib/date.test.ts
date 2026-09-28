@@ -5,6 +5,7 @@ import {
   formatClock,
   formatDayLabel,
   formatDuration,
+  formatShortDayLabel,
   formatTimeAgo,
   formatWeekRange,
   isSameDay,
@@ -108,6 +109,10 @@ describe('labels', () => {
 
   it('writes a full day label', () => {
     expect(formatDayLabel(friday)).toBe('Friday, 11 September 2026');
+  });
+
+  it('writes a short day label for tables', () => {
+    expect(formatShortDayLabel(friday)).toBe('Fri, 11 Sep 2026');
   });
 
   it('prefers a relative day name when there is one', () => {

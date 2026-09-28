@@ -39,7 +39,9 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State, Url};
 
 pub use manifest::FileState;
-pub(crate) use manifest::{enclosing, holds_synced_folder, is_synced_folder, MANIFEST};
+pub(crate) use manifest::{
+    enclosing, holds_synced_folder, is_synced_folder, mark_seen, unseen_below, MANIFEST,
+};
 use manifest::{Disk, Listed, Manifest, Plan, Tracked, TrackedFolder};
 
 use super::fetch::{self, Pace};
@@ -233,6 +235,78 @@ fn join(dir: &str, name: &str) -> String {
     } else {
         format!("{dir}/{name}")
     }
+}
+
+/// A synced course as the ILIAS space in Documents shows it.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CourseFiles {
+    course_ref_id: String,
+    title: String,
+    /// The course's `ILIAS` folder, workspace-relative.
+    root: String,
+    synced_at: Option<String>,
+    unseen: usize,
+    files: Vec<CourseFile>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CourseFile {
+    name: String,
+    /// Workspace-relative, as the explorer opens it.
+    path: String,
+    size: u64,
+    /// When ILIAS last changed the file, `YYYY-MM-DDTHH:MM`, if it said.
+    updated_at: Option<String>,
+    /// When it arrived here, in milliseconds since the epoch.
+    arrived: u64,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    unseen: bool,
+    /// ILIAS no longer lists it; the copy here stays.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    gone: bool,
+}
+
+/// Every synced course in the workspace, with the files the sync keeps there
+/// that are still on disk. Read from the manifests alone: no network.
+pub(crate) fn courses(root: &Path) -> Vec<CourseFiles> {
+    manifest::find_all(root)
+        .into_iter()
+        .map(|(folder, manifest)| {
+            let base = relative(root, &folder);
+            let files: Vec<CourseFile> = manifest
+                .files
+                .values()
+                .filter(|file| file.state != FileState::Removed)
+                .filter_map(|file| {
+                    let meta = fs::symlink_metadata(folder.join(&file.path)).ok()?;
+                    meta.is_file().then(|| CourseFile {
+                        name: file
+                            .path
+                            .rsplit('/')
+                            .next()
+                            .unwrap_or(&file.path)
+                            .to_string(),
+                        path: join(&base, &file.path),
+                        size: meta.len(),
+                        updated_at: file.updated_at.clone(),
+                        arrived: file.local_modified,
+                        unseen: file.unseen,
+                        gone: file.state == FileState::Gone,
+                    })
+                })
+                .collect();
+            CourseFiles {
+                course_ref_id: manifest.course_ref_id,
+                title: manifest.course_title,
+                root: base,
+                synced_at: manifest.synced_at,
+                unseen: files.iter().filter(|file| file.unseen).count(),
+                files,
+            }
+        })
+        .collect()
 }
 
 fn summary(root: &Path, folder: &Path, manifest: &Manifest) -> Summary {
@@ -471,6 +545,7 @@ fn place_file(
                 local_size: meta.len(),
                 local_modified: manifest::modified_ms(&meta),
                 state: FileState::Synced,
+                unseen: true,
             },
         );
         manifest::write(ilias_folder, &manifest)?;
@@ -1179,6 +1254,7 @@ mod tests {
         assert!(!partial.exists());
         let tracked = manifest::read(&folder).unwrap().files["501"].clone();
         assert_eq!(tracked.state, FileState::Synced);
+        assert!(tracked.unseen, "a file that just arrived is new");
         assert_eq!(manifest::disk_state(&folder, &tracked), Disk::Untouched);
 
         // The same version again is not placed twice.
@@ -1216,6 +1292,62 @@ mod tests {
             "version one"
         );
         assert_eq!(manifest::read(&folder).unwrap().files["501"].version, 2);
+    }
+
+    #[test]
+    fn lists_every_course_with_the_files_still_there() {
+        let workspace = Workspace::new();
+        let (folder, _) = locate_or_create(
+            &workspace.0,
+            "ilias.example",
+            &workspace.course("1", "Datenbanken"),
+        )
+        .unwrap();
+        let first = workspace.partial(&folder.join("Übungen"), "blatt eins");
+        place_file(&workspace.0, &folder, &job(1, Plan::New), &first).unwrap();
+        let mut second = job(1, Plan::New);
+        second.listed.ref_id = "502".into();
+        second.listed.title = "Blatt 2".into();
+        let partial = workspace.partial(&folder.join("Übungen"), "blatt zwei");
+        place_file(&workspace.0, &folder, &second, &partial).unwrap();
+        mark_seen(&workspace.0, &folder.join("Übungen/Blatt 1.pdf")).unwrap();
+        fs::remove_file(folder.join("Übungen/Blatt 2.pdf")).unwrap();
+
+        let courses = courses(&workspace.0);
+        assert_eq!(courses.len(), 1);
+        let course = &courses[0];
+        assert_eq!(course.title, "Datenbanken");
+        assert_eq!(course.root, "Courses/Winter 2026-27/Datenbanken/ILIAS");
+        assert_eq!(course.unseen, 0, "the deleted new file is not counted");
+        assert_eq!(course.files.len(), 1);
+        let file = &course.files[0];
+        assert_eq!(file.name, "Blatt 1.pdf");
+        assert_eq!(
+            file.path,
+            "Courses/Winter 2026-27/Datenbanken/ILIAS/Übungen/Blatt 1.pdf"
+        );
+        assert_eq!(file.updated_at.as_deref(), Some("2026-10-01T10:00"));
+        assert!(file.arrived > 0);
+        assert!(!file.unseen && !file.gone);
+    }
+
+    #[test]
+    fn a_new_version_is_new_again_after_the_old_one_was_opened() {
+        let workspace = Workspace::new();
+        let (folder, _) = locate_or_create(
+            &workspace.0,
+            "ilias.example",
+            &workspace.course("1", "Kurs"),
+        )
+        .unwrap();
+        let first = workspace.partial(&folder.join("Übungen"), "version one");
+        place_file(&workspace.0, &folder, &job(1, Plan::New), &first).unwrap();
+        mark_seen(&workspace.0, &folder.join("Übungen/Blatt 1.pdf")).unwrap();
+        assert!(!manifest::read(&folder).unwrap().files["501"].unseen);
+
+        let second = workspace.partial(&folder.join("Übungen"), "version two");
+        place_file(&workspace.0, &folder, &job(2, Plan::Replace), &second).unwrap();
+        assert!(manifest::read(&folder).unwrap().files["501"].unseen);
     }
 
     #[test]

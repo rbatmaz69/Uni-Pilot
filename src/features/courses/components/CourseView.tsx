@@ -34,6 +34,7 @@ import {
   formatIliasDate,
   formatSize,
   groupByBlock,
+  iliasSpaceLink,
   iliasTarget,
   itemKind,
   splitCourseTitle,
@@ -45,7 +46,6 @@ import { FailureNotice, SyncBar } from '@/features/courses/components/CourseNoti
 import { CourseFiles, SyncSwitch } from '@/features/courses/components/CourseFiles';
 import { CourseFileIcon } from '@/features/courses/components/CourseFileIcon';
 import { ComposeDialog } from '@/features/mail/components/ComposeDialog';
-import { NAV_ITEMS } from '@/lib/navigation';
 
 interface CourseViewProps {
   connection: IliasConnection;
@@ -66,12 +66,9 @@ const ICONS: Record<ItemKind, typeof Folder> = {
   other: Box,
 };
 
-/** Builds a Courses address; the trail is the folders opened so far. */
+/** Where a course opens in the ILIAS space; the trail is the folders opened so far. */
 function address(courseId: string, trail: string[], exerciseId?: string): string {
-  const params = new URLSearchParams({ course: courseId });
-  if (trail.length > 0) params.set('trail', trail.join(','));
-  if (exerciseId) params.set('exercise', exerciseId);
-  return `?${params.toString()}`;
+  return iliasSpaceLink(courseId, trail, exerciseId);
 }
 
 export function CourseView({ connection, courseId, trail, exerciseId }: CourseViewProps) {
@@ -125,7 +122,7 @@ export function CourseView({ connection, courseId, trail, exerciseId }: CourseVi
       <nav aria-label="Where you are in the course">
         <ol className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted">
           <li>
-            <Link to={NAV_ITEMS.courses.path} className="hover:text-accent">
+            <Link to={iliasSpaceLink()} className="hover:text-accent">
               All courses
             </Link>
           </li>

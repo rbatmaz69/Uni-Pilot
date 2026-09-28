@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
+  ArrowUpRight,
+  Check,
+  Clock3,
   BookOpen,
   ExternalLink,
   FileText,
@@ -12,7 +15,7 @@ import {
 import { Link } from 'react-router-dom';
 import { Button, IconButton } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS } from '@/lib/navigation';
+import { iliasSpaceLink } from '@/features/courses/lib/courses';
 import {
   openInMail,
   replyInMail,
@@ -92,7 +95,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
 
   if (!selectedId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center px-8 py-16 text-center">
+      <div className="mail-empty-reader">
         <span className="grid h-14 w-14 place-items-center rounded-2xl border border-line bg-surface-secondary text-accent">
           <Inbox size={24} strokeWidth={1.4} />
         </span>
@@ -125,8 +128,8 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
   return (
     // No entrance animation: moving between messages is instant, and one read
     // before is shown as it is — not as if it were being loaded again.
-    <article key={selectedId} className="flex min-h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-line-soft px-5 py-2.5">
+    <article key={selectedId} className="mail-article">
+      <div className="mail-reader-toolbar">
         <Button
           variant="ghost"
           size="sm"
@@ -138,6 +141,32 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
         >
           {view === 'board' ? 'Close' : 'Inbox'}
         </Button>
+        <div role="group" aria-label="Sort this message" className="mail-triage">
+          {TRIAGE_ORDER.map((state) => (
+            <button
+              key={state}
+              type="button"
+              aria-pressed={triage === state}
+              onClick={() => setTriage(selectedId, triage === state ? null : state)}
+              className={cn(
+                'rounded-full border px-3 py-1 text-[12px] font-medium transition-colors',
+                triage === state
+                  ? 'border-transparent bg-primary text-inverted'
+                  : 'border-line text-secondary hover:border-line-strong hover:text-primary',
+              )}
+            >
+              {state === 'reply' ? (
+                <Reply size={13} aria-hidden />
+              ) : state === 'waiting' ? (
+                <Clock3 size={13} aria-hidden />
+              ) : (
+                <Check size={13} aria-hidden />
+              )}
+              <span>{TRIAGE_LABELS[state]}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-1">
           <IconButton
             label="Mark as unread"
@@ -156,9 +185,9 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
         </div>
       </div>
 
-      <div className="flex-1 px-6 py-6 lg:px-8">
+      <div className="mail-letter">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-[10.5px] font-medium text-secondary">
+          <span className="mail-category" data-category={category}>
             {CATEGORY_LABELS[category]}
           </span>
           {course ? (
@@ -172,47 +201,23 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
             </span>
           ) : null}
         </div>
-        <h2 className="mt-3 text-[21px] font-semibold leading-snug tracking-tight text-primary">
-          {message.subject || '(no subject)'}
-        </h2>
+        <h2 className="mail-subject">{message.subject || '(no subject)'}</h2>
 
-        <div className="mt-5 flex items-start gap-3">
+        <div className="mail-sender">
           <MailAvatar name={sender.name} size="lg" />
           <div className="min-w-0 flex-1">
             <p className="text-[13.5px] font-semibold text-primary">{sender.name}</p>
-            <p className="truncate text-[12px] text-muted">
-              {sender.address ?? ''}
-              {body && body.to.length > 0 ? ` → ${body.to.join(', ')}` : ''}
-            </p>
+            {sender.address && <p className="mail-sender-address">{sender.address}</p>}
+            {body && body.to.length > 0 && (
+              <p className="mail-recipient">To {body.to.join(', ')}</p>
+            )}
           </div>
-          <time
-            className="shrink-0 text-[11.5px] text-muted"
-            dateTime={message.receivedAt ?? undefined}
-          >
+          <time className="mail-sender-date" dateTime={message.receivedAt ?? undefined}>
             {fullDate(message.receivedAt)}
           </time>
         </div>
 
-        <div role="group" aria-label="Sort this message" className="mt-5 flex flex-wrap gap-1.5">
-          {TRIAGE_ORDER.map((state) => (
-            <button
-              key={state}
-              type="button"
-              aria-pressed={triage === state}
-              onClick={() => setTriage(selectedId, triage === state ? null : state)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-[12px] font-medium transition-colors',
-                triage === state
-                  ? 'border-transparent bg-primary text-inverted'
-                  : 'border-line text-secondary hover:border-line-strong hover:text-primary',
-              )}
-            >
-              {TRIAGE_LABELS[state]}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-6 max-w-[70ch]">
+        <div className="mail-body">
           {loading ? (
             <div aria-label="Reading the message" className="flex flex-col gap-2.5">
               {[92, 84, 88, 60].map((width) => (
@@ -229,9 +234,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
             </p>
           ) : (
             <>
-              <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-primary">
-                {text || message.subject}
-              </p>
+              <p className="mail-body-text">{text || message.subject}</p>
               {quote ? (
                 <div className="mt-4">
                   <button
@@ -255,22 +258,22 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
         </div>
 
         {body && body.attachments.length > 0 ? (
-          <section aria-label="Attachments" className="mt-7">
+          <section aria-label="Attachments" className="mail-attachments">
             <h3 className="text-[12px] font-semibold text-secondary">
               {body.attachments.length === 1
                 ? '1 attachment'
                 : `${body.attachments.length} attachments`}
             </h3>
-            <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="mail-attachment-grid">
               {body.attachments.map((attachment, index) => (
                 <li key={`${attachment.name}-${index}`}>
                   <button
                     type="button"
                     onClick={() => void act(openInMail(selectedId))}
                     title="Open the message in Mail to save it"
-                    className="flex w-full items-center gap-3 rounded-xl border border-line-soft bg-surface-secondary/60 px-3 py-2.5 text-left transition-colors hover:border-line-strong"
+                    className="mail-attachment"
                   >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface text-secondary">
+                    <span className="mail-file-icon">
                       <FileText size={15} strokeWidth={1.7} aria-hidden />
                     </span>
                     <span className="min-w-0">
@@ -278,7 +281,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
                         {attachment.name}
                       </span>
                       <span className="block text-[11px] text-muted">
-                        {formatBytes(attachment.size) ?? 'In Mail'}
+                        {formatBytes(attachment.size) ?? 'Attachment'} · Open in Mail
                       </span>
                     </span>
                   </button>
@@ -289,10 +292,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
         ) : null}
 
         {course ? (
-          <Link
-            to={`${NAV_ITEMS.courses.path}?course=${course.refId}`}
-            className="mt-7 flex items-center gap-3 rounded-xl border border-line-soft px-4 py-3 transition-colors hover:border-line-strong"
-          >
+          <Link to={iliasSpaceLink(course.refId)} className="mail-course-link">
             <span className={cn('grid h-9 w-9 place-items-center rounded-lg', toneFor(course.key))}>
               <BookOpen size={16} strokeWidth={1.7} aria-hidden />
             </span>
@@ -302,6 +302,7 @@ export function ReadingPane({ domain, refs, summary }: ReadingPaneProps) {
                 {course.name}
               </span>
             </span>
+            <ArrowUpRight size={16} aria-hidden className="ml-auto shrink-0 text-muted" />
           </Link>
         ) : null}
 
@@ -355,33 +356,33 @@ function ReplyBox({ message, to }: { message: MessageRef; to: string }) {
   };
 
   return (
-    <form
-      onSubmit={(event) => void submit(event)}
-      className="sticky bottom-0 border-t border-line-soft bg-surface/95 px-5 py-3 backdrop-blur"
-    >
-      <textarea
-        aria-label={`Reply to ${to}`}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        rows={open ? 4 : 1}
-        placeholder={`Reply to ${to}…`}
-        className="w-full resize-none rounded-xl border border-line bg-surface-secondary px-3 py-2 text-[13px] text-primary transition-[height] placeholder:text-muted focus:border-accent focus:outline-none"
-      />
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+    <form onSubmit={(event) => void submit(event)} className="mail-reply" data-expanded={open}>
+      <div className="mail-reply-field">
+        <Reply size={18} strokeWidth={1.6} aria-hidden className="mail-reply-icon" />
+        <textarea
+          aria-label={`Reply to ${to}`}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          rows={open ? 4 : 1}
+          placeholder={`Reply to ${to}…`}
+          className="mail-reply-input"
+        />
+      </div>
+      <div className="mail-reply-footer">
         <p
           aria-live="polite"
-          className={cn('text-[11.5px]', note?.tone === 'problem' ? 'text-coral' : 'text-muted')}
+          className={cn('mail-reply-note', note?.tone === 'problem' ? 'text-coral' : 'text-muted')}
         >
-          {note?.text ?? 'Mail opens this as a draft. Nothing is sent until you press Send there.'}
+          {note?.text ?? 'Draft in Apple Mail. You decide when to send.'}
         </p>
         <Button
           type="submit"
           variant="primary"
           size="sm"
           disabled={busy}
-          leadingIcon={<Reply size={14} strokeWidth={1.8} aria-hidden />}
+          leadingIcon={<ArrowUpRight size={14} strokeWidth={1.8} aria-hidden />}
         >
           Continue in Mail
         </Button>

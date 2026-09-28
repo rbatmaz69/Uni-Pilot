@@ -32,6 +32,8 @@ export interface MailMessage {
   snippet: string;
   /** How many files are attached. */
   attachments: number;
+  /** Names returned with this session's message preview, never kept on disk. */
+  attachmentNames?: string[];
 }
 
 /** Which message: its Message-ID, and Mail's own number when the list had one. */
@@ -149,6 +151,8 @@ export function launchMail(): Promise<void> {
 export interface MailPreview {
   snippet: string;
   attachments: number;
+  /** A few file names for the message list. Older replies may omit this. */
+  attachmentNames?: string[];
 }
 
 /**

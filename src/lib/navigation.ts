@@ -1,6 +1,5 @@
 import {
   Award,
-  BookOpen,
   CalendarDays,
   FileText,
   FolderOpen,
@@ -65,14 +64,6 @@ export const NAV_ITEMS = {
     placeholder: 'This area will hold your focus timer and session history.',
     icon: Timer,
     tone: 'pink',
-  },
-  courses: {
-    path: '/courses',
-    label: 'Courses',
-    subtitle: 'Every module you are enrolled in.',
-    placeholder: 'This area will list your enrolled courses.',
-    icon: BookOpen,
-    tone: 'yellow',
   },
   ilias: {
     path: '/ilias',
@@ -154,7 +145,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'academics',
     label: 'Academics',
-    items: [NAV_ITEMS.courses, NAV_ITEMS.ilias, NAV_ITEMS.exams, NAV_ITEMS.grades],
+    items: [NAV_ITEMS.ilias, NAV_ITEMS.exams, NAV_ITEMS.grades],
   },
   {
     id: 'campus',

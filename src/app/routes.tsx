@@ -5,7 +5,6 @@ import {
   AiAssistantPage,
   CalendarPage,
   CommunitiesPage,
-  CoursesPage,
   DashboardPage,
   DocumentsPage,
   EventsPage,
@@ -14,6 +13,7 @@ import {
   GradesPage,
   IliasPage,
   InboxPage,
+  OldCoursesLink,
   SettingsPage,
   StudiesPage,
   TasksPage,
@@ -30,7 +30,6 @@ export function AppRoutes() {
         <Route path={NAV_ITEMS.calendar.path} element={<CalendarPage />} />
         <Route path={NAV_ITEMS.tasks.path} element={<TasksPage />} />
         <Route path={NAV_ITEMS.focus.path} element={<FocusPage />} />
-        <Route path={NAV_ITEMS.courses.path} element={<CoursesPage />} />
         <Route path={NAV_ITEMS.ilias.path} element={<IliasPage />} />
         <Route path={NAV_ITEMS.exams.path} element={<ExamsPage />} />
         <Route path={NAV_ITEMS.grades.path} element={<GradesPage />} />
@@ -38,6 +37,8 @@ export function AppRoutes() {
         <Route path={NAV_ITEMS.communities.path} element={<CommunitiesPage />} />
         <Route path={NAV_ITEMS.documents.path} element={<DocumentsPage />} />
         <Route path={NAV_ITEMS.ai.path} element={<AiAssistantPage />} />
+        {/* Courses moved into the ILIAS space of Documents; old links still arrive. */}
+        <Route path="/courses" element={<OldCoursesLink />} />
         <Route path={NAV_ITEMS.settings.path} element={<SettingsPage />} />
         <Route path="*" element={<Navigate to={DEFAULT_ROUTE} replace />} />
       </Route>

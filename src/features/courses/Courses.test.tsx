@@ -1,8 +1,9 @@
 /**
- * The Courses page across the shell: courses from ILIAS by area, a course's
- * folders and files, an exercise's assignments, and what the page says when
- * ILIAS has forgotten the sign-in. Rust is a stand-in answering like the
- * readers do against the recorded HHN pages.
+ * Courses across the shell, in the ILIAS space of Documents — reached, as old
+ * links are, through `/courses`: the courses as folders, a course's folders
+ * and files, an exercise's assignments, and what the space says when ILIAS has
+ * forgotten the sign-in. Rust is a stand-in answering like the readers do
+ * against the recorded HHN pages.
  */
 
 import { screen, within } from '@testing-library/react';
@@ -245,13 +246,16 @@ describe('before there is anything to read', () => {
 });
 
 describe('the course list', () => {
-  it('shows courses by study area, and offline ones apart', async () => {
+  it('shows every open course as a folder in the ILIAS space, and offline ones apart', async () => {
     pretendDesktop();
     renderApp('/courses');
 
-    const area = await screen.findByRole('region', { name: 'H3 Labor für Beispielsysteme' });
-    const link = within(area).getByRole('link', { name: /Beispielsysteme 1 - WS25/ });
+    expect(await screen.findByRole('region', { name: 'ILIAS' })).toBeInTheDocument();
+    const courses = await screen.findByRole('list', { name: 'Your courses' });
+    const link = within(courses).getByRole('link', { name: 'Beispielsysteme 1 - WS25' });
     expect(link).toHaveTextContent('100001');
+    expect(link).toHaveTextContent('Not in Documents');
+    expect(within(courses).getByRole('button', { name: 'Add to Documents' })).toBeInTheDocument();
 
     const offline = screen.getByRole('region', { name: 'Offline in ILIAS' });
     expect(within(offline).getByText('Beispieltheorie 2026 SS')).toBeInTheDocument();
@@ -366,13 +370,35 @@ describe("keeping a course's files in Documents", () => {
     expect(within(panel).getByText(/Vorlesung 1 \(300 MB\)/)).toBeInTheDocument();
   });
 
+  it('brings a course into Documents from the ILIAS space', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/courses');
+
+    const courses = await screen.findByRole('list', { name: 'Your courses' });
+    await user.click(within(courses).getByRole('button', { name: 'Add to Documents' }));
+    expect(invoke).toHaveBeenCalledWith('ilias_mirror_course', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+      course: {
+        refId: '100100',
+        container: 'crs',
+        title: 'Beispielsysteme 1',
+        semester: 'Winter 2025-26',
+      },
+    });
+    const link = await within(courses).findByRole('link', { name: 'Beispielsysteme 1 - WS25' });
+    expect(await within(link).findByText(/In Documents/)).toBeInTheDocument();
+  });
+
   it('marks the courses whose files are in Documents', async () => {
     pretendDesktop();
     folders = [courseFolder({ auto: true })];
     renderApp('/courses');
 
     const synced = await screen.findByRole('link', { name: /Beispielsysteme 1 - WS25/ });
-    expect(await within(synced).findByText('Files in Documents')).toBeInTheDocument();
+    expect(await within(synced).findByText(/^In Documents/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add to Documents' })).not.toBeInTheDocument();
   });
 
   it('leaves out a folder the student switches off', async () => {

@@ -32,6 +32,7 @@ import {
   type DocumentPreviewData,
 } from '@/features/documents/lib/files';
 import { IliasBadge } from '@/features/integrations';
+import { folderTone } from '@/features/documents/lib/folderTone';
 import { loadNotePreview, loadPreview } from '@/features/documents/lib/previewCache';
 import {
   packFolder,
@@ -42,6 +43,7 @@ import {
 import { cn } from '@/lib/utils';
 import { DocumentThumbnail } from './DocumentThumbnail';
 import { FolderArtwork } from './FolderArtwork';
+import { NewBadge } from './NewBadge';
 import { NoteVisualPreview } from './NoteVisualPreview';
 import {
   FOLDER_OPEN_MS,
@@ -121,9 +123,7 @@ function readLayout(): Layout {
   }
 }
 function colorFor(entry: DocumentEntry) {
-  return ['sage', 'peach', 'blue', 'lilac'][
-    Array.from(entry.name).reduce((n, c) => n + c.charCodeAt(0), 0) % 4
-  ];
+  return folderTone(entry.name);
 }
 
 function CanvasScrollbar({
@@ -327,6 +327,11 @@ const CardContent = memo(
             className="absolute -top-2 left-2 z-10"
           />
         ) : null}
+        <NewBadge
+          count={entry.unseen}
+          file={!entry.folder}
+          className={cn('absolute -right-1.5 -top-1.5 z-10', !entry.folder && 'size-3')}
+        />
       </>
     );
   },

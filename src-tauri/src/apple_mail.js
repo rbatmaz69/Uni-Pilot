@@ -241,14 +241,26 @@ function handle(Mail, command, input) {
       for (const ref of input.messages) {
         if (Date.now() > until) break;
         const message = lookUp(box, ref);
+        // The file names share the preview's time budget and stay in memory;
+        // do not ask Mail for a separate message-body read just to name them.
+        const files = message
+          ? safely(
+              () =>
+                message
+                  .mailAttachments()
+                  .map((attachment) => safely(() => attachment.name(), 'Attachment')),
+              null,
+            )
+          : null;
         // A message Mail no longer has gets an empty preview: asked, answered,
         // and not asked about again.
         previews[ref.id] = message
           ? {
               snippet: preview(message),
-              attachments: safely(() => message.mailAttachments.length, 0),
+              attachments: files?.length ?? safely(() => message.mailAttachments.length, 0),
+              attachmentNames: (files ?? []).slice(0, 3),
             }
-          : { snippet: '', attachments: 0 };
+          : { snippet: '', attachments: 0, attachmentNames: [] };
       }
       return { previews };
     }

@@ -68,6 +68,12 @@ pub enum Request {
     Search {
         query: String,
     },
+    /// The student opened a file from ILIAS, or asked to clear a folder's new files.
+    Seen {
+        path: String,
+    },
+    /// Every synced course with its files, for the ILIAS space.
+    Ilias,
 }
 
 /// Describes the raw bytes sent to `document_upload`.
@@ -93,6 +99,14 @@ struct Entry {
     /// `gone` for a file ILIAS no longer lists.
     #[serde(skip_serializing_if = "Option::is_none")]
     ilias: Option<&'static str>,
+    /// Files the ILIAS sync brought that are not opened yet: 1 on such a file,
+    /// on a folder all of them below it.
+    #[serde(skip_serializing_if = "is_zero")]
+    unseen: usize,
+}
+
+fn is_zero(count: &usize) -> bool {
+    *count == 0
 }
 
 #[derive(Serialize)]
@@ -471,6 +485,23 @@ fn entry(name: String, path: String, meta: &fs::Metadata) -> Entry {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0),
         ilias: None,
+        unseen: 0,
+    }
+}
+
+/// Counts on every entry what the ILIAS sync brought and nobody opened yet.
+fn count_unseen(root: &Path, directory: &Path, entries: &mut [Entry]) {
+    let unseen = mirror::unseen_below(root, directory);
+    if unseen.is_empty() {
+        return;
+    }
+    for entry in entries.iter_mut() {
+        let path = directory.join(&entry.name);
+        entry.unseen = if entry.folder {
+            unseen.iter().filter(|file| file.starts_with(&path)).count()
+        } else {
+            usize::from(unseen.contains(&path))
+        };
     }
 }
 
@@ -650,6 +681,7 @@ fn perform(root: &Path, request: Request) -> Result<serde_json::Value, String> {
                 entries.push(entry(name, path, &meta));
             }
             let ilias = mark_synced(root, &directory, &mut entries);
+            count_unseen(root, &directory, &mut entries);
             Ok(serde_json::json!({
                 "root": root.to_string_lossy(),
                 "entries": entries,
@@ -756,6 +788,11 @@ fn perform(root: &Path, request: Request) -> Result<serde_json::Value, String> {
             Ok(serde_json::Value::Null)
         }
         Request::Search { query } => search(root, &query),
+        Request::Seen { path } => {
+            mirror::mark_seen(root, &resolve(root, &path)?)?;
+            Ok(serde_json::Value::Null)
+        }
+        Request::Ilias => Ok(serde_json::json!(mirror::courses(root))),
     }
 }
 
@@ -1369,7 +1406,7 @@ mod tests {
             serde_json::json!({
                 "path": path, "title": path, "parentRefId": "10", "version": 1,
                 "updatedAt": null, "iliasSize": 3, "localSize": 3, "localModified": 0,
-                "state": state,
+                "state": state, "unseen": path == "Folien/Kapitel 1.pdf",
             })
         };
         let manifest = serde_json::json!({
@@ -1465,6 +1502,81 @@ mod tests {
                 ("Meins.pdf".into(), serde_json::Value::Null),
             ]
         );
+    }
+
+    fn unseen(listing: &serde_json::Value) -> Vec<(String, u64)> {
+        let mut counts: Vec<_> = listing["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|entry| {
+                let count = entry.get("unseen")?.as_u64()?;
+                Some((entry["name"].as_str().unwrap().to_string(), count))
+            })
+            .collect();
+        counts.sort();
+        counts
+    }
+
+    #[test]
+    fn counts_new_ilias_files_on_every_folder_above_them_until_opened() {
+        let workspace = Workspace::new();
+        synced_course(&workspace);
+        workspace.write("Courses/Kurs/ILIAS/Folien/Blatt 2.pdf", "pdf");
+        let manifest = "Courses/Kurs/ILIAS/.ilias-sync.json";
+        let mut value: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(workspace.0.join(manifest)).unwrap()).unwrap();
+        value["files"]["13"] = serde_json::json!({
+            "path": "Folien/Blatt 2.pdf", "title": "Blatt 2", "parentRefId": "10",
+            "version": 1, "updatedAt": null, "iliasSize": 3, "localSize": 3,
+            "localModified": 0, "state": "synced", "unseen": true,
+        });
+        workspace.write(manifest, &value.to_string());
+        let list = |path: &str| workspace.run(Request::List { path: path.into() }).unwrap();
+
+        assert_eq!(unseen(&list("")), vec![("Courses".into(), 2)]);
+        assert_eq!(unseen(&list("Courses/Kurs")), vec![("ILIAS".into(), 2)]);
+        assert_eq!(
+            unseen(&list("Courses/Kurs/ILIAS/Folien")),
+            vec![("Blatt 2.pdf".into(), 1), ("Kapitel 1.pdf".into(), 1)]
+        );
+
+        workspace
+            .run(Request::Seen {
+                path: "Courses/Kurs/ILIAS/Folien/Kapitel 1.pdf".into(),
+            })
+            .unwrap();
+        assert_eq!(unseen(&list("Courses")), vec![("Kurs".into(), 1)]);
+
+        // A new file the student deleted before opening it is not counted.
+        fs::remove_file(workspace.0.join("Courses/Kurs/ILIAS/Folien/Blatt 2.pdf")).unwrap();
+        assert_eq!(unseen(&list("")), vec![]);
+
+        // Outside a synced folder there is nothing to clear.
+        workspace
+            .run(Request::Seen {
+                path: "Courses/Kurs/Notizen.md".into(),
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn clears_every_new_file_below_a_folder_at_once() {
+        let workspace = Workspace::new();
+        synced_course(&workspace);
+        workspace
+            .run(Request::Seen {
+                path: "Courses/Kurs/ILIAS".into(),
+            })
+            .unwrap();
+        let listing = workspace
+            .run(Request::List {
+                path: "Courses/Kurs".into(),
+            })
+            .unwrap();
+        assert_eq!(unseen(&listing), vec![]);
+        // Seen leaves the rest of the manifest as it was.
+        assert!(marks(&listing).contains(&("ILIAS".into(), serde_json::json!("root"))));
     }
 
     #[test]

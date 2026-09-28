@@ -3,6 +3,7 @@ import type { IliasContentItem, IliasCourse } from '@/features/integrations/lib/
 import {
   containerFor,
   documentsLink,
+  iliasSpaceLink,
   dueLabel,
   fileKind,
   folderOf,
@@ -142,5 +143,15 @@ describe('links into the document explorer', () => {
     );
     expect(folderOf('Courses/Kurs/ILIAS/Blatt 1.pdf')).toBe('Courses/Kurs/ILIAS');
     expect(folderOf('Blatt 1.pdf')).toBe('');
+  });
+
+  it('opens a course, a folder in it or an exercise in the ILIAS space', () => {
+    expect(iliasSpaceLink()).toBe('/documents?path=%3Ailias');
+    expect(iliasSpaceLink('100100')).toBe('/documents?path=%3Ailias&course=100100');
+    expect(iliasSpaceLink('100100', ['1', '2'], '3')).toBe(
+      '/documents?path=%3Ailias&course=100100&trail=1%2C2&exercise=3',
+    );
+    // A trail without a course leads nowhere: the overview.
+    expect(iliasSpaceLink(null, ['1'])).toBe('/documents?path=%3Ailias');
   });
 });

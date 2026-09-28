@@ -1,16 +1,11 @@
-import { Paperclip } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MailMessage } from '@/features/mail/lib/appleMail';
 import {
-  CATEGORY_LABELS,
   TRIAGE_LABELS,
-  categoryOf,
-  courseFor,
   formatReceived,
   groupByDay,
   parseSender,
-  toneFor,
-  type CourseRef,
   type TriageState,
 } from '@/features/mail/lib/mail';
 import { MailAvatar } from '@/features/mail/components/MailAvatar';
@@ -18,10 +13,11 @@ import { MailAvatar } from '@/features/mail/components/MailAvatar';
 interface ListProps {
   messages: MailMessage[];
   selectedId: string | null;
-  domain: string | null;
-  refs: readonly CourseRef[];
-  triage: Readonly<Record<string, TriageState>>;
   onSelect: (id: string) => void;
+}
+
+interface BoardProps extends ListProps {
+  triage: Readonly<Record<string, TriageState>>;
 }
 
 /** What a screen reader hears for a message, and what the tests find it by. */
@@ -30,25 +26,20 @@ function messageLabel(message: MailMessage): string {
 }
 
 /** Newest first, under Today, Yesterday, This week and Earlier. */
-export function MessageList({ messages, selectedId, domain, refs, triage, onSelect }: ListProps) {
+export function MessageList({ messages, selectedId, onSelect }: ListProps) {
   const now = new Date();
   const groups = groupByDay(messages, now);
   return (
     <div role="region" aria-label="Messages">
       {groups.map((group) => (
         <section key={group.label} aria-label={group.label}>
-          <h3 className="sticky top-0 z-10 border-b border-line-soft bg-surface/95 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted backdrop-blur">
-            {group.label}
-          </h3>
-          <ul className="divide-y divide-line-soft">
+          <h3 className="mail-day-heading">{group.label}</h3>
+          <ul className="mail-message-group">
             {group.messages.map((message) => (
               <MessageRow
                 key={message.id}
                 message={message}
                 selected={message.id === selectedId}
-                course={courseFor(message, refs)}
-                category={categoryOf(message, domain)}
-                triage={triage[message.id] ?? null}
                 now={now}
                 onSelect={() => onSelect(message.id)}
               />
@@ -63,14 +54,11 @@ export function MessageList({ messages, selectedId, domain, refs, triage, onSele
 interface RowProps {
   message: MailMessage;
   selected: boolean;
-  course: CourseRef | null;
-  category: ReturnType<typeof categoryOf>;
-  triage: TriageState | null;
   now: Date;
   onSelect: () => void;
 }
 
-function MessageRow({ message, selected, course, category, triage, now, onSelect }: RowProps) {
+function MessageRow({ message, selected, now, onSelect }: RowProps) {
   const sender = parseSender(message.sender);
   return (
     <li>
@@ -80,16 +68,12 @@ function MessageRow({ message, selected, course, category, triage, now, onSelect
         aria-label={messageLabel(message)}
         aria-current={selected ? 'true' : undefined}
         className={cn(
-          'relative flex w-full gap-3 px-4 py-3.5 text-left transition-colors',
-          selected ? 'bg-accent-soft' : 'hover:bg-surface-hover',
+          'mail-message-row',
+          selected && 'mail-message-row--selected',
+          !message.read && 'mail-message-row--unread',
         )}
       >
-        {!message.read ? (
-          <span
-            aria-hidden
-            className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r-full bg-accent"
-          />
-        ) : null}
+        {!message.read ? <span aria-hidden className="mail-unread-dot" /> : null}
         <MailAvatar name={sender.name} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
@@ -113,66 +97,50 @@ function MessageRow({ message, selected, course, category, triage, now, onSelect
           >
             {message.subject || '(no subject)'}
           </span>
-          {message.snippet ? (
-            <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-muted">
-              {message.snippet}
-            </span>
+          {message.snippet ? <span className="mail-message-snippet">{message.snippet}</span> : null}
+          {message.attachments > 0 ? (
+            <AttachmentBadges count={message.attachments} names={message.attachmentNames ?? []} />
           ) : null}
-          <Tags
-            course={course}
-            category={category}
-            triage={triage}
-            attachments={message.attachments}
-          />
         </span>
       </button>
     </li>
   );
 }
 
-function Tags({
-  course,
-  category,
-  triage,
-  attachments,
-}: {
-  course: CourseRef | null;
-  category: ReturnType<typeof categoryOf>;
-  triage: TriageState | null;
-  attachments: number;
-}) {
-  if (!course && category !== 'ilias' && !triage && attachments === 0) return null;
+/** Real filenames arrive with the lightweight preview; the count is the fallback. */
+function AttachmentBadges({ count, names }: { count: number; names: string[] }) {
+  const files = names.slice(0, 3);
+  const remaining = Math.max(0, count - files.length);
   return (
-    <span className="mt-2 flex flex-wrap items-center gap-1.5">
-      {course ? (
-        <span
-          className={cn('rounded-full px-2 py-0.5 text-[10.5px] font-medium', toneFor(course.key))}
-        >
-          {course.key}
+    <span
+      className="mail-attachment-badges"
+      aria-label={`${count} ${count === 1 ? 'attachment' : 'attachments'}`}
+    >
+      {files.map((name, index) => {
+        const extension = name.split('.').at(-1)?.toLowerCase() ?? '';
+        const kind = /^[a-z0-9]{1,4}$/.test(extension) ? extension : 'file';
+        return (
+          <span className="mail-file-badge" key={`${name}-${index}`} title={name}>
+            <span className="mail-file-mark" data-filetype={kind} aria-hidden>
+              {kind === 'pdf' ? 'PDF' : kind.slice(0, 3).toUpperCase() || <FileText size={11} />}
+            </span>
+            <span className="mail-file-name">{name}</span>
+          </span>
+        );
+      })}
+      {remaining > 0 ? (
+        <span className="mail-more-files">
+          {remaining === count ? `${count} files` : `+${remaining}`}
         </span>
       ) : null}
-      {category === 'ilias' ? (
-        <span className="rounded-full bg-blue-soft px-2 py-0.5 text-[10.5px] font-medium text-blue">
-          {CATEGORY_LABELS.ilias}
-        </span>
-      ) : null}
-      {triage ? (
-        <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-[10.5px] font-medium',
-            triage === 'reply' && 'bg-orange-soft text-orange',
-            triage === 'waiting' && 'bg-lavender-soft text-lavender',
-            triage === 'done' && 'bg-green-soft text-green',
-          )}
-        >
-          {TRIAGE_LABELS[triage]}
-        </span>
-      ) : null}
-      {attachments > 0 ? (
-        <span className="flex items-center gap-0.5 text-[11px] text-muted">
-          <Paperclip size={12} strokeWidth={1.8} aria-hidden />
-          {attachments}
-          <span className="sr-only">{attachments === 1 ? ' attachment' : ' attachments'}</span>
+      {files.length === 0 && remaining === 0 ? (
+        <span className="mail-file-badge">
+          <span className="mail-file-mark" data-filetype="file" aria-hidden>
+            <FileText size={11} />
+          </span>
+          <span className="mail-file-name">
+            {count} {count === 1 ? 'file' : 'files'}
+          </span>
         </span>
       ) : null}
     </span>
@@ -187,7 +155,7 @@ const COLUMNS: { id: TriageState | 'new'; title: string; hint: string }[] = [
 ];
 
 /** The same messages as columns: what still needs you, and what does not. */
-export function TriageBoard({ messages, selectedId, refs, triage, onSelect }: ListProps) {
+export function TriageBoard({ messages, selectedId, triage, onSelect }: BoardProps) {
   const now = new Date();
   return (
     <div className="grid h-full min-w-[640px] grid-cols-4 gap-3 p-3">
@@ -213,7 +181,6 @@ export function TriageBoard({ messages, selectedId, refs, triage, onSelect }: Li
             <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
               {cards.map((message) => {
                 const sender = parseSender(message.sender);
-                const course = courseFor(message, refs);
                 return (
                   <li key={message.id}>
                     <button
@@ -250,16 +217,6 @@ export function TriageBoard({ messages, selectedId, refs, triage, onSelect }: Li
                       <span className="mt-1 line-clamp-2 block text-[12.5px] font-medium leading-snug text-primary">
                         {message.subject || '(no subject)'}
                       </span>
-                      {course ? (
-                        <span
-                          className={cn(
-                            'mt-2 inline-block rounded-full px-2 py-0.5 text-[10.5px] font-medium',
-                            toneFor(course.key),
-                          )}
-                        >
-                          {course.key}
-                        </span>
-                      ) : null}
                     </button>
                   </li>
                 );

@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import {
   Columns3,
+  Check,
+  ChevronDown,
+  Inbox,
+  X,
   Mail,
   MailPlus,
   MonitorSmartphone,
@@ -31,6 +35,7 @@ import {
 } from '@/features/mail/lib/mail';
 import { useMailStore } from '@/features/mail/store/mailStore';
 import { ComposeDialog } from '@/features/mail/components/ComposeDialog';
+import '@/features/mail/mail.css';
 import { MessageList, TriageBoard } from '@/features/mail/components/MessageList';
 import { ReadingPane } from '@/features/mail/components/ReadingPane';
 
@@ -82,7 +87,7 @@ export function InboxExperience() {
     return <FailureState failure={failure} onRetry={() => void refresh(domain)} />;
   }
   if (accounts && !account) return <AccountChoice domain={domain} />;
-  return <Workspace domain={domain} />;
+  return <MailWorkspace domain={domain} />;
 }
 
 interface Chip {
@@ -146,7 +151,7 @@ function summaryOf(
   return parts.join(' · ');
 }
 
-function Workspace({ domain }: { domain: string | null }) {
+export function MailWorkspace({ domain }: { domain: string | null }) {
   const account = useMailStore((state) => state.account);
   const messages = useMailStore((state) => state.messages);
   const checkedAt = useMailStore((state) => state.checkedAt);
@@ -172,17 +177,21 @@ function Workspace({ domain }: { domain: string | null }) {
   const now = new Date();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <h2 className="text-[22px] font-semibold tracking-tight text-primary" aria-live="polite">
-          {summary}
-        </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            aria-label="View"
-            className="flex rounded-full border border-line p-0.5"
-          >
+    <div className="mail-workspace" data-view={view} data-selected={Boolean(selectedId)}>
+      <header className="mail-workspace-header">
+        <div className="mail-heading">
+          <span className="mail-heading-icon">
+            <Inbox size={21} strokeWidth={1.6} aria-hidden />
+          </span>
+          <div>
+            <p className="mail-heading-title">Your inbox</p>
+            <h2 className="mail-summary" aria-live="polite">
+              {summary}
+            </h2>
+          </div>
+        </div>
+        <div className="mail-header-actions">
+          <div role="group" aria-label="View" className="mail-view-toggle">
             {(
               [
                 ['list', 'List', Rows3],
@@ -206,9 +215,7 @@ function Workspace({ domain }: { domain: string | null }) {
               </button>
             ))}
           </div>
-          <span className="text-[11.5px] text-muted">
-            {loading ? 'Asking Mail…' : formatChecked(checkedAt, now)}
-          </span>
+
           <IconButton
             label="Refresh"
             size="sm"
@@ -225,6 +232,7 @@ function Workspace({ domain }: { domain: string | null }) {
           <Button
             variant="primary"
             size="sm"
+            className="mail-compose-button"
             onClick={() => setComposing(true)}
             leadingIcon={<MailPlus size={14} strokeWidth={1.8} aria-hidden />}
           >
@@ -233,106 +241,134 @@ function Workspace({ domain }: { domain: string | null }) {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
-          {chips.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              aria-pressed={filter === chip.id}
-              onClick={() => setFilter(chip.id)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
-                filter === chip.id
-                  ? 'bg-primary text-inverted'
-                  : 'bg-surface-secondary text-secondary hover:text-primary',
+      <div className={cn('mail-panes', view === 'board' && selectedId && 'mail-panes--board-open')}>
+        <div className={cn('mail-list-pane', selectedId && 'max-lg:hidden')}>
+          <div className="mail-list-controls">
+            <label className="mail-search">
+              <Search size={16} strokeWidth={1.7} aria-hidden />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search your mail…"
+                aria-label="Search mail"
+              />
+              {query && (
+                <button type="button" aria-label="Clear search" onClick={() => setQuery('')}>
+                  <X size={14} aria-hidden />
+                </button>
               )}
-            >
-              {chip.label}
-              {chip.id !== 'all' ? (
-                <span
-                  className={cn('text-[10.5px]', filter === chip.id ? 'opacity-70' : 'text-muted')}
-                >
-                  {chip.count}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-        <label className="ml-auto flex min-w-[200px] items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 focus-within:border-accent">
-          <Search size={14} strokeWidth={1.8} aria-hidden className="text-muted" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search mail"
-            aria-label="Search mail"
-            className="w-full bg-transparent text-[12.5px] text-primary placeholder:text-muted focus:outline-none"
-          />
-        </label>
-      </div>
-
-      <div
-        className={cn(
-          'grid min-h-[420px] flex-1 overflow-hidden rounded-2xl border border-line-soft bg-surface',
-          view === 'list'
-            ? 'lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]'
-            : // The board takes the width until a card is opened beside it.
-              selectedId
-              ? 'lg:grid-cols-[minmax(0,1fr)_minmax(340px,400px)]'
-              : 'lg:grid-cols-1',
-        )}
-      >
-        <div className={cn('min-h-0 overflow-auto', selectedId && 'max-lg:hidden')}>
-          {!messages && loading ? (
-            <p className="px-4 py-6 text-[13px] text-secondary">Asking Apple Mail…</p>
-          ) : shown.length === 0 ? (
-            <p className="px-4 py-6 text-[13px] text-secondary">
-              {all.length === 0 ? 'Your inbox is empty.' : 'Nothing here with this filter.'}
-            </p>
-          ) : view === 'board' ? (
-            <TriageBoard
-              messages={shown}
-              selectedId={selectedId}
-              domain={domain}
-              refs={refs}
-              triage={triage}
-              onSelect={(id) => void select(id)}
-            />
-          ) : (
-            <MessageList
-              messages={shown}
-              selectedId={selectedId}
-              domain={domain}
-              refs={refs}
-              triage={triage}
-              onSelect={(id) => void select(id)}
-            />
-          )}
+            </label>
+            <div role="group" aria-label="Show" className="mail-filters">
+              {chips
+                .filter((chip) => ['all', 'unread', 'reply'].includes(chip.id))
+                .map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    aria-pressed={filter === chip.id}
+                    onClick={() => setFilter(chip.id)}
+                  >
+                    {chip.label}
+                    {chip.id !== 'all' && <span>{chip.count}</span>}
+                  </button>
+                ))}
+              <details
+                className="mail-filter-menu"
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.currentTarget.removeAttribute('open');
+                    event.currentTarget.querySelector('summary')?.focus();
+                  }
+                }}
+              >
+                <summary aria-label="Filter by sender or course" title="Filter by sender or course">
+                  <span>{!['all', 'unread', 'reply'].includes(filter) ? 'Filtered' : 'More'}</span>
+                  <ChevronDown size={12} aria-hidden />
+                </summary>
+                <div className="mail-filter-options">
+                  <p>Sender &amp; course</p>
+                  {chips
+                    .filter((chip) => !['all', 'unread', 'reply'].includes(chip.id))
+                    .map((chip) => (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        aria-pressed={filter === chip.id}
+                        onClick={(event) => {
+                          setFilter(chip.id);
+                          const menu = event.currentTarget.closest('details');
+                          menu?.removeAttribute('open');
+                          menu?.querySelector('summary')?.focus();
+                        }}
+                      >
+                        {chip.label}
+                        <span>{chip.count}</span>
+                      </button>
+                    ))}
+                </div>
+              </details>
+            </div>
+            {!['all', 'unread', 'reply'].includes(filter) && (
+              <button type="button" className="mail-active-filter" onClick={() => setFilter('all')}>
+                {chips.find((chip) => chip.id === filter)?.label ?? 'Course filter'}
+                <X size={12} aria-hidden />
+                <span className="sr-only">Clear filter</span>
+              </button>
+            )}
+          </div>
+          <div className="mail-list-scroll scroll-area">
+            {!messages && loading ? (
+              <p className="px-4 py-6 text-[13px] text-secondary">Asking Apple Mail…</p>
+            ) : shown.length === 0 ? (
+              <p className="px-4 py-6 text-[13px] text-secondary">
+                {all.length === 0 ? 'Your inbox is empty.' : 'Nothing here with this filter.'}
+              </p>
+            ) : view === 'board' ? (
+              <TriageBoard
+                messages={shown}
+                selectedId={selectedId}
+                triage={triage}
+                onSelect={(id) => void select(id)}
+              />
+            ) : (
+              <MessageList
+                messages={shown}
+                selectedId={selectedId}
+                onSelect={(id) => void select(id)}
+              />
+            )}
+          </div>
+          <div className="mail-list-count">
+            {shown.length} {shown.length === 1 ? 'message' : 'messages'}
+            <span>Newest first</span>
+          </div>
         </div>
         <div
           className={cn(
-            'min-h-0 overflow-y-auto border-line-soft lg:border-l',
+            'mail-reading-pane scroll-area',
             !selectedId && 'max-lg:hidden',
             view === 'board' && !selectedId && 'lg:hidden',
           )}
         >
-          <ReadingPane domain={domain} refs={refs} summary={summary} />
+          <ReadingPane key={selectedId ?? 'empty'} domain={domain} refs={refs} summary={summary} />
         </div>
       </div>
 
-      <p className="flex flex-wrap items-center gap-x-3 text-[12px] text-muted">
-        {account ? <span>Reading {account} in Apple Mail</span> : null}
-        {accounts && accounts.length > 1 ? (
-          <button
-            type="button"
-            onClick={() => useMailStore.getState().chooseAccount(null)}
-            className="hover:text-accent"
-          >
-            Use another Mail account
+      <footer className="mail-status">
+        <span className="mail-connection">
+          <Check size={12} aria-hidden />
+          {account ? `${account} · Apple Mail` : 'Apple Mail'}
+        </span>
+        <span className="mail-freshness">
+          {loading ? 'Asking Mail…' : formatChecked(checkedAt, now)}
+        </span>
+        {accounts && accounts.length > 1 && (
+          <button type="button" onClick={() => useMailStore.getState().chooseAccount(null)}>
+            Switch account
           </button>
-        ) : null}
-      </p>
+        )}
+      </footer>
 
       {composing ? <ComposeDialog onClose={() => setComposing(false)} /> : null}
     </div>

@@ -21,14 +21,14 @@ Every property the script reads is an Apple Event — a round trip to Mail — a
 - **The list is read in bulk.** Mail filters the inbox by date (the last 14 days, then 90, then all of it only if those hold too few), and each property — subject, sender, date, read — comes for all listed messages in one Apple Event. About ten Apple Events for the list, however big the inbox; before, it was four per message. If Mail will not filter or answer in bulk, the script falls back to reading one message at a time.
 - **Messages are found by Mail's own id.** The list carries each message's `mailId`; opening, previewing, marking read and replying look the message up by it in one step and check its Message-ID. Only when that fails is the inbox searched by Message-ID.
 - **Mail is asked again only when the list is over a minute old** — on opening the Inbox as on coming back to the window. Mail's accounts are asked for once a session.
-- **Previews come five at a time** and wait while a message is being opened; each message is asked about once a session, also when it has no text.
+- **Previews, including up to three attachment file names, come five at a time** and wait while a message is being opened; each message is asked about once a session, also when it has no text.
 - **A message's text is fetched once.** Clicking it again while it loads waits for the same answer; clicking it later shows it at once.
 
 The first time, macOS asks whether Uni Pilot may control Mail (System Settings → Privacy & Security → Automation). In `npm run tauri:dev` the question names **Terminal**, which started the app; in an installed build it names Uni Pilot, with the reason from `src-tauri/Info.plist`.
 
 ## The rules
 
-- **Read what the Inbox shows, nothing more.** The newest 50 messages with a one-line preview, and the full text of the message the student opens. On this Mac, in memory only — no message is stored or passed on. Kept on disk: the chosen account, list or board, and the triage (Needs reply / Waiting / Done) by Message-ID.
+- **Read what the Inbox shows, nothing more.** The newest 50 messages with a one-line preview and up to three attachment names each, and the full text of the message the student opens. On this Mac, in memory only — no message is stored or passed on. Kept on disk: the chosen account, list or board, and the triage (Needs reply / Waiting / Done) by Message-ID.
 - **Listing marks nothing read.** Opening a message in the pane marks it read in Mail, as Mail would; **Mark as unread** undoes it.
 - **Uni Pilot never sends.** Reply, New message and "Email about this" on a course's assignment open a draft in Mail. The student reads it there and presses Send there. The script has no send; `appleMailScript.test.ts` fails if it ever calls one.
 - **Links in a message are not links.** The text is shown as text; a link followed inside Uni Pilot's window would navigate the app itself away. Open the message in Mail to follow one.

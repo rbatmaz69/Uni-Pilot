@@ -10,6 +10,7 @@ import {
   type DocumentRequest,
 } from '@/features/documents/lib/files';
 import { clearPreviewCache } from '@/features/documents/lib/previewCache';
+import { useSpaceStore } from '@/features/documents/store/spaceStore';
 import { isDesktopRuntime } from '@/lib/icsFetch';
 
 vi.mock('@/features/documents/lib/files', async (original) => ({
@@ -45,6 +46,7 @@ const folder: DocumentEntry = {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  useSpaceStore.setState({ spaces: [], picked: null });
   clearPreviewCache();
   vi.mocked(isDesktopRuntime).mockReturnValue(true);
   request.mockImplementation((action) => {
@@ -76,10 +78,10 @@ async function openNotes() {
 }
 
 describe('Document explorer', () => {
-  it('shows a folder tree and keeps opened folders in the top tab strip', async () => {
+  it('opens folders from the space sidebar and keeps them in the top tab strip', async () => {
     const user = userEvent.setup();
     render(<DocumentExplorer />);
-    const tree = screen.getByLabelText('Document folders');
+    const tree = screen.getByLabelText('Document spaces');
     await within(tree).findByRole('button', { name: 'Biology' });
     await user.click(within(tree).getByRole('button', { name: 'Biology' }));
     expect(screen.getByRole('tab', { name: 'Biology' })).toHaveAttribute('aria-selected', 'true');
@@ -106,10 +108,10 @@ describe('Document explorer', () => {
     );
     const user = userEvent.setup();
     render(<DocumentExplorer />);
-    await user.type(screen.getByRole('textbox', { name: 'Search folder tree' }), 'deep');
+    await user.type(screen.getByRole('textbox', { name: 'Search all documents' }), 'deep');
     expect(
-      await within(screen.getByLabelText('Document folders')).findByRole('button', {
-        name: 'Deep notes.md',
+      await within(screen.getByLabelText('Document spaces')).findByRole('button', {
+        name: 'Deep notes',
       }),
     ).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith({ action: 'search', query: 'deep' });
@@ -118,8 +120,8 @@ describe('Document explorer', () => {
   it('saves an open note before changing to another document tab', async () => {
     const user = userEvent.setup();
     render(<DocumentExplorer />);
-    const tree = screen.getByLabelText('Document folders');
-    await user.click(await within(tree).findByRole('button', { name: 'Notes.md' }));
+    const tree = screen.getByLabelText('Document spaces');
+    await user.click(await within(tree).findByRole('button', { name: 'Notes' }));
     expect(screen.getByRole('tab', { name: 'Notes.md' })).toHaveAttribute('aria-selected', 'true');
     await user.type(await screen.findByRole('textbox', { name: 'Document content' }), ' draft');
     await user.click(screen.getByRole('tab', { name: 'Documents' }));
@@ -915,7 +917,7 @@ describe('ILIAS sync', () => {
     expect(within(banner).getByText(/Last synced/)).toBeInTheDocument();
     expect(within(banner).getByRole('link', { name: 'Open course' })).toHaveAttribute(
       'href',
-      '/courses?course=crs_42',
+      '/documents?path=%3Ailias&course=crs_42',
     );
   });
 
@@ -952,6 +954,41 @@ describe('ILIAS sync', () => {
     expect(within(card).getByText('No longer on ILIAS')).toBeInTheDocument();
     expect(within(card).getByRole('img', { name: 'Downloaded from ILIAS' })).toBeInTheDocument();
   });
+  it("follows a link while open, keeping the canvas for the student's own folders", async () => {
+    const root = 'Courses/Winter 2025-26/Datenbanken/ILIAS';
+    request.mockImplementation((action) => {
+      if (action.action === 'list')
+        return Promise.resolve({
+          root: '/workspace',
+          entries: action.path === root ? [{ ...goneFile, path: `${root}/Handout.docx` }] : [notes],
+          ilias: action.path === root ? { ...iliasInfo, root } : null,
+        });
+      return Promise.resolve();
+    });
+    const { rerender } = render(
+      <MemoryRouter>
+        <DocumentExplorer request="first" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('button', { name: 'Add to canvas' })).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <DocumentExplorer initialPath={root} request="second" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('button', { name: 'Select Handout.docx' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'ILIAS sync' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add to canvas' })).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <DocumentExplorer initialPath="" request="third" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('button', { name: 'Add to canvas' })).toBeInTheDocument();
+  });
+
   it('opens at a course folder linked from Courses, as a list', async () => {
     const root = 'Courses/Winter 2025-26/Datenbanken/ILIAS';
     request.mockImplementation((action) => {
@@ -974,5 +1011,181 @@ describe('ILIAS sync', () => {
     expect(await screen.findByRole('button', { name: 'Select Handout.docx' })).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith({ action: 'list', path: root });
     expect(screen.getByRole('status', { name: 'ILIAS sync' })).toBeInTheDocument();
+  });
+});
+
+describe('Document spaces', () => {
+  it('takes the new mark off a file from ILIAS once it is opened', async () => {
+    const folder = 'Courses/Datenbanken/ILIAS';
+    const sheet = { ...notes, name: 'Blatt 1.zip', path: `${folder}/Blatt 1.zip` };
+    let seen = false;
+    request.mockImplementation((action) => {
+      if (action.action === 'seen') {
+        seen = true;
+        return Promise.resolve();
+      }
+      if (action.action !== 'list') return Promise.resolve();
+      const unseen = seen ? {} : { unseen: 1 };
+      const entries: Record<string, DocumentEntry[]> = {
+        '': [{ ...folder_('Courses'), ...unseen }],
+        Courses: [{ ...folder_('Courses/Datenbanken'), ...unseen }],
+        [folder]: [{ ...sheet, ilias: 'file', ...unseen }],
+      };
+      return Promise.resolve({ root: '/workspace', entries: entries[action.path] ?? [] });
+    });
+    render(
+      <MemoryRouter>
+        <DocumentExplorer initialPath={folder} />
+      </MemoryRouter>,
+    );
+    const row = await screen.findByRole('button', { name: 'Select Blatt 1.zip' });
+    expect(within(row).getByRole('img', { name: 'New' })).toBeInTheDocument();
+    const sidebar = screen.getByLabelText('Document spaces');
+    expect(
+      await within(sidebar).findByRole('button', { name: 'Courses 1 new file' }),
+    ).toBeVisible();
+
+    fireEvent.doubleClick(row);
+    await waitFor(() => expect(request).toHaveBeenCalledWith({ action: 'seen', path: sheet.path }));
+    expect(request).toHaveBeenCalledWith({ action: 'open', path: sheet.path });
+    expect(within(row).queryByRole('img', { name: 'New' })).not.toBeInTheDocument();
+    expect(await within(sidebar).findByRole('button', { name: 'Courses' })).toBeVisible();
+  });
+
+  it('starts a note in the open space and adds spaces for new or existing folders', async () => {
+    const user = userEvent.setup();
+    render(<DocumentExplorer />);
+    const sidebar = screen.getByLabelText('Document spaces');
+    const dock = screen.getByRole('navigation', { name: 'Spaces' });
+    expect(await within(sidebar).findByRole('heading', { name: 'Documents' })).toBeVisible();
+
+    await user.click(within(sidebar).getByRole('button', { name: 'New note' }));
+    expect(screen.getByRole('dialog', { name: 'New document' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith({
+        action: 'create',
+        path: '',
+        name: 'Untitled.md',
+        folder: false,
+      }),
+    );
+
+    // A space for a new folder.
+    await user.click(within(dock).getByRole('button', { name: 'New space' }));
+    expect(screen.getByRole('dialog', { name: 'New space' })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Personal');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith({
+        action: 'create',
+        path: '',
+        name: 'Personal',
+        folder: true,
+      }),
+    );
+    expect(await screen.findByRole('tab', { name: 'Personal' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(within(dock).getByRole('button', { name: 'Personal space' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    // A space for a folder that is already there: nothing is created.
+    request.mockClear();
+    await user.click(within(dock).getByRole('button', { name: 'New space' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Bio');
+    const choice = screen.getByRole('combobox', { name: /Folder/ });
+    await within(choice).findByRole('option', { name: 'Biology' });
+    await user.selectOptions(choice, 'Biology');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await within(dock).findByRole('button', { name: 'Bio space' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(request).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'create' }));
+    expect(useSpaceStore.getState().spaces.map((space) => space.folder)).toEqual([
+      'Personal',
+      'Biology',
+    ]);
+  });
+});
+
+function folder_(path: string): DocumentEntry {
+  return { ...folder, name: path.split('/').at(-1) ?? path, path };
+}
+
+describe('ILIAS space', () => {
+  it('opens as courses and newest files, never as a canvas, and opens a course as a list', async () => {
+    const root = 'Courses/Winter 2026-27/Datenbanken/ILIAS';
+    const sheet = `${root}/Blatt 6.zip`;
+    let seen = false;
+    request.mockImplementation((action) => {
+      if (action.action === 'seen') {
+        seen = true;
+        return Promise.resolve();
+      }
+      if (action.action === 'ilias')
+        return Promise.resolve([
+          {
+            courseRefId: '7',
+            title: 'Datenbanken 1 - WS26',
+            root,
+            syncedAt: null,
+            unseen: seen ? 0 : 1,
+            files: [
+              {
+                name: 'Blatt 6.zip',
+                path: sheet,
+                size: 10,
+                updatedAt: '2026-10-08T10:00',
+                arrived: 0,
+                ...(seen ? {} : { unseen: true }),
+              },
+            ],
+          },
+        ]);
+      if (action.action === 'list')
+        return Promise.resolve({
+          root: '/workspace',
+          entries: action.path === root ? [{ ...notes, name: 'Blatt 6.zip', path: sheet }] : [],
+          ilias:
+            action.path === root
+              ? { courseRefId: '7', courseTitle: 'Datenbanken 1', root, syncedAt: null, auto: true }
+              : null,
+        });
+      return Promise.resolve();
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DocumentExplorer />
+      </MemoryRouter>,
+    );
+    const dock = screen.getByRole('navigation', { name: 'Spaces' });
+    await user.click(await within(dock).findByRole('button', { name: 'ILIAS, 1 new' }));
+
+    expect(screen.getByRole('tab', { name: 'ILIAS' })).toHaveAttribute('aria-selected', 'true');
+    const overview = screen.getByRole('region', { name: 'ILIAS' });
+    expect(screen.queryByRole('button', { name: 'Add to canvas' })).not.toBeInTheDocument();
+    expect(request).not.toHaveBeenCalledWith({ action: 'list', path: ':ilias' });
+
+    await user.click(within(overview).getByRole('button', { name: 'Blatt 6.zip New' }));
+    await waitFor(() => expect(request).toHaveBeenCalledWith({ action: 'seen', path: sheet }));
+    expect(request).toHaveBeenCalledWith({ action: 'open', path: sheet });
+    expect(await within(dock).findByRole('button', { name: 'ILIAS' })).toBeInTheDocument();
+
+    // Every course is there, by its title in ILIAS.
+    const sidebar = screen.getByLabelText('Document spaces');
+    expect(
+      within(sidebar).getByRole('button', { name: 'Datenbanken 1 - WS26' }),
+    ).toBeInTheDocument();
+
+    // Back in Documents, the student's own things are on the canvas again.
+    await user.click(within(dock).getByRole('button', { name: 'Documents' }));
+    expect(await screen.findByRole('button', { name: 'Add to canvas' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Go to parent folder' })).not.toBeInTheDocument();
   });
 });

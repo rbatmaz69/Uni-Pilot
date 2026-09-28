@@ -18,6 +18,31 @@ export interface IliasFolderInfo {
   auto: boolean;
 }
 
+/** A file the ILIAS sync keeps, as the ILIAS space lists it. */
+export interface IliasFile {
+  name: string;
+  path: string;
+  size: number;
+  /** When ILIAS last changed it, `YYYY-MM-DDTHH:MM` in local time, if ILIAS said. */
+  updatedAt: string | null;
+  /** When it arrived on this computer, in milliseconds. */
+  arrived: number;
+  unseen?: boolean;
+  /** ILIAS no longer lists it; the copy here stays. */
+  gone?: boolean;
+}
+
+/** A course the ILIAS sync keeps, with its files. */
+export interface IliasCourse {
+  courseRefId: string;
+  title: string;
+  /** Workspace-relative path of the course's `ILIAS` folder. */
+  root: string;
+  syncedAt: string | null;
+  unseen: number;
+  files: IliasFile[];
+}
+
 export interface DocumentEntry {
   name: string;
   path: string;
@@ -25,6 +50,11 @@ export interface DocumentEntry {
   size: number;
   modified: number;
   ilias?: IliasMark | null;
+  /**
+   * Files the ILIAS sync brought that were not opened yet: 1 on such a file,
+   * on a folder all of them below it. Absent when there are none.
+   */
+  unseen?: number;
 }
 export interface DirectoryListing {
   root: string;
@@ -51,7 +81,10 @@ export type DocumentRequest =
   | { action: 'save'; path: string; content: string; expected: string }
   | { action: 'saveDrawing'; path: string; content: string }
   | { action: 'move'; path: string; destination: string; name: string }
-  | { action: 'search'; query: string };
+  | { action: 'search'; query: string }
+  /** Clears the new mark of a file from ILIAS, or of every file below a folder. */
+  | { action: 'seen'; path: string }
+  | { action: 'ilias' };
 
 export type DocumentUpload =
   | { kind: 'import'; path: string; name: string }

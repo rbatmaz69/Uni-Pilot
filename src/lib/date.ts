@@ -120,6 +120,12 @@ export function formatDayLabel(date: Date): string {
   return `${WEEKDAY_NAMES[weekdayIndex(date)] ?? ''}, ${date.getDate()} ${MONTH_NAMES[date.getMonth()] ?? ''} ${date.getFullYear()}`;
 }
 
+/** `'Mon, 8 Sep 2026'`. */
+export function formatShortDayLabel(date: Date): string {
+  const month = MONTH_NAMES[date.getMonth()]?.slice(0, 3) ?? '';
+  return `${WEEKDAY_SHORT[weekdayIndex(date)] ?? ''}, ${date.getDate()} ${month} ${date.getFullYear()}`;
+}
+
 /** `'Today'`, `'Tomorrow'`, `'Yesterday'` — or `null` when nothing shorter fits. */
 export function relativeDayLabel(date: Date, today: Date): string | null {
   const offset = differenceInDays(date, today);
