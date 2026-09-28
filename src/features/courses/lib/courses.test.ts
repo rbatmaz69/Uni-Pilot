@@ -4,6 +4,7 @@ import {
   containerFor,
   documentsLink,
   dueLabel,
+  fileKind,
   folderOf,
   formatIliasDate,
   formatSize,
@@ -97,6 +98,15 @@ describe('what a row is', () => {
     expect(containerFor('fold')).toBe('fold');
     expect(containerFor('file')).toBeNull();
     expect(iliasTarget('file', '967852')).toBe('file_967852');
+  });
+
+  it('uses the suffix ILIAS reports even when the title has no extension', () => {
+    expect(fileKind('PDF', 'Klausur04Jul25')).toBe('pdf');
+    expect(fileKind('docx', 'Seminar notes')).toBe('document');
+    expect(fileKind('PNG', 'Course diagram')).toBe('image');
+    expect(fileKind(null, 'Slides.pptx')).toBe('presentation');
+    expect(fileKind('xlsx', 'Marks')).toBe('spreadsheet');
+    expect(fileKind('backup', 'Database')).toBe('other');
   });
 });
 

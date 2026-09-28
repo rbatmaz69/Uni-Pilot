@@ -43,6 +43,7 @@ import { useCourseStore } from '@/features/courses/store/courseStore';
 import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
 import { FailureNotice, SyncBar } from '@/features/courses/components/CourseNotices';
 import { CourseFiles, SyncSwitch } from '@/features/courses/components/CourseFiles';
+import { CourseFileIcon } from '@/features/courses/components/CourseFileIcon';
 import { ComposeDialog } from '@/features/mail/components/ComposeDialog';
 import { NAV_ITEMS } from '@/lib/navigation';
 
@@ -325,9 +326,13 @@ function ItemRow({ connection, course, trail, item, to }: ItemRowProps) {
 
   const body = (
     <>
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-secondary text-secondary">
-        <Icon size={17} strokeWidth={1.7} aria-hidden />
-      </span>
+      {kind === 'file' ? (
+        <CourseFileIcon title={item.title} suffix={item.file?.suffix ?? null} />
+      ) : (
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-secondary text-secondary">
+          <Icon size={17} strokeWidth={1.7} aria-hidden />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-medium text-primary">{item.title}</span>

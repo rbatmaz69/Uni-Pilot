@@ -74,6 +74,20 @@ export function groupByBlock(items: readonly IliasContentItem[]): ContentBlock[]
 
 export type ItemKind = 'folder' | 'file' | 'exercise' | 'link' | 'other';
 
+export type CourseFileKind =
+  'pdf' | 'document' | 'image' | 'presentation' | 'spreadsheet' | 'other';
+
+/** ILIAS lists the suffix separately from the title, which often has no extension. */
+export function fileKind(suffix: string | null, title: string): CourseFileKind {
+  const extension = (suffix || title.split('.').pop() || '').replace(/^\./, '').toLowerCase();
+  if (extension === 'pdf') return 'pdf';
+  if (['doc', 'docx', 'odt', 'rtf', 'txt'].includes(extension)) return 'document';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'heic'].includes(extension)) return 'image';
+  if (['ppt', 'pptx', 'odp', 'key'].includes(extension)) return 'presentation';
+  if (['xls', 'xlsx', 'ods', 'csv'].includes(extension)) return 'spreadsheet';
+  return 'other';
+}
+
 /** What a row is, for its icon and for what a click on it does. */
 export function itemKind(providerType: string): ItemKind {
   switch (providerType) {
