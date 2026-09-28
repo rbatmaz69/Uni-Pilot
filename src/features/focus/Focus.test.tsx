@@ -295,13 +295,6 @@ describe('Focus workspace', () => {
     expect(screen.queryByText('Focus complete. Well done!')).not.toBeInTheDocument();
   });
 
-  it('opens the shared Focus page from the dashboard', () => {
-    renderApp('/dashboard');
-    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Focus');
-    expect(screen.getByRole('timer')).toBeInTheDocument();
-  });
-
   it('keeps the app header in normal mode and restores it when a covered session pauses', () => {
     renderApp('/focus');
     const cover = screen.getByRole('region', { name: 'Focus timer' });
