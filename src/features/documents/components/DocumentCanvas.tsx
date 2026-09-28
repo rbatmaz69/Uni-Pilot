@@ -31,6 +31,7 @@ import {
   type DocumentEntry,
   type DocumentPreviewData,
 } from '@/features/documents/lib/files';
+import { IliasBadge } from '@/features/integrations';
 import { loadNotePreview, loadPreview } from '@/features/documents/lib/previewCache';
 import {
   packFolder,
@@ -307,9 +308,25 @@ const CardContent = memo(
         )}
         <span className="canvas-card-caption">
           <strong>{entry.name}</strong>
-          <span>{entry.folder ? 'Folder · open to explore' : fileKind(entry)}</span>
+          <span>
+            {entry.ilias === 'gone'
+              ? 'No longer on ILIAS'
+              : entry.folder
+                ? 'Folder · open to explore'
+                : fileKind(entry)}
+          </span>
         </span>
         {pinned && <Pin className="canvas-pin" size={13} fill="currentColor" aria-label="Pinned" />}
+        {entry.ilias === 'root' ? (
+          <IliasBadge size="sm" className="absolute -top-2 left-2 z-10" />
+        ) : entry.ilias === 'file' || entry.ilias === 'folder' || entry.ilias === 'gone' ? (
+          <IliasBadge
+            size="sm"
+            showLabel={false}
+            title="Downloaded from ILIAS"
+            className="absolute -top-2 left-2 z-10"
+          />
+        ) : null}
       </>
     );
   },

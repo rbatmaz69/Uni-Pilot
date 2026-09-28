@@ -7,16 +7,16 @@ import { useUiStore } from '@/store/uiStore';
  * The calendar's right panel is drawn to run off the edge of the screen, so a
  * centred column would strand it in the middle of a wide monitor. The Inbox
  * scrolls its list and the open message apart, which needs a column exactly
- * as tall as the window.
+ * as tall as the window, and so does the document explorer.
  */
 const FULL_BLEED_PATHS = new Set(['/calendar', '/inbox', '/documents']);
 
 export function MainContent() {
   const { pathname } = useLocation();
   const fullBleed = FULL_BLEED_PATHS.has(pathname);
-  // The notes editor scrolls its own panes and runs to the window's edge.
-  const documents = pathname === '/documents';
   const immersive = useUiStore((state) => state.immersive);
+  // The document explorer lays out its own panes and scrolls them itself.
+  const documents = pathname === '/documents';
 
   return (
     <main
@@ -24,11 +24,7 @@ export function MainContent() {
       tabIndex={-1}
       className={cn(
         'min-h-0 flex-1',
-        immersive
-          ? 'overflow-hidden'
-          : documents
-            ? 'scroll-area overflow-hidden'
-            : 'scroll-area overflow-y-auto',
+        immersive || documents ? 'overflow-hidden' : 'scroll-area overflow-y-auto',
       )}
     >
       <div

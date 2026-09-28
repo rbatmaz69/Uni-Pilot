@@ -39,7 +39,6 @@ beforeEach(() => {
     assignments: {},
     failure: null,
     loading: {},
-    downloads: {},
   });
 });
 
@@ -106,39 +105,6 @@ describe('the course store', () => {
 
     expect(useCourseStore.getState().courses).toBeNull();
     expect(useCourseStore.getState().installation).toBe('ilias.hs-heilbronn.de');
-  });
-
-  it('notes where a download stands, by file', async () => {
-    invoke.mockResolvedValue({ id: 7, fileName: 'Blatt 4.pdf', openable: true });
-    const running = useCourseStore.getState().download(HHN, '100121');
-    expect(useCourseStore.getState().downloads['100121']).toEqual({ state: 'downloading' });
-    await running;
-
-    expect(invoke).toHaveBeenCalledWith('ilias_sync_download', {
-      baseUrl: 'https://ilias.hs-heilbronn.de',
-      clientId: 'iliashhn',
-      fileRefId: '100121',
-    });
-    expect(useCourseStore.getState().downloads['100121']).toEqual({
-      state: 'saved',
-      id: 7,
-      fileName: 'Blatt 4.pdf',
-      openable: true,
-    });
-  });
-
-  it('tells the whole page when a download finds the sign-in gone', async () => {
-    invoke.mockRejectedValue({ kind: 'signedOut' });
-    await useCourseStore.getState().download(HHN, '100121');
-
-    expect(useCourseStore.getState().downloads['100121']?.state).toBe('failed');
-    expect(useCourseStore.getState().failure?.kind).toBe('session-expired');
-  });
-
-  /** Download ids last as long as Uni Pilot runs; keeping them would open the wrong file. */
-  it('does not keep downloads across restarts', () => {
-    const persisted = useCourseStore.persist.getOptions().partialize?.(useCourseStore.getState());
-    expect(persisted).not.toHaveProperty('downloads');
   });
 
   /** A laptop asleep over a break: ILIAS forgot, the sign-on did not. */

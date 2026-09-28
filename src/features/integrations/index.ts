@@ -83,19 +83,29 @@ export {
   overlayIsOpen,
 } from './lib/iliasView';
 export {
-  downloadIliasFile,
+  configureCourseFolder,
+  listCourseFolders,
+  listenToCourseSync,
   readIliasAssignments,
   readIliasContents,
   readIliasCourses,
+  saveCourseFile,
+  stopSyncingCourse,
+  syncCourseFiles,
   toIliasError,
+  type CourseFile,
+  type CourseFolder,
+  type CourseSyncProgress,
+  type CourseSyncReport,
+  type CourseTarget,
   type IliasAssignment,
   type IliasContainer,
   type IliasContentItem,
   type IliasCourse,
   type IliasFileFacts,
-  type IliasSavedFile,
 } from './lib/iliasSync';
 export { useIliasStore } from './store/iliasStore';
+export { IliasBadge } from './components/IliasBadge';
 export { IliasStrip } from './components/IliasStrip';
 export { IliasWorkspace } from './components/IliasWorkspace';
 export { OpenInIliasButton } from './components/OpenInIliasButton';

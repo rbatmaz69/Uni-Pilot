@@ -1,9 +1,9 @@
 import { PanelLeftOpen } from 'lucide-react';
-import { isTauri } from '@tauri-apps/api/core';
 import { useLocation } from 'react-router-dom';
 import { IconButton } from '@/components/ui';
 import { CourseSync } from '@/features/courses/components/CourseSync';
 import { ReminderService } from '@/features/reminders/components/ReminderService';
+import { isDesktopRuntime } from '@/lib/icsFetch';
 import { cn } from '@/lib/utils';
 import { useUiStore } from '@/store/uiStore';
 import { Header } from './Header';
@@ -12,8 +12,7 @@ import { Sidebar } from './Sidebar';
 
 /**
  * The shell. When a page takes over the window (`immersive`), the sidebar and
- * header step aside and the frame drops its glass background, so the page
- * runs edge to edge.
+ * header step aside, so the page runs edge to edge.
  *
  * The tree keeps its shape either way — the absent parts leave empty slots
  * rather than a different structure. Otherwise React would remount the page
@@ -33,7 +32,7 @@ export function AppLayout() {
         'relative flex h-full w-full overflow-hidden',
         immersive ? 'bg-surface' : 'app-shell',
       )}
-      data-macos-desktop={isTauri() && navigator.platform.startsWith('Mac')}
+      data-macos-desktop={isDesktopRuntime() && navigator.platform.startsWith('Mac')}
     >
       <ReminderService />
       <CourseSync />
@@ -52,7 +51,7 @@ export function AppLayout() {
           )}
         >
           {immersive || documents ? null : <Header />}
-          {!immersive && documents && collapsed ? (
+          {documents && collapsed && !immersive ? (
             <IconButton
               label="Expand sidebar"
               className="absolute left-2 top-2 z-40 bg-surface"

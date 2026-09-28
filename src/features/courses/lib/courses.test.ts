@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { IliasContentItem, IliasCourse } from '@/features/integrations/lib/iliasSync';
 import {
   containerFor,
+  documentsLink,
   dueLabel,
+  folderOf,
   formatIliasDate,
   formatSize,
   groupByBlock,
@@ -120,5 +122,15 @@ describe('formatting', () => {
     expect(dueLabel('2026-09-26T09:00', now)).toBe('Due tomorrow');
     expect(dueLabel('2026-09-28T23:55', now)).toBe('Due in 3 days');
     expect(dueLabel(null, now)).toBeNull();
+  });
+});
+
+describe('links into the document explorer', () => {
+  it('opens a workspace folder by its path', () => {
+    expect(documentsLink('Courses/Winter 2025-26/Kurs/ILIAS')).toBe(
+      '/documents?path=Courses%2FWinter+2025-26%2FKurs%2FILIAS',
+    );
+    expect(folderOf('Courses/Kurs/ILIAS/Blatt 1.pdf')).toBe('Courses/Kurs/ILIAS');
+    expect(folderOf('Blatt 1.pdf')).toBe('');
   });
 });

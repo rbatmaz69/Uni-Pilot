@@ -16,7 +16,6 @@ import { persist } from 'zustand/middleware';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import { IliasError, type IliasFailureKind } from '@/features/integrations/lib/ilias/errors';
 import {
-  downloadIliasFile,
   renewIliasSession,
   readIliasAssignments,
   readIliasContents,
@@ -25,7 +24,6 @@ import {
   type IliasContainer,
   type IliasContentItem,
   type IliasCourse,
-  type IliasSavedFile,
 } from '@/features/integrations/lib/iliasSync';
 
 export interface Loaded<T> {
@@ -39,12 +37,6 @@ export interface CourseFailure {
   message: string;
 }
 
-/** Where a file the student asked for stands. */
-export type FileDownload =
-  | { state: 'downloading' }
-  | ({ state: 'saved' } & IliasSavedFile)
-  | { state: 'failed'; message: string };
-
 interface CourseState {
   /** The host the cache below was read from. */
   installation: string | null;
@@ -57,11 +49,6 @@ interface CourseState {
   failure: CourseFailure | null;
   /** Requests in flight, by `courses`, `contents:<id>`, `assignments:<id>`. */
   loading: Record<string, boolean>;
-  /**
-   * Files asked for this session, by ref_id. Not kept: the ids Rust opens
-   * them by last only as long as Uni Pilot runs.
-   */
-  downloads: Record<string, FileDownload>;
 
   loadCourses: (connection: IliasConnection) => Promise<void>;
   loadContents: (
@@ -70,11 +57,9 @@ interface CourseState {
     refId: string,
   ) => Promise<void>;
   loadAssignments: (connection: IliasConnection, exerciseRefId: string) => Promise<void>;
-  /** Saves a file to Downloads. Only on the student's click; see `downloadIliasFile`. */
-  download: (connection: IliasConnection, fileRefId: string) => Promise<void>;
 }
 
-function hostOf(connection: IliasConnection): string {
+export function hostOf(connection: IliasConnection): string {
   try {
     return new URL(connection.baseUrl).host;
   } catch {
@@ -82,7 +67,7 @@ function hostOf(connection: IliasConnection): string {
   }
 }
 
-function asFailure(cause: unknown): CourseFailure {
+export function asFailure(cause: unknown): CourseFailure {
   return cause instanceof IliasError
     ? { kind: cause.kind, message: cause.message }
     : { kind: 'provider-error', message: 'ILIAS could not be read.' };
@@ -95,7 +80,10 @@ const EMPTY = { courses: null, contents: {}, assignments: {} };
  * new one once — no password, no code — and runs it again. Only when that
  * fails does the student hear "sign in".
  */
-async function withRenewal<T>(connection: IliasConnection, work: () => Promise<T>): Promise<T> {
+export async function withRenewal<T>(
+  connection: IliasConnection,
+  work: () => Promise<T>,
+): Promise<T> {
   try {
     return await work();
   } catch (cause) {
@@ -139,7 +127,6 @@ export const useCourseStore = create<CourseState>()(
         ...EMPTY,
         failure: null,
         loading: {},
-        downloads: {},
 
         loadCourses: (connection) =>
           load(
@@ -168,25 +155,6 @@ export const useCourseStore = create<CourseState>()(
               assignments: { ...get().assignments, [exerciseRefId]: { items, loadedAt } },
             }),
           ),
-
-        download: async (connection, fileRefId) => {
-          if (get().downloads[fileRefId]?.state === 'downloading') return;
-          const note = (download: FileDownload) =>
-            set((state) => ({ downloads: { ...state.downloads, [fileRefId]: download } }));
-
-          note({ state: 'downloading' });
-          try {
-            const saved = await withRenewal(connection, () =>
-              downloadIliasFile(connection, fileRefId),
-            );
-            note({ state: 'saved', ...saved });
-          } catch (cause) {
-            const failure = asFailure(cause);
-            note({ state: 'failed', message: failure.message });
-            // An ended sign-in is the whole page's news, not just this file's.
-            if (failure.kind === 'session-expired') set({ failure });
-          }
-        },
       };
     },
     {

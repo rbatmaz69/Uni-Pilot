@@ -2,6 +2,10 @@ import { useEffect } from 'react';
 import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import {
+  listenToCourseFiles,
+  useCourseFilesStore,
+} from '@/features/courses/store/courseFilesStore';
 
 /**
  * Under ILIAS's idle timeout — 30 minutes by default — so a sign-in lasts as
@@ -29,6 +33,11 @@ const RETURN_GAP_MS = 5 * 60 * 1000;
  * session did end, the store asks the sign-on for a new one before anyone is
  * bothered (`withRenewal`). Once even that fails, the pings stop — they could
  * not bring the sign-in back — until the student signs in.
+ *
+ * Each time the course list arrives — a ping, or the Courses page — the
+ * courses the student set to sync automatically are synced when due
+ * (`courseFilesStore`): the sign-in is known to work at that moment, and the
+ * sync adds no reason of its own to wake ILIAS.
  *
  * Mounted with the app, not a route: leaving the Courses page must not end it.
  */
@@ -59,11 +68,20 @@ export function CourseSync() {
     window.addEventListener('focus', back);
     document.addEventListener('visibilitychange', back);
 
+    void listenToCourseFiles().catch(() => undefined);
+    const stopWatching = useCourseStore.subscribe((state, before) => {
+      const read = state.courses?.loadedAt;
+      const connection = useIliasStore.getState().connection;
+      if (!read || read === before.courses?.loadedAt || !connection || !state.courses) return;
+      void useCourseFilesStore.getState().syncDue(connection, state.courses.items);
+    });
+
     return () => {
       clearInterval(keepAlive);
       clearInterval(clock);
       window.removeEventListener('focus', back);
       document.removeEventListener('visibilitychange', back);
+      stopWatching();
     };
   }, []);
   return null;

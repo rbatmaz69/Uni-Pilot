@@ -17,15 +17,19 @@
 //! - `dates`: ILIAS's "Heute, 10:12" into a date.
 //! - `reauth`: a new ILIAS session through the sign-on, while it still
 //!   remembers the student — no password, no code, no form.
+//! - `mirror`: a course's files kept in the student's Documents, in the
+//!   course's `ILIAS` folder.
 //!
-//! The sync only reads. Nothing it does marks a file as read in ILIAS: files
-//! are described from the lists they appear in. A file is downloaded only when
-//! the student clicks for it (`ilias_sync_download`) — which ILIAS counts as
-//! reading, as it would a click in ILIAS itself.
+//! Reading pages marks nothing as read in ILIAS: files are described from the
+//! lists they appear in. A file is downloaded only when the student clicks for
+//! it, or for a course whose files the student asked Uni Pilot to keep
+//! (`mirror`) — either of which ILIAS counts as reading, as it would a click
+//! in ILIAS itself.
 
 mod dates;
 mod fetch;
 mod links;
+pub mod mirror;
 mod parse;
 pub mod reauth;
 mod session;
@@ -51,17 +55,9 @@ pub enum SyncError {
     Unreachable(String),
     /// ILIAS answered with a page the readers do not know: a new release, most likely.
     Unrecognised(String),
-}
-
-/// A file saved to Downloads. The page opens or shows it by `id`, through
-/// `open_ilias_download` and `reveal_ilias_download`, never by a path.
-#[derive(Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SavedFile {
-    pub id: u64,
-    pub file_name: String,
-    /// Whether Uni Pilot opens it with its default app: documents and media.
-    pub openable: bool,
+    /// Uni Pilot could not do its part on this computer: a course folder that
+    /// could not be written, a sync already running.
+    Local(String),
 }
 
 /// Collapses runs of whitespace — ILIAS's `&nbsp;&nbsp;` padding among them.
@@ -123,22 +119,6 @@ pub async fn ilias_sync_assignments(
         .map_err(SyncError::Refused)?;
     let html = fetch::fetch(&app, &pace, url).await?;
     parse::read_assignments(&html, &exercise_ref_id, today()).map_err(SyncError::Unrecognised)
-}
-
-/// Downloads a file the student clicked, into Downloads. ILIAS counts this as
-/// reading the file — exactly as a click in ILIAS would.
-#[tauri::command]
-pub async fn ilias_sync_download(
-    app: tauri::AppHandle,
-    base_url: String,
-    client_id: String,
-    file_ref_id: String,
-) -> Result<SavedFile, SyncError> {
-    let id = ref_id(&file_ref_id).map_err(SyncError::Refused)?;
-    let url = Page::File(id)
-        .url(&base_url, &client_id)
-        .map_err(SyncError::Refused)?;
-    fetch::download(&app, url, &format!("ilias-file-{id}")).await
 }
 
 #[cfg(test)]

@@ -9,6 +9,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
+  CourseFolder,
+  CourseSyncReport,
   IliasAssignment,
   IliasContentItem,
   IliasCourse,
@@ -104,12 +106,84 @@ const ASSIGNMENTS: IliasAssignment[] = [
   },
 ];
 
+const ROOT = 'Courses/Winter 2025-26/Beispielsysteme 1/ILIAS';
+
+/** The course folders on this computer, as the workspace holds them. */
+let folders: CourseFolder[] = [];
+
+function courseFolder(change: Partial<CourseFolder> = {}): CourseFolder {
+  return {
+    courseRefId: '100100',
+    courseTitle: 'Beispielsysteme 1',
+    root: ROOT,
+    auto: false,
+    excluded: [],
+    syncedAt: null,
+    folders: [{ refId: '100120', title: 'Material', path: `${ROOT}/Material` }],
+    files: {},
+    ...change,
+  };
+}
+
 /** Answers as Rust would; the commands in `signedOut` find the sign-in gone. */
 function answerLikeRust(signedOut: string[] = []) {
   const forgotten = vi.fn<() => Promise<unknown>>().mockRejectedValue({ kind: 'signedOut' });
   invoke.mockImplementation((command, args) => {
     if (signedOut.includes(command)) return forgotten();
+    const configure = () => {
+      const current = folders[0] ?? courseFolder();
+      const next = {
+        ...current,
+        ...(args.auto === null || args.auto === undefined ? {} : { auto: args.auto as boolean }),
+        ...(args.excluded ? { excluded: args.excluded as string[] } : {}),
+      };
+      folders = [next];
+      return next;
+    };
     switch (command) {
+      case 'ilias_mirror_list':
+        return Promise.resolve(folders);
+      case 'ilias_mirror_course': {
+        const summary = courseFolder({
+          syncedAt: new Date().toISOString(),
+          files: {
+            '100121': { path: `${ROOT}/Material/Beispiel_DB.backup`, state: 'synced', version: 3 },
+          },
+        });
+        folders = [summary];
+        const report: CourseSyncReport = {
+          summary,
+          added: [`${ROOT}/Material/Beispiel_DB.backup`],
+          updated: [],
+          kept: [],
+          tooLarge: [{ refId: '100122', title: 'Vorlesung 1', size: 300 * 1024 * 1024 }],
+          gone: 0,
+          failed: [],
+        };
+        return Promise.resolve(report);
+      }
+      case 'ilias_mirror_configure':
+        return Promise.resolve(configure());
+      case 'ilias_mirror_detach':
+        folders = [];
+        return Promise.resolve(undefined);
+      case 'ilias_mirror_file':
+        folders = [
+          courseFolder({
+            files: {
+              '100121': {
+                path: `${ROOT}/Material/Beispiel_DB.backup`,
+                state: 'synced',
+                version: 3,
+              },
+            },
+          }),
+        ];
+        return Promise.resolve({
+          path: `${ROOT}/Material/Beispiel_DB.backup`,
+          state: 'synced',
+          version: 3,
+        });
       case 'ilias_sync_courses':
         return Promise.resolve(COURSES);
       case 'ilias_sync_contents':
@@ -118,8 +192,6 @@ function answerLikeRust(signedOut: string[] = []) {
         );
       case 'ilias_sync_assignments':
         return Promise.resolve(ASSIGNMENTS);
-      case 'ilias_sync_download':
-        return Promise.resolve({ id: 7, fileName: 'Beispiel_DB.backup', openable: false });
       default:
         return Promise.resolve(undefined);
     }
@@ -128,6 +200,7 @@ function answerLikeRust(signedOut: string[] = []) {
 
 beforeEach(() => {
   invoke.mockReset();
+  folders = [];
   answerLikeRust();
   useIliasStore.setState({
     connection: {
@@ -147,7 +220,6 @@ beforeEach(() => {
     assignments: {},
     failure: null,
     loading: {},
-    downloads: {},
   });
 });
 
@@ -214,23 +286,43 @@ describe('inside a course', () => {
     });
   });
 
-  it('downloads a file on a click and shows where it went', async () => {
+  it('downloads a file on a click into the course folder in Documents', async () => {
     pretendDesktop();
     const user = userEvent.setup();
     renderApp('/courses?course=100100&trail=100120');
 
     await user.click(await screen.findByRole('button', { name: 'Download Beispiel_DB' }));
-    expect(await screen.findByText('Saved to Downloads')).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith('ilias_sync_download', {
+    expect(await screen.findByText('On this computer')).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith('ilias_mirror_file', {
       baseUrl: 'https://ilias.hs-heilbronn.de',
       clientId: 'iliashhn',
-      fileRefId: '100121',
+      course: {
+        refId: '100100',
+        container: 'crs',
+        title: 'Beispielsysteme 1',
+        semester: 'Winter 2025-26',
+      },
+      // Read from the course's contents, though the folder was opened by a link.
+      trail: [{ refId: '100120', title: 'Material' }],
+      file: {
+        refId: '100121',
+        title: 'Beispiel_DB',
+        suffix: 'backup',
+        size: 51087,
+        version: 3,
+        updatedAt: '2025-09-15T08:41',
+      },
     });
 
-    // A backup is not a document: Uni Pilot shows it in its folder, it does not run it.
-    expect(screen.queryByRole('button', { name: 'Open Beispiel_DB' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Show Beispiel_DB in its folder' }));
-    expect(invoke).toHaveBeenCalledWith('reveal_ilias_download', { id: 7 });
+    expect(screen.getByRole('link', { name: 'Show Beispiel_DB in Documents' })).toHaveAttribute(
+      'href',
+      `/documents?path=${encodeURIComponent(`${ROOT}/Material`).replaceAll('%20', '+')}`,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open Beispiel_DB' }));
+    expect(invoke).toHaveBeenCalledWith('document_request', {
+      request: { action: 'open', path: `${ROOT}/Material/Beispiel_DB.backup` },
+    });
+    expect(screen.queryByRole('button', { name: 'Download Beispiel_DB' })).not.toBeInTheDocument();
   });
 
   it("lists an exercise's assignments with deadline and hand-in", async () => {
@@ -244,6 +336,81 @@ describe('inside a course', () => {
     expect(within(past).getByText('Not handed in')).toBeInTheDocument();
     expect(within(past).getByText('Mandatory')).toBeInTheDocument();
     expect(within(past).getByText('Nicht bewertet')).toBeInTheDocument();
+  });
+});
+
+describe("keeping a course's files in Documents", () => {
+  it('syncs a course when the student switches it on, and syncs it automatically after', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/courses?course=100100');
+
+    const panel = await screen.findByRole('region', { name: 'Course files' });
+    expect(within(panel).getByText(/counts as opening the files in ILIAS/)).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: 'Sync to Documents' }));
+
+    expect(await within(panel).findByText('In your Documents')).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith('ilias_mirror_course', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+      course: {
+        refId: '100100',
+        container: 'crs',
+        title: 'Beispielsysteme 1',
+        semester: 'Winter 2025-26',
+      },
+    });
+    expect(within(panel).getByRole('switch', { name: 'Sync automatically' })).toBeChecked();
+    expect(within(panel).getByRole('link', { name: ROOT })).toBeInTheDocument();
+    expect(within(panel).getByText('1 new')).toBeInTheDocument();
+    expect(within(panel).getByText(/Vorlesung 1 \(300 MB\)/)).toBeInTheDocument();
+  });
+
+  it('marks the courses whose files are in Documents', async () => {
+    pretendDesktop();
+    folders = [courseFolder({ auto: true })];
+    renderApp('/courses');
+
+    const synced = await screen.findByRole('link', { name: /Beispielsysteme 1 - WS25/ });
+    expect(await within(synced).findByText('Files in Documents')).toBeInTheDocument();
+  });
+
+  it('leaves out a folder the student switches off', async () => {
+    pretendDesktop();
+    folders = [courseFolder({ auto: true })];
+    const user = userEvent.setup();
+    renderApp('/courses?course=100100');
+
+    const folderSwitch = await screen.findByRole('switch', { name: 'Sync Material' });
+    expect(folderSwitch).toBeChecked();
+    await user.click(folderSwitch);
+    expect(invoke).toHaveBeenCalledWith('ilias_mirror_configure', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      courseRefId: '100100',
+      auto: null,
+      excluded: ['100120'],
+    });
+    expect(await screen.findByRole('switch', { name: 'Sync Material' })).not.toBeChecked();
+  });
+
+  it('stops syncing after asking, and leaves the files where they are', async () => {
+    pretendDesktop();
+    folders = [courseFolder({ auto: true, syncedAt: '2026-09-25T09:00:00.000Z' })];
+    const user = userEvent.setup();
+    renderApp('/courses?course=100100');
+
+    const panel = await screen.findByRole('region', { name: 'Course files' });
+    await user.click(await within(panel).findByRole('button', { name: 'Stop syncing…' }));
+    expect(within(panel).getByText('The files stay in Documents.')).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: 'Stop syncing' }));
+
+    expect(invoke).toHaveBeenCalledWith('ilias_mirror_detach', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      courseRefId: '100100',
+    });
+    expect(
+      await within(panel).findByRole('button', { name: 'Sync to Documents' }),
+    ).toBeInTheDocument();
   });
 });
 
