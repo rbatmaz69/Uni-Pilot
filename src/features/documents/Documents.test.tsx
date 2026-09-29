@@ -9,6 +9,7 @@ import {
   type DocumentRequest,
 } from '@/features/documents/lib/files';
 import { clearPreviewCache } from '@/features/documents/lib/previewCache';
+import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { isDesktopRuntime } from '@/lib/icsFetch';
 
 vi.mock('@/features/documents/lib/files', async (original) => ({
@@ -353,6 +354,16 @@ describe('Document explorer', () => {
     expect(workspace).toHaveClass('is-focus');
     await user.keyboard('{Meta>}{Shift>}f{/Shift}{/Meta}');
     expect(workspace).not.toHaveClass('is-focus');
+  });
+
+  it('toggles the Textmarker with ⌘⇧M without saving anything', async () => {
+    const { user, editor } = await openNotes();
+    await user.click(editor);
+    await user.keyboard('{Meta>}{Shift>}m{/Shift}{/Meta}');
+    expect(useNoteStyleStore.getState().markers).toBe(true);
+    await user.keyboard('{Meta>}{Shift>}m{/Shift}{/Meta}');
+    expect(useNoteStyleStore.getState().markers).toBe(false);
+    expect(saves()).toEqual([]);
   });
 
   it('renames the note from the title on its page and reopens it there', async () => {

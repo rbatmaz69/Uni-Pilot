@@ -2013,6 +2013,59 @@ button.document-tree-disclosure:hover {
   background: var(--accent-primary-soft);
   color: var(--accent-primary);
 }
+/* Textmarker: each sentence under the ink of its role, drawn only while it is on.
+   Its first and last word feather into the sentence beside it, like overlapping
+   strokes; the rounded, uneven ends are where the pen was set down and lifted.
+   Every rule stays at one class, so a find-in-note match on the same text wins. */
+:where(.text-marker, .text-marker-role).is-definition {
+  --marker: var(--marker-definition);
+}
+:where(.text-marker, .text-marker-role).is-fact {
+  --marker: var(--marker-fact);
+}
+:where(.text-marker, .text-marker-role).is-claim {
+  --marker: var(--marker-claim);
+}
+:where(.text-marker, .text-marker-role).is-opinion {
+  --marker: var(--marker-opinion);
+}
+:where(.text-marker, .text-marker-role).is-qualification {
+  --marker: var(--marker-qualification);
+}
+.text-marker {
+  /* Without a neighbour the stroke keeps its own ink right to the end. */
+  --marker-in: color-mix(in oklab, var(--marker-before, var(--marker)) 70%, var(--marker));
+  --marker-out: color-mix(in oklab, var(--marker-after, var(--marker)) 70%, var(--marker));
+  padding-block: 0.1em;
+  background-color: var(--marker);
+  color: inherit;
+  transition: background-color 250ms ease;
+}
+.text-marker:where(.is-marker-start) {
+  border-start-start-radius: 0.3em 0.5em;
+  border-end-start-radius: 0.2em 0.4em;
+  background-color: transparent;
+  background-image: linear-gradient(90deg, var(--marker-in), var(--marker) 1.6em);
+}
+.text-marker:where(.is-marker-end) {
+  border-start-end-radius: 0.2em 0.4em;
+  border-end-end-radius: 0.35em 0.5em;
+  background-color: transparent;
+  background-image: linear-gradient(270deg, var(--marker-out), var(--marker) 1.6em);
+}
+.text-marker:where(.is-marker-start.is-marker-end) {
+  background-image: linear-gradient(
+    90deg,
+    var(--marker-in),
+    var(--marker) 0.8em,
+    var(--marker) calc(100% - 0.8em),
+    var(--marker-out)
+  );
+}
+/* A spotlight on one role leaves the others as a faint trace. */
+.text-marker:where(.is-muted) {
+  background-color: color-mix(in oklab, var(--marker) 22%, transparent);
+}
 .note-search-match {
   border-radius: 2px;
   background: var(--page-search-match);
@@ -2483,6 +2536,24 @@ button.document-tree-disclosure:hover {
   border: 0;
   border-radius: 0;
 }
+/* The highlighter on the dock sits on a swipe of every ink while it is on. */
+.editor-dock-marker {
+  display: inline-flex;
+  padding: 3px 5px;
+  border-radius: 0.3em 0.5em 0.35em 0.45em;
+  transition: background-color 150ms ease;
+}
+.editor-dock-marker.is-on {
+  background: linear-gradient(
+    100deg,
+    var(--marker-definition),
+    var(--marker-fact) 30%,
+    var(--marker-claim) 55%,
+    var(--marker-opinion) 78%,
+    var(--marker-qualification)
+  );
+  color: var(--text-primary);
+}
 .note-layout-glyph {
   flex: none;
   width: 28px;
@@ -2546,6 +2617,9 @@ button.document-tree-disclosure:hover {
 .editor-popover.is-info {
   --popover-width: 320px;
 }
+.editor-popover.is-marker {
+  --popover-width: 360px;
+}
 .editor-popover-heading {
   display: flex;
   flex: none;
@@ -2585,6 +2659,95 @@ button.document-tree-disclosure:hover {
 .editor-popover button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* The Textmarker popover: the switch, then its inks as a key to the colours.
+   While it is on, each ink fills as far as its role covers the note. */
+.text-marker-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.text-marker-toggle-title {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 550;
+}
+.text-marker-toggle small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.text-marker-toggle kbd {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface-secondary);
+  font-family: inherit;
+  font-size: 11px;
+}
+.text-marker-toggle:has(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.text-marker-legend {
+  display: grid;
+  gap: 2px;
+  margin: 0 -8px 14px;
+  padding: 0;
+  list-style: none;
+}
+.text-marker-role {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 46px 1fr;
+  column-gap: 12px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: background-color 150ms ease;
+}
+.text-marker-role:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.text-marker-role[aria-pressed='true'] {
+  background: var(--accent-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-primary);
+}
+/* Off, the inks are still the key to the colours, not a greyed-out control. */
+.editor-popover .text-marker-role:disabled {
+  opacity: 1;
+}
+.text-marker-swatch {
+  grid-row: span 2;
+  height: 18px;
+  border-radius: 0.3em 0.5em 0.35em 0.45em;
+  /* Two coats of the translucent ink, so the key reads at a glance. */
+  --swatch: linear-gradient(
+    90deg,
+    var(--marker) var(--marker-share),
+    color-mix(in oklab, var(--marker) 30%, transparent) var(--marker-share)
+  );
+  background: var(--swatch), var(--swatch);
+}
+.text-marker-role-name {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 550;
+}
+.text-marker-role-hint {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Segmented controls: the Insert tabs, and short ordered choices. */
@@ -4549,6 +4712,11 @@ button.document-tree-disclosure:hover {
   --note-bold-blue: var(--note-bold-blue-light);
   --note-bold-teal: var(--note-bold-teal-light);
   --note-bold-rose: var(--note-bold-rose-light);
+  --marker-definition: var(--marker-definition-light);
+  --marker-fact: var(--marker-fact-light);
+  --marker-claim: var(--marker-claim-light);
+  --marker-opinion: var(--marker-opinion-light);
+  --marker-qualification: var(--marker-qualification-light);
   --text-primary: var(--notebook-ink);
   --text-secondary: var(--notebook-ink-muted);
   --text-muted: var(--notebook-ink-faint);
@@ -6209,6 +6377,11 @@ button.document-tree-disclosure:hover {
   --note-bold-blue: var(--note-bold-blue-light);
   --note-bold-teal: var(--note-bold-teal-light);
   --note-bold-rose: var(--note-bold-rose-light);
+  --marker-definition: var(--marker-definition-light);
+  --marker-fact: var(--marker-fact-light);
+  --marker-claim: var(--marker-claim-light);
+  --marker-opinion: var(--marker-opinion-light);
+  --marker-qualification: var(--marker-qualification-light);
   --accent-yellow-soft: var(--notebook-highlight);
   --accent-yellow: var(--notebook-highlight-strong);
   --page: #fbf7ee;
@@ -6225,6 +6398,11 @@ button.document-tree-disclosure:hover {
   --note-bold-blue: var(--note-bold-blue-dark);
   --note-bold-teal: var(--note-bold-teal-dark);
   --note-bold-rose: var(--note-bold-rose-dark);
+  --marker-definition: var(--marker-definition-dark);
+  --marker-fact: var(--marker-fact-dark);
+  --marker-claim: var(--marker-claim-dark);
+  --marker-opinion: var(--marker-opinion-dark);
+  --marker-qualification: var(--marker-qualification-dark);
   --accent-yellow-soft: var(--note-highlight-dark);
   --accent-yellow: var(--note-highlight-dark-strong);
   --page: #252b2a;

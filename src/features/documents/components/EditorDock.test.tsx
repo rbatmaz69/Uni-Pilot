@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { noteExtensions } from '@/features/documents/lib/markdown';
 import { noteStats } from '@/features/documents/lib/noteOutline';
+import { setTextMarker, TextMarker } from '@/features/documents/lib/textMarker';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { EditorDock } from './EditorDock';
 
@@ -17,11 +18,17 @@ beforeEach(() => {
     cover: 'none',
     backdrop: 'paper',
     focus: false,
+    markers: false,
+    markerOnly: null,
   });
 });
 afterEach(() => editor?.destroy());
 function open(content = 'Keep my notes', disabled = false) {
-  editor = new Editor({ extensions: noteExtensions(), content, contentType: 'markdown' });
+  editor = new Editor({
+    extensions: [...noteExtensions(), TextMarker],
+    content,
+    contentType: 'markdown',
+  });
   const onImage = vi.fn();
   const onCanvas = vi.fn();
   render(
@@ -254,6 +261,35 @@ describe('editor dock', () => {
       });
       expect(editor.getMarkdown()).toBe(content);
     }
+  });
+
+  it('turns the Textmarker on from its popover and spotlights one role from its key', () => {
+    const content = 'I think this is great. It was founded in 1998. The bus is red.';
+    open(content);
+    const button = within(dock()).getByRole('button', { name: 'Textmarker' });
+    expect(button).toHaveAttribute('title', 'Textmarker: Off');
+    const panel = openPanel('Textmarker', 'Textmarker');
+    const fact = within(panel).getByRole('button', { name: 'Fact' });
+    expect(fact).toBeDisabled();
+    expect(fact).toHaveAccessibleDescription('Numbers, dates and sources');
+
+    fireEvent.click(within(panel).getByRole('switch', { name: /^Mark sentences by role/ }));
+    expect(useNoteStyleStore.getState().markers).toBe(true);
+    expect(button).toHaveAttribute('title', 'Textmarker: On');
+    // What the editor does when the setting changes.
+    act(() => setTextMarker(editor.view, { enabled: true, only: null }));
+    expect(fact).toHaveAccessibleDescription('38% · Numbers, dates and sources');
+    expect(within(panel).getByRole('button', { name: 'Opinion' })).toHaveAccessibleDescription(
+      '37% · A view or a judgement',
+    );
+    expect(within(panel).getByText(/25% has no clear cue/)).toBeInTheDocument();
+
+    fireEvent.click(fact);
+    expect(fact).toHaveAttribute('aria-pressed', 'true');
+    expect(useNoteStyleStore.getState().markerOnly).toBe('fact');
+    fireEvent.click(fact);
+    expect(useNoteStyleStore.getState().markerOnly).toBeNull();
+    expect(editor.getMarkdown()).toBe(content);
   });
 
   it('shows each statistic once', () => {

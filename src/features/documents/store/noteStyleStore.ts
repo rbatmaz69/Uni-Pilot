@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_NOTE_FONT, noteFont, type PageFont } from '@/features/documents/lib/noteFonts';
 import { clampZoom } from '@/features/documents/lib/pageSheets';
+import type { SentenceKind } from '@/features/documents/lib/textMarker';
 
 /** How a note is presented while writing: a plain page, or a ring-bound notebook. */
 export type NoteStyle = 'standard' | 'notebook';
@@ -49,6 +50,10 @@ interface NoteStyleState {
   sidebar: boolean;
   /** Dims everything but the block being written and steps the chrome back. */
   focus: boolean;
+  /** Colours each sentence by its role, like a set of highlighters; never saved into the note. */
+  markers: boolean;
+  /** The one role the Textmarker spotlights, for this session only. */
+  markerOnly: SentenceKind | null;
   /** Per note path, the document position the ribbon marks. */
   bookmarks: Record<string, number>;
   setStyle: (style: NoteStyle) => void;
@@ -66,6 +71,8 @@ interface NoteStyleState {
   setZoom: (zoom: number) => void;
   toggleSidebar: () => void;
   toggleFocus: () => void;
+  toggleMarkers: () => void;
+  setMarkerOnly: (kind: SentenceKind | null) => void;
   setBookmark: (path: string, position: number | null) => void;
   /** Keeps a note's bookmark when the note is renamed. */
   moveBookmark: (from: string, to: string) => void;
@@ -89,6 +96,8 @@ export const useNoteStyleStore = create<NoteStyleState>()(
       zoom: 1,
       sidebar: true,
       focus: false,
+      markers: false,
+      markerOnly: null,
       bookmarks: {},
       setStyle: (style) => set({ style }),
       setPaper: (paper) => set({ paper }),
@@ -105,6 +114,9 @@ export const useNoteStyleStore = create<NoteStyleState>()(
       setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
       toggleSidebar: () => set((state) => ({ sidebar: !state.sidebar })),
       toggleFocus: () => set((state) => ({ focus: !state.focus })),
+      // Turning the Textmarker off or on again starts without a spotlight.
+      toggleMarkers: () => set((state) => ({ markers: !state.markers, markerOnly: null })),
+      setMarkerOnly: (markerOnly) => set({ markerOnly }),
       setBookmark: (path, position) =>
         set((state) => {
           const bookmarks = { ...state.bookmarks };
@@ -124,6 +136,8 @@ export const useNoteStyleStore = create<NoteStyleState>()(
     {
       name: 'uni-pilot.note-style',
       version: 2,
+      // A spotlight is a look at one note, not a preference.
+      partialize: (state) => ({ ...state, markerOnly: null }),
       migrate: (persisted, version) => {
         let state = persisted as Partial<NoteStyleState>;
         // Version 1 brings sheets: the growing card was the default, not a choice.
