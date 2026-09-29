@@ -19,6 +19,7 @@ export function DocumentsPage() {
   const [params] = useSearchParams();
   const location = useLocation();
   const path = workspacePath(params.get('path'));
+  const file = workspacePath(params.get('file')) || null;
   const courseId = idParam(params.get('course'));
   const course: IliasCourseView | null = courseId
     ? {
@@ -35,7 +36,12 @@ export function DocumentsPage() {
       <h1 className="sr-only">{NAV_ITEMS.documents.label}</h1>
       <p className="sr-only">{NAV_ITEMS.documents.subtitle}</p>
       {/* Each link is a request the open explorer follows, keeping its view and tabs. */}
-      <DocumentExplorer initialPath={path} initialCourse={course} request={location.key} />
+      <DocumentExplorer
+        initialPath={path}
+        initialCourse={course}
+        initialFile={file}
+        request={location.key}
+      />
     </Page>
   );
 }

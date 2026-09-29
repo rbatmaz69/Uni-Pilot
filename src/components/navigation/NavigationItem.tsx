@@ -1,44 +1,32 @@
-import { NavLink } from 'react-router-dom';
+import type { AnchorHTMLAttributes } from 'react';
+import { Link, useMatch } from 'react-router-dom';
 import { Tooltip } from '@/components/ui';
-import { cn } from '@/lib/utils';
 import type { NavItem } from '@/types';
+import { SIDEBAR_ICON, sidebarIconClass, sidebarRowClass } from './sidebarRow';
 
-export function NavigationItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+interface NavigationItemProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
+  item: NavItem;
+  collapsed: boolean;
+  /** Overrides route matching, e.g. while a favorite inside this page is the current place. */
+  active?: boolean | undefined;
+}
+
+export function NavigationItem({ item, collapsed, active, ...props }: NavigationItemProps) {
+  const match = useMatch({ path: item.path, end: false });
+  const current = active ?? Boolean(match);
   const Icon = item.icon;
   return (
     <Tooltip label={item.label} disabled={!collapsed} className="w-full">
-      <NavLink
+      <Link
+        {...props}
         to={item.path}
         aria-label={item.label}
-        className={({ isActive }) =>
-          cn(
-            'nav-link group flex h-[37px] w-full items-center rounded-full transition-colors duration-150',
-            collapsed ? 'justify-center' : 'gap-3 px-3.5',
-            isActive
-              ? 'bg-sidebar-active/80 font-semibold text-sidebar-foreground'
-              : 'text-sidebar-muted hover:bg-sidebar-hover/65 hover:text-sidebar-foreground',
-          )
-        }
+        aria-current={current ? 'page' : undefined}
+        className={sidebarRowClass(current, collapsed)}
       >
-        {({ isActive }) => (
-          <>
-            <Icon
-              size={20}
-              strokeWidth={isActive ? 2 : 1.7}
-              className="nav-icon flex-none"
-              aria-hidden
-            />
-            {!collapsed && (
-              <span className="sidebar-label min-w-0 flex-1 truncate text-[13.5px]">
-                {item.label}
-              </span>
-            )}
-            {!collapsed && isActive && (
-              <span aria-hidden className="sidebar-label h-1.5 w-1.5 rounded-full bg-accent" />
-            )}
-          </>
-        )}
-      </NavLink>
+        <Icon {...SIDEBAR_ICON} className={sidebarIconClass(current)} aria-hidden />
+        {!collapsed && <span className="sidebar-label min-w-0 flex-1 truncate">{item.label}</span>}
+      </Link>
     </Tooltip>
   );
 }

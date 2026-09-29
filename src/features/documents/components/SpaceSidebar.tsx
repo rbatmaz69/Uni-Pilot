@@ -38,7 +38,9 @@ import {
 } from '@/features/documents/lib/spaces';
 import { useSpaceStore } from '@/features/documents/store/spaceStore';
 import { IliasBadge } from '@/features/integrations';
+import { toFavorite, writeDocumentDrag } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
+import { useSidebarStore } from '@/store/sidebarStore';
 
 type Props = {
   desktop: boolean;
@@ -104,6 +106,7 @@ export function SpaceSidebar({
 }: Props) {
   const listedCourses = useCourseStore((state) => state.courses);
   const [dropping, setDropping] = useState(false);
+  const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
   const spaces = useSpaceStore((state) => state.spaces);
   const picked = useSpaceStore((state) => state.picked);
   const setPicked = useSpaceStore((state) => state.pick);
@@ -228,6 +231,12 @@ export function SpaceSidebar({
         <div
           className={cn('document-tree-row', active && 'is-active')}
           style={{ paddingLeft: `${8 + depth * 18}px` }}
+          draggable={desktop}
+          onDragStart={(event) => {
+            writeDocumentDrag(event.dataTransfer, entry);
+            setDocumentDrag(toFavorite(entry));
+          }}
+          onDragEnd={() => setDocumentDrag(null)}
         >
           {disclosure ? (
             <button

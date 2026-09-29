@@ -16,6 +16,7 @@ import {
 } from '@/features/courses/store/courseFilesStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
+import { useSidebarStore } from '@/store/sidebarStore';
 import { useUiStore } from '@/store/uiStore';
 import { useFocusStore } from '@/features/focus/store/focusStore';
 
@@ -43,6 +44,15 @@ afterEach(() => {
     studentEventsCollapsed: false,
     theme: 'light',
     immersive: false,
+  });
+  useSidebarStore.setState({
+    favorites: [],
+    order: {},
+    hidden: [],
+    collapsedSections: [],
+    documentDrag: null,
+    documentDragOver: false,
+    activeDocument: null,
   });
   useSourceStore.setState({ sources: [], syncingIds: [] });
   useTaskStore.setState({ tasks: [] });

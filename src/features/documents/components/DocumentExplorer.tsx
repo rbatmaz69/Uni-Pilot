@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   ArrowLeft,
   PanelsTopLeft,
@@ -17,6 +17,7 @@ import {
   Pencil,
   RefreshCw,
   Search,
+  Star,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -33,7 +34,9 @@ import { Button, IconButton, Modal } from '@/components/ui';
 import { IliasBadge } from '@/features/integrations';
 import { formatTimeAgo } from '@/lib/date';
 import { isDesktopRuntime } from '@/lib/icsFetch';
+import { toFavorite, writeDocumentDrag } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
+import { useSidebarStore } from '@/store/sidebarStore';
 import {
   documentRequest,
   editable,
@@ -85,6 +88,15 @@ function folderName(path: string, courses: IliasCourse[] | null = null) {
 }
 const EMPTY_ENTRIES: DocumentEntry[] = [];
 
+function joinPath(folder: string, name: string) {
+  return folder ? `${folder}/${name}` : name;
+}
+
+/** A note a link points at; the explorer opens it over its folder. */
+function fileEntry(path: string): DocumentEntry {
+  return { path, name: path.split('/').at(-1) ?? path, folder: false, size: 0, modified: 0 };
+}
+
 interface DocumentExplorerProps {
   /**
    * A workspace folder to open at, e.g. a course's `ILIAS` folder linked from a
@@ -94,9 +106,11 @@ interface DocumentExplorerProps {
   initialPath?: string;
   /** A course to open in the ILIAS space. */
   initialCourse?: IliasCourseView | null;
+  /** A file to open over `initialPath`, e.g. a note kept under Favorites. */
+  initialFile?: string | null;
   /**
    * Changes with every link followed to Documents. The open explorer then goes
-   * to `initialPath` and `initialCourse`, keeping its view and tabs.
+   * to `initialPath`, `initialCourse` and `initialFile`, keeping its view and tabs.
    */
   request?: string;
 }
@@ -104,6 +118,7 @@ interface DocumentExplorerProps {
 export function DocumentExplorer({
   initialPath = '',
   initialCourse = null,
+  initialFile = null,
   request,
 }: DocumentExplorerProps) {
   const desktop = isDesktopRuntime();
@@ -159,6 +174,16 @@ export function DocumentExplorer({
   const searchQuery = query.trim();
   const searching = desktop && searchQuery.length >= 2;
   const searchHits = search?.query === searchQuery ? search.hits : null;
+  const shownPath = note?.entry.path ?? path;
+  const favorite = useSidebarStore((state) =>
+    state.favorites.some((item) => item.path === selected),
+  );
+  const addFavorite = useSidebarStore((state) => state.addFavorite);
+  const removeFavorite = useSidebarStore((state) => state.removeFavorite);
+  const relocateFavorites = useSidebarStore((state) => state.relocateFavorites);
+  const forgetFavorites = useSidebarStore((state) => state.forgetFavorites);
+  const setActiveDocument = useSidebarStore((state) => state.setActiveDocument);
+  const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
 
   function rememberTab(tab: DocumentTab) {
     setTabs((current) =>
@@ -227,6 +252,12 @@ export function DocumentExplorer({
     const timeout = window.setTimeout(() => setNotice(''), 5000);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  // Lets the sidebar light up a favorite while it is the place on screen.
+  useEffect(() => {
+    setActiveDocument(shownPath);
+  }, [shownPath, setActiveDocument]);
+  useEffect(() => () => setActiveDocument(null), [setActiveDocument]);
 
   const refresh = useCallback(async () => {
     if (!desktop) return;
@@ -359,18 +390,6 @@ export function DocumentExplorer({
     });
   }
 
-  // A link followed while Documents is open: go where it points.
-  useEffect(() => {
-    if (request === followed.current) return;
-    followed.current = request;
-    const target = initialPath;
-    const course = initialCourse;
-    leaveThen(() => {
-      setIliasCourse(course);
-      navigate(target);
-    });
-  });
-
   // A course's first sync makes its folder; the ILIAS space and sidebar read it then.
   useEffect(
     () =>
@@ -466,14 +485,17 @@ export function DocumentExplorer({
         setNotice(`${name.trim()} created on your computer.`);
       } else if (dialog.type === 'trash') {
         await documentRequest({ action: 'trash', path: dialog.entry.path });
+        forgetFavorites(dialog.entry.path);
         setNotice('Moved to Recently deleted. You can restore it at any time.');
       } else {
+        const target = dialog.type === 'move' ? destination : path;
         await documentRequest({
           action: 'move',
           path: dialog.entry.path,
-          destination: dialog.type === 'move' ? destination : path,
+          destination: target,
           name: name.trim(),
         });
+        relocateFavorites(dialog.entry.path, joinPath(target, name.trim()));
         setNotice('Changes saved on your computer.');
       }
       setDialog(null);
@@ -529,6 +551,25 @@ export function DocumentExplorer({
       setBusy(false);
     }
   }
+  // A link followed while Documents is open: go where it points.
+  useEffect(() => {
+    if (request === followed.current) return;
+    followed.current = request;
+    const target = initialPath;
+    const course = initialCourse;
+    const file = initialFile;
+    leaveThen(() => {
+      setIliasCourse(course);
+      navigate(target);
+      if (file) activate(fileEntry(file));
+    });
+  });
+  // The first link opens its folder through the initial state; a note it names opens here.
+  const openInitialFile = useEffectEvent(() => {
+    if (initialFile) activate(fileEntry(initialFile));
+  });
+  useEffect(() => openInitialFile(), []);
+
   const breadcrumbs = path ? path.split('/') : [];
 
   return (
@@ -950,6 +991,7 @@ export function DocumentExplorer({
                         destination: target,
                         name: item.name,
                       });
+                      relocateFavorites(item.path, joinPath(target, item.name));
                       moved = true;
                       setSelected(null);
                       setNotice(
@@ -996,6 +1038,12 @@ export function DocumentExplorer({
                             aria-label={`Select ${item.name}`}
                             aria-pressed={selected === item.path}
                             disabled={busy}
+                            draggable={desktop && !inTrash}
+                            onDragStart={(event) => {
+                              writeDocumentDrag(event.dataTransfer, item);
+                              setDocumentDrag(toFavorite(item));
+                            }}
+                            onDragEnd={() => setDocumentDrag(null)}
                             onClick={() => setSelected(item.path)}
                             onDoubleClick={() => activate(item)}
                             onKeyDown={(event) => {
@@ -1120,6 +1168,18 @@ export function DocumentExplorer({
                     </Button>
                   ) : (
                     <>
+                      <IconButton
+                        label={favorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                        onClick={() =>
+                          favorite ? removeFavorite(entry.path) : addFavorite(toFavorite(entry))
+                        }
+                      >
+                        <Star
+                          size={15}
+                          fill={favorite ? 'currentColor' : 'none'}
+                          className={favorite ? 'text-yellow' : undefined}
+                        />
+                      </IconButton>
                       <IconButton
                         label="Rename selected item"
                         {...(locked ? { title: locked } : {})}
