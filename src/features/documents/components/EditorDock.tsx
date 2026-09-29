@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useEditorState } from '@tiptap/react';
-import { Focus, Info, Plus, Redo2, Undo2 } from 'lucide-react';
+import { Focus, Highlighter, Info, Plus, Redo2, Undo2 } from 'lucide-react';
 import {
   layoutChoice,
   layoutSummary,
@@ -22,8 +22,9 @@ import { cn } from '@/lib/utils';
 import { LayoutGlyph, LayoutPanel, PagePanel, TypographyPanel } from './NoteAppearance';
 import { NoteInsertPanel, type InsertTab } from './NoteInsertPanel';
 import { NoteTextPanel } from './NoteTextPanel';
+import { TextMarkerPanel } from './TextMarkerPanel';
 
-type Panel = 'insert' | 'text' | 'layout' | 'type' | 'page' | 'info';
+type Panel = 'insert' | 'text' | 'layout' | 'type' | 'page' | 'info' | 'marker';
 
 const TITLES: Record<Panel, string> = {
   insert: 'Insert',
@@ -32,6 +33,7 @@ const TITLES: Record<Panel, string> = {
   type: 'Typography',
   page: 'Page',
   info: 'Details',
+  marker: 'Textmarker',
 };
 /** Room kept between a popover and the edges of the editor. */
 const EDGE = 12;
@@ -167,7 +169,10 @@ export function EditorDock({
   const layoutText = layoutSummary(layout, settings.width, settings.paper);
   const typeText = typographySummary(settings.font, settings.textSize);
   const shown: Panel | null =
-    open && ((open !== 'insert' && open !== 'text') || writing) && !(open === 'page' && notebook)
+    open &&
+    ((open !== 'insert' && open !== 'text') || writing) &&
+    !(open === 'page' && notebook) &&
+    (open !== 'marker' || editor)
       ? open
       : null;
 
@@ -255,11 +260,18 @@ export function EditorDock({
   function toggle(name: Panel) {
     setOpen((current) => (current === name ? null : name));
   }
-  function panelButton(name: Panel, label: string, content: ReactNode, current?: string) {
+  /** `current` names the setting in the tooltip; `valued` makes room for it on the button. */
+  function panelButton(
+    name: Panel,
+    label: string,
+    content: ReactNode,
+    current?: string,
+    valued = current !== undefined,
+  ) {
     return (
       <button
         type="button"
-        className={cn('editor-dock-button', current && 'has-value')}
+        className={cn('editor-dock-button', valued && 'has-value')}
         data-panel={name}
         aria-label={label}
         title={current ? `${label}: ${current}` : label}
@@ -348,6 +360,7 @@ export function EditorDock({
             {shown === 'info' && stats && (
               <DetailsPanel stats={stats} fileName={fileName} keepsProperties={keepsProperties} />
             )}
+            {shown === 'marker' && <TextMarkerPanel editor={editor} />}
           </div>
         </div>
       )}
@@ -432,6 +445,17 @@ export function EditorDock({
             )}
         <span className="editor-dock-divider" aria-hidden />
         {panelButton('info', 'Note details', <Info size={18} aria-hidden />)}
+        {editor
+          ? panelButton(
+              'marker',
+              'Textmarker',
+              <span className={cn('editor-dock-marker', settings.markers && 'is-on')} aria-hidden>
+                <Highlighter size={18} />
+              </span>,
+              settings.markers ? 'On' : 'Off',
+              false,
+            )
+          : null}
         <button
           type="button"
           className="editor-dock-button"

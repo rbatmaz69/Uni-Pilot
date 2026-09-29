@@ -42,6 +42,7 @@ import { NoteSearch } from '@/features/documents/lib/noteSearch';
 import { NotePageBreaks, setPageBreaks } from '@/features/documents/lib/pageBreaks';
 import { noteTitle, titleToFileName } from '@/features/documents/lib/noteTitle';
 import { sheetStackStyle, stackHeight, stepZoom } from '@/features/documents/lib/pageSheets';
+import { setTextMarker, TextMarker } from '@/features/documents/lib/textMarker';
 import {
   registerImagePicker,
   SlashCommandExtension,
@@ -208,6 +209,7 @@ export function StudyEditor({
       Focus.configure({ className: 'has-focus', mode: 'shallowest' }),
       NoteSearch,
       NotePageBreaks,
+      TextMarker,
       SlashCommandExtension.configure({ onChange: setSlash }),
       // Typing and keyboard help: they change the note only as the student asks.
       NoteTypography,
@@ -249,6 +251,11 @@ export function StudyEditor({
     [initial.body, source],
   );
   const readOnly = lost.length > 0 && !unlocked;
+
+  useEffect(() => {
+    if (source && !source.isDestroyed)
+      setTextMarker(source.view, { enabled: settings.markers, only: settings.markerOnly });
+  }, [settings.markers, settings.markerOnly, source]);
 
   useEffect(() => {
     // While a rename is on its way, typing would be saved under the old name.
@@ -456,6 +463,9 @@ export function StudyEditor({
     } else if (mod && event.shiftKey && key === 'f') {
       event.preventDefault();
       settings.toggleFocus();
+    } else if (mod && event.shiftKey && key === 'm') {
+      event.preventDefault();
+      settings.toggleMarkers();
     } else if (mod && !event.shiftKey && key === 'f' && source && !notebook && mode === 'text') {
       event.preventDefault();
       if (!settings.sidebar) settings.toggleSidebar();

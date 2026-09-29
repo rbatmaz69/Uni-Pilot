@@ -41,4 +41,16 @@ describe('note style settings', () => {
       lineSpacing: 'normal',
     });
   });
+
+  it('keeps the Textmarker on across sessions but never its spotlight', () => {
+    const store = useNoteStyleStore.getState();
+    store.toggleMarkers();
+    store.setMarkerOnly('claim');
+    expect(useNoteStyleStore.getState()).toMatchObject({ markers: true, markerOnly: 'claim' });
+    expect(JSON.parse(localStorage.getItem('uni-pilot.note-style')!)).toMatchObject({
+      state: { markers: true, markerOnly: null },
+    });
+    useNoteStyleStore.getState().toggleMarkers();
+    expect(useNoteStyleStore.getState()).toMatchObject({ markers: false, markerOnly: null });
+  });
 });
