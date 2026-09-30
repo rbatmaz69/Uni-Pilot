@@ -31,6 +31,7 @@ export function FocusWorkspace() {
   const handledSpaceRef = useRef(false);
   const [controlsFading, setControlsFading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const savedSettingsPhaseRef = useRef<'work' | 'break' | null>(null);
   const [openSidePanel, setOpenSidePanel] = useState<OpenSidePanel>(null);
   const [now, setNow] = useState(Date.now);
   const statisticsOpen = openSidePanel === 'statistics';
@@ -113,6 +114,16 @@ export function FocusWorkspace() {
       window.removeEventListener('focus', update);
     };
   }, [state.status]);
+  useEffect(() => {
+    if (
+      settingsOpen &&
+      savedSettingsPhaseRef.current !== null &&
+      state.phase !== savedSettingsPhaseRef.current
+    ) {
+      savedSettingsPhaseRef.current = null;
+      setSettingsOpen(false);
+    }
+  }, [settingsOpen, state.phase]);
   const active = state.status === 'running' || state.status === 'paused';
   const remaining =
     state.status === 'running' && state.deadline !== null
@@ -351,10 +362,30 @@ export function FocusWorkspace() {
           breakMinutes={state.breakMinutes}
           appliesToNextSegment={active}
           onSave={(workMinutes, breakMinutes) => {
+            const timerIsActive = ['running', 'paused'].includes(
+              useFocusStore.getState().status,
+            );
             state.configureTimes(workMinutes, breakMinutes);
+            if (!timerIsActive) {
+              savedSettingsPhaseRef.current = null;
+              setSettingsOpen(false);
+              return 'applied';
+            }
+            savedSettingsPhaseRef.current = useFocusStore.getState().phase;
+            return 'saved-for-next';
+          }}
+          onRestart={() => {
+            savedSettingsPhaseRef.current = null;
+            state.reset();
+            prepareFocusAudio();
+            setNow(Date.now());
+            state.start();
             setSettingsOpen(false);
           }}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => {
+            savedSettingsPhaseRef.current = null;
+            setSettingsOpen(false);
+          }}
         />
       )}
       <FocusStatisticsPanel

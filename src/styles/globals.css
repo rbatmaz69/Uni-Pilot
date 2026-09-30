@@ -589,6 +589,20 @@
       0 12px 28px -16px color-mix(in srgb, var(--focus-sky) 76%, transparent);
     transform: translateY(-1px);
   }
+  .focus-duration-secondary {
+    border: 1px solid color-mix(in srgb, var(--focus-foreground) 30%, transparent);
+    background: color-mix(in srgb, var(--focus-foreground) 8%, transparent);
+    color: color-mix(in srgb, var(--focus-foreground) 82%, transparent);
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      transform 160ms ease;
+  }
+  .focus-duration-secondary:hover {
+    border-color: color-mix(in srgb, var(--focus-foreground) 44%, transparent);
+    background: color-mix(in srgb, var(--focus-foreground) 14%, transparent);
+    transform: translateY(-1px);
+  }
   .focus-side-panel-layer {
     --focus-side-panel-surface: color-mix(in srgb, var(--focus-foreground) 14%, transparent);
     --focus-side-panel-card: color-mix(in srgb, var(--focus-foreground) 9%, transparent);

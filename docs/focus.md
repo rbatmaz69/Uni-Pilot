@@ -3,6 +3,7 @@
 Über die Sidebar oder „Start focus“ im Dashboard erreichbar. Beide Einstiege verwenden denselben Timer.
 
 - Standard: 25 Minuten Pomodoro und 5 Minuten Pause. Beide Zeiten lassen sich über das Regler-Icon auf 1–240 ganze Minuten einstellen.
+- Änderungen während eines laufenden oder pausierten Timers speichern die neuen Zeiten für kommende Timerabschnitte; der aktuelle Countdown bleibt unverändert. Nach dem Speichern kann der laufende Timer mit den neuen Zeiten neu gestartet oder unverändert fortgesetzt werden.
 - Die drei Bedienelemente unter dem Timer sind Zurücksetzen, Start/Pause und Zeiteinstellungen. Die Gruppe hat keinen äußeren Rand; nur der mittlere Button ist gefüllt. „Reset“ verwirft einen laufenden Arbeitsdurchlauf.
 - Nach einer vollständig abgelaufenen Arbeitsphase wird die Session gespeichert und die Pause startet automatisch. Nach der Pause steht der nächste Arbeitsdurchlauf bereit.
 - Der gesamte Focus-Bereich liegt auf einem Cover: Timer und Einstellungen. Die App-Kopfzeile bleibt wie auf der Kalenderseite sichtbar; eine zusätzliche Seitenüberschrift und Inhalte unter dem Cover entfallen. Bei kleinen Fenstern scrollt der Inhalt innerhalb des Covers.
