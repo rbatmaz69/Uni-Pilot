@@ -132,7 +132,11 @@ export function FocusDurationPanel({
           </div>
           {savedForNext ? (
             <>
-              <p role="status" aria-live="polite" className="focus-duration-note text-sm leading-relaxed">
+              <p
+                role="status"
+                aria-live="polite"
+                className="focus-duration-note text-sm leading-relaxed"
+              >
                 Your current timer will keep running. The new times will be used for upcoming timer
                 segments.
               </p>

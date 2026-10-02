@@ -362,9 +362,7 @@ export function FocusWorkspace() {
           breakMinutes={state.breakMinutes}
           appliesToNextSegment={active}
           onSave={(workMinutes, breakMinutes) => {
-            const timerIsActive = ['running', 'paused'].includes(
-              useFocusStore.getState().status,
-            );
+            const timerIsActive = ['running', 'paused'].includes(useFocusStore.getState().status);
             state.configureTimes(workMinutes, breakMinutes);
             if (!timerIsActive) {
               savedSettingsPhaseRef.current = null;
