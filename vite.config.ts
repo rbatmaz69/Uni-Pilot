@@ -167,6 +167,7 @@ export default defineConfig({
     sourcemap: false,
   },
   test: {
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,

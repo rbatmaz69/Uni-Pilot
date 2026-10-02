@@ -273,7 +273,7 @@ describe('Focus workspace', () => {
     const deadline = useFocusStore.getState().deadline;
     expect(settings).toBeEnabled();
     fireEvent.click(settings);
-    expect(screen.getByText('Changes apply to the next timer.')).toBeInTheDocument();
+    expect(screen.getByText('Your current countdown stays unchanged.')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Pomodoro minutes' }), {
       target: { value: '40' },
     });
@@ -281,6 +281,10 @@ describe('Focus workspace', () => {
       target: { value: '7' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save times' }));
+
+    expect(screen.getByRole('dialog', { name: 'Timer times saved' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restart now with new times' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep current timer' }));
 
     expect(useFocusStore.getState()).toMatchObject({
       status: 'running',
@@ -517,9 +521,9 @@ describe('Focus workspace', () => {
     expect(playFocusCompletionSound).toHaveBeenCalledOnce();
   });
 
-  it('opens the shared Focus page from the dashboard', () => {
+  it('opens the shared Focus page from dashboard navigation', () => {
     renderApp('/dashboard');
-    fireEvent.click(screen.getByRole('button', { name: 'Start focus' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Focus' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Focus');
     expect(screen.getByRole('timer')).toBeInTheDocument();
   });
