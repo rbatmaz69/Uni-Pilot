@@ -158,7 +158,7 @@ export default defineConfig({
   clearScreen: false,
   server: {
     port: 1420,
-    strictPort: true,
+    strictPort: Boolean(process.env.TAURI_ENV_PLATFORM),
     watch: { ignored: ['**/src-tauri/**'] },
   },
   envPrefix: ['VITE_', 'TAURI_'],
@@ -167,6 +167,7 @@ export default defineConfig({
     sourcemap: false,
   },
   test: {
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
