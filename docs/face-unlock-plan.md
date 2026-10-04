@@ -269,8 +269,12 @@ differs from the above:
 - **Dev button:** "Test sign-in" in `FailureNotice`'s "Sign in to ILIAS" notice, only under
   `import.meta.env.DEV`. It calls the command `sign_in_to_ilias(baseUrl, clientId)`, which exists
   only in debug builds (`#[cfg(debug_assertions)]`, also in `generate_handler!`), and on success
-  runs the read again. Credentials are stored for now through `auto_sign_in_save`; there is no
-  set-up UI yet (Phase 3).
+  runs the read again. Next to it, "Store sign-in…" (same notice, same `DEV` gate) opens
+  `DevSignInDialog`: user name, password, authenticator (`otpauth://` link or bare secret, both
+  fields masked) and its name (default "Uni Pilot"), saved through `auto_sign_in_save` for the
+  connected ILIAS — the entry "Test sign-in" reads. The dialog is mounted only while open, so the
+  password is gone once it closes; the answer carries only user name and device. Saving again
+  clears `stale`. Phase 3's `CredentialsDialog` in Settings replaces it.
 - The command calls `sign_in_stored`: it reads `{ username, password, otpauth, device }` from the
   vault for that ILIAS host (`vault::stored_sign_in`, on a blocking thread), then `sign_in_with` →
   `keycloak::sign_in` (HTTP only, returns the jar) → `handoff::hand_off`. Nothing is stored →
