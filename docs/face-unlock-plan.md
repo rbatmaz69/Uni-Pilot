@@ -481,6 +481,34 @@ Where it differs from the above:
   close and blur stop the camera), `camera.ts` against stubbed `getUserMedia` and canvas, Settings
   through `renderApp`. Rust's lockout after 3 is tested in `attempt.rs`.
 
+**Revised (04.10.2026): the face bar.** The dialog was long and blocked the window. Signing in to
+HHN is unchanged; how the face is asked for is not:
+
+- **A thin bar, not a modal** (`FaceUnlockBar`, at the top of the workspace in `AppLayout`): a
+  small mirrored preview, one sentence, "Camera on", **Sign in with password instead** and
+  **Cancel**. Everything below stays usable. In ILIAS mode (`immersive`) the bar is not rendered,
+  so the camera is off there.
+- **When:** the course store says the session ended (`session-expired`), no course read is under
+  way, a sign-in and a face are stored and not refused, and the student either allowed it in
+  Settings ("Unlock as soon as ILIAS signs you out", **off by default**, disabled until a face is
+  set up, turned off again by Forget) or clicked **Unlock with your face** in the notice. The camera
+  runs only inside the bar, and stops when Uni Pilot goes to the background (it looks again on
+  coming back). The sign-out is never persisted, so nothing turns the camera on at start while the
+  session holds. Coming back from ILIAS mode with the session marked gone re-reads the course list
+  first (`CourseSync`): the student may have signed in there.
+- **Passing:** the enrolled face, matched (cosine ≥ 0.50, face ≥ 12 % of the frame) frame after
+  frame for **1.5 s**. No turn, no "come closer", no prompt that jumps back; a frame without the
+  face only restarts the count. Ten seconds without passing end the attempt.
+- **After passing:** the bar goes at once, `face_unlock_finish` runs in the background, then the
+  course list is read again (`finishFaceUnlock` in `autoSignInStore`). If that fails, the bar
+  comes back with the reason and does not turn the camera on again for it.
+- **Lockout:** an attempt counts as failed only when a stranger's face was seen — looking away,
+  Cancel and the window losing focus do not count. Three, and the face waits 5 minutes or a sign-in
+  by hand.
+- **What this gives up:** with no anti-spoofing model and no movement asked for, a photo or video
+  of the student held to the camera unlocks (threat model, §7). And the camera now turns on without
+  a click — only after the student allowed it once, and only with the bar showing.
+
 ### Phase 6 — Platforms, packaging, privacy, docs
 
 - `Info.plist`: `NSCameraUsageDescription` — "Uni Pilot uses the camera only when you choose to
@@ -506,17 +534,17 @@ Linux and camera-less setups nothing new, but makes the Phase 3 button shippable
 
 ## 7. Threat model
 
-| Threat                           | Mitigation                                                                           | Left over                                 |
-| -------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------- |
-| Someone at the unlocked laptop   | Face must match on every frame                                                       | —                                         |
-| Photo / printout                 | MiniFASNet + head-turn challenge + identity on every frame                           | Good photos on a phone may pass the model |
-| Video replay                     | Random challenge order, 10 s limit                                                   | A prepared video of all moves             |
-| Stolen laptop, locked            | Keychain locked with the Mac login                                                   | —                                         |
-| Script in Uni Pilot's page (XSS) | Page never gets secrets; commands accept frames only; ILIAS view has no capabilities | Could start a camera prompt               |
-| Account lockout at HHN           | One password POST and one code POST per unlock; stop on any unknown page             | —                                         |
-| Secrets in logs or crash output  | Names only in logs; `Zeroizing`; no `Debug` on secret types                          | —                                         |
-| Malware running as the student   | Keychain asks before another app reads the item                                      | Out of scope                              |
-| Two factors on one device        | Opt-in, explained in Settings                                                        | Real — that is the trade-off              |
+| Threat                           | Mitigation                                                                           | Left over                               |
+| -------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
+| Someone at the unlocked laptop   | Face must match on every frame                                                       | —                                       |
+| Photo / printout                 | Planned: MiniFASNet + head-turn challenge. **Built: neither** (see the bar revision) | **A good photo of the student unlocks** |
+| Video replay                     | Planned: random challenges, 10 s limit. **Built: none**                              | **A video of the student unlocks**      |
+| Stolen laptop, locked            | Keychain locked with the Mac login                                                   | —                                       |
+| Script in Uni Pilot's page (XSS) | Page never gets secrets; commands accept frames only; ILIAS view has no capabilities | Could start a camera prompt             |
+| Account lockout at HHN           | One password POST and one code POST per unlock; stop on any unknown page             | —                                       |
+| Secrets in logs or crash output  | Names only in logs; `Zeroizing`; no `Debug` on secret types                          | —                                       |
+| Malware running as the student   | Keychain asks before another app reads the item                                      | Out of scope                            |
+| Two factors on one device        | Opt-in, explained in Settings                                                        | Real — that is the trade-off            |
 
 ## 8. Privacy (GDPR Art. 9 — biometric data)
 

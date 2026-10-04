@@ -30,7 +30,7 @@ const known = () => useAutoSignInStore.getState().byHost[HOST];
 
 beforeEach(() => {
   invoke.mockReset();
-  useAutoSignInStore.setState({ byHost: {}, signingIn: false });
+  useAutoSignInStore.setState({ byHost: {}, signingIn: false, autoUnlock: false, faceBar: null });
 });
 
 describe('what Uni Pilot remembers about the stored sign-in', () => {
@@ -78,6 +78,18 @@ describe('what Uni Pilot remembers about the stored sign-in', () => {
       .getState()
       .save(HHN, { username: 'student', password: 'new', authenticator: 'S', device: '' });
     expect(known()?.stale).toBe(false);
+  });
+
+  /** The face goes with Forget; turning the camera on by itself waits for a new one. */
+  it('turns automatic face unlock off again on Forget', async () => {
+    useAutoSignInStore.setState({
+      byHost: { [HOST]: { ...SET_UP, face: true } },
+      autoUnlock: true,
+    });
+    invoke.mockResolvedValue(undefined);
+    await useAutoSignInStore.getState().forget(HHN);
+    expect(useAutoSignInStore.getState().autoUnlock).toBe(false);
+    expect(known()?.face).toBe(false);
   });
 
   it('signs in once at a time', async () => {

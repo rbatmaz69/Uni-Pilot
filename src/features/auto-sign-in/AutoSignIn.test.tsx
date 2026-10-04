@@ -65,7 +65,7 @@ beforeEach(() => {
       checkedAt: '2026-09-25T10:00:00.000Z',
     },
   });
-  useAutoSignInStore.setState({ byHost: {}, signingIn: false });
+  useAutoSignInStore.setState({ byHost: {}, signingIn: false, autoUnlock: false, faceBar: null });
 });
 
 afterEach(() => {
@@ -164,6 +164,30 @@ describe('signing in automatically, in Settings', () => {
       within(section()).getByRole('button', { name: 'Set up face unlock again' }),
     ).toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith('face_enroll_start', expect.anything());
+  });
+
+  it('lets the camera turn on by itself only once allowed, and only with a face', async () => {
+    useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
+    const user = userEvent.setup();
+    const { unmount } = renderApp('/settings');
+    const off = within(section()).getByRole('switch', {
+      name: 'Unlock as soon as ILIAS signs you out',
+    });
+    expect(off).toBeDisabled();
+    expect(off).toHaveAttribute('aria-checked', 'false');
+    unmount();
+
+    useAutoSignInStore.setState({
+      byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP, face: true } },
+    });
+    renderApp('/settings');
+    const toggle = within(section()).getByRole('switch', {
+      name: 'Unlock as soon as ILIAS signs you out',
+    });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(useAutoSignInStore.getState().autoUnlock).toBe(true);
   });
 
   it('forgets the sign-in', async () => {

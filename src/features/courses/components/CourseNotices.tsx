@@ -5,7 +5,7 @@ import { Button } from '@/components/ui';
 import { formatTimeAgo } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
-import { FaceUnlockDialog, installationHost, useAutoSignInStore } from '@/features/auto-sign-in';
+import { installationHost, useAutoSignInStore, useFaceBar } from '@/features/auto-sign-in';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
@@ -71,8 +71,8 @@ export function SyncBar({ label, loadedAt, loading, onRefresh }: SyncBarProps) {
 /**
  * ILIAS wants a sign-in. When the student set up signing in automatically and
  * the university has not refused the stored password, Uni Pilot offers to do
- * it — behind a look into the camera when a face is set up, else at a click:
- * one try, then the read runs again. Signing in with the password, in ILIAS
+ * it — with a face set up, through the face bar at the top of the window
+ * (`FaceUnlockBar`), else at a click: one try, then the read runs again. Signing in with the password, in ILIAS
  * mode, is always on offer. Whether any of it is set up comes from
  * `autoSignInStore`, so this notice never asks the credential store itself.
  */
@@ -85,7 +85,9 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
   const signIn = useAutoSignInStore((state) => state.signIn);
   const signingIn = useAutoSignInStore((state) => state.signingIn);
   const [said, setSaid] = useState<string | null>(null);
-  const [unlocking, setUnlocking] = useState(false);
+  const failure = useCourseStore((state) => state.failure);
+  const faceBar = useFaceBar();
+  const setFaceBar = useAutoSignInStore((state) => state.setFaceBar);
   const automatic = Boolean(connection && known?.credentials && !known.stale);
   const face = automatic && Boolean(known?.face);
   const signInYourself = () => void navigate(NAV_ITEMS.ilias.path);
@@ -106,9 +108,11 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
       <div className="max-w-xl">
         <p className="text-[13px] font-semibold text-primary">Sign in to ILIAS to update</p>
         <p className="mt-1 text-[12.5px] leading-relaxed text-secondary">
-          {automatic
-            ? 'ILIAS ends its sign-in when Uni Pilot quits. Uni Pilot can sign in again for you, as you set up in Settings.'
-            : 'ILIAS ends its sign-in when Uni Pilot quits. Sign in once with your password and authenticator code — while Uni Pilot runs, it keeps the sign-in alive.'}
+          {face && faceBar.showing
+            ? 'ILIAS ends its sign-in when Uni Pilot quits. Look at the camera in the bar at the top, and Uni Pilot signs you in again.'
+            : automatic
+              ? 'ILIAS ends its sign-in when Uni Pilot quits. Uni Pilot can sign in again for you, as you set up in Settings.'
+              : 'ILIAS ends its sign-in when Uni Pilot quits. Sign in once with your password and authenticator code — while Uni Pilot runs, it keeps the sign-in alive.'}
         </p>
         {known?.credentials && known.stale ? (
           <p className="mt-1 text-[12.5px] leading-relaxed text-secondary">
@@ -131,14 +135,16 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
             <Button size="sm" onClick={signInYourself}>
               Sign in with password instead
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setUnlocking(true)}
-              leadingIcon={<ScanFace size={14} strokeWidth={1.8} aria-hidden />}
-            >
-              Unlock with your face
-            </Button>
+            {faceBar.showing || !failure ? null : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setFaceBar({ for: failure, state: 'requested' })}
+                leadingIcon={<ScanFace size={14} strokeWidth={1.8} aria-hidden />}
+              >
+                Unlock with your face
+              </Button>
+            )}
           </>
         ) : automatic ? (
           <>
@@ -166,20 +172,6 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
           </Button>
         )}
       </div>
-      {unlocking && connection ? (
-        <FaceUnlockDialog
-          connection={connection}
-          onClose={() => setUnlocking(false)}
-          onSignedIn={() => {
-            setUnlocking(false);
-            onRetry();
-          }}
-          onPasswordInstead={() => {
-            setUnlocking(false);
-            signInYourself();
-          }}
-        />
-      ) : null}
     </div>
   );
 }

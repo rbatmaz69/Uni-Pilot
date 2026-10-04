@@ -6,14 +6,15 @@
 //! - `detect`: YuNet — exactly one face, with five landmarks.
 //! - `align`: the face onto SFace's 112×112 template.
 //! - `embed`: SFace's 128 numbers, and how alike two faces are.
-//! - `liveness`: head turn and size from the landmarks. No anti-spoofing
-//!   model yet: see `models/README.md`.
+//! - `liveness`: head turn (for the enrolment) and size from the landmarks.
+//!   No anti-spoofing model and no challenge to move: a good photo of the
+//!   student can unlock (`models/README.md`).
 //! - `attempt`: enrolment, unlock and lockout, with no I/O.
 //! - `models`: loading YuNet and SFace and running a frame through both.
 //!
 //! The page sends frames — raw JPEG bytes over IPC, about six a second — and
-//! gets back prompts and progress only: never the template, the password or a
-//! code, and never whether a face matched. Rust decides, and on success signs
+//! gets back progress only: never the template, the password or a code, and
+//! never whether a face matched. Rust decides, and on success signs
 //! in itself. The credential store is read when an unlock starts, before the
 //! page may turn the camera on; if that fails, the camera stays off. Frames
 //! are dropped as soon as they are looked at. Only Uni Pilot's own page may
@@ -53,7 +54,7 @@ pub enum FaceError {
     /// Three unlocks failed: the face is not asked again until the student
     /// signs in by hand or five minutes have passed.
     Locked,
-    /// Ten seconds went by without the challenges met by the enrolled face.
+    /// Ten seconds went by without the enrolled face held for a second and a half.
     NotRecognised,
     /// Face unlock cannot run on this computer: no models, no credential store.
     Unavailable(String),
@@ -179,18 +180,6 @@ async fn see(models: Arc<Models>, jpeg: Vec<u8>) -> Result<attempt::Seen, FaceEr
         .map_err(FaceError::Local)
 }
 
-/// A random number for the challenges' order: not a secret, only not
-/// predictable from one attempt to the next.
-fn random() -> u64 {
-    use std::hash::{BuildHasher, Hasher};
-    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    hasher.write_u128(now.as_nanos());
-    hasher.finish()
-}
-
 // Enrolment ---------------------------------------------------------------
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -287,11 +276,8 @@ pub fn face_enroll_cancel(webview: Webview, state: State<'_, FaceUnlock>) -> Res
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(tag = "state", rename_all = "camelCase")]
 pub enum UnlockProgress {
-    Looking {
-        prompt: Prompt,
-        done: usize,
-        of: usize,
-    },
+    /// Still looking for the enrolled face, held for a second and a half.
+    Looking,
     /// The face passed; `face_unlock_finish` signs in.
     Passed,
 }
@@ -338,21 +324,17 @@ pub async fn face_unlock_start(
     let mut session = state.session();
     let now = session.now();
     session.unlock = Some(UnlockRun {
-        unlock: Unlock::new(template, attempt::challenges(random()), now),
+        unlock: Unlock::new(template, now),
         passed: false,
         credentials,
         base_url,
         client_id,
     });
-    Ok(UnlockProgress::Looking {
-        prompt: Prompt::LookAtCamera,
-        done: 0,
-        of: attempt::CHALLENGES,
-    })
+    Ok(UnlockProgress::Looking)
 }
 
-/// One frame for the unlock. Ten seconds without the challenges met count as
-/// one failed attempt.
+/// One frame for the unlock. Ten seconds without passing count as one failed
+/// attempt when a stranger's face was among them.
 #[tauri::command]
 pub async fn face_unlock_frame(
     webview: Webview,
@@ -376,12 +358,9 @@ pub async fn face_unlock_frame(
     let result = run.unlock.frame(seen, now);
     #[cfg(debug_assertions)]
     eprintln!("Face unlock: {measured} → {}", answered(&result));
+    let stranger = run.unlock.saw_a_stranger();
     match result {
-        Unlocking::Going { prompt, done } => Ok(UnlockProgress::Looking {
-            prompt,
-            done,
-            of: attempt::CHALLENGES,
-        }),
+        Unlocking::Looking => Ok(UnlockProgress::Looking),
         Unlocking::Passed => {
             run.passed = true;
             session.lockout.signed_in();
@@ -390,7 +369,9 @@ pub async fn face_unlock_frame(
         }
         Unlocking::TimedOut => {
             session.unlock = None;
-            session.lockout.failed(now);
+            if stranger {
+                session.lockout.failed(now);
+            }
             eprintln!("Face unlock: not recognised in time.");
             Err(FaceError::NotRecognised)
         }
@@ -416,9 +397,7 @@ fn measured(unlock: &Unlock, seen: &attempt::Seen) -> String {
 #[cfg(debug_assertions)]
 fn answered(result: &Unlocking) -> String {
     match result {
-        Unlocking::Going { prompt, done } => {
-            format!("prompt {prompt:?}, {done} of {} done", attempt::CHALLENGES)
-        }
+        Unlocking::Looking => "looking".into(),
         Unlocking::Passed => "passed".into(),
         Unlocking::TimedOut => "timed out".into(),
     }
@@ -448,15 +427,15 @@ pub async fn face_unlock_finish(
         .map_err(FaceError::SignIn)
 }
 
-/// The student closed the dialog or Uni Pilot lost focus. An attempt that
-/// saw a face and did not pass counts as failed — otherwise closing and
-/// starting again would get round the lockout.
+/// The student closed the bar, or Uni Pilot lost focus. An attempt that saw a
+/// stranger's face and did not pass counts as failed — otherwise closing and
+/// starting again would get round the lockout. Looking away counts for nothing.
 #[tauri::command]
 pub fn face_unlock_cancel(webview: Webview, state: State<'_, FaceUnlock>) -> Result<(), FaceError> {
     from_main(&webview)?;
     let mut session = state.session();
     if let Some(run) = session.unlock.take() {
-        if !run.passed && run.unlock.saw_a_face() {
+        if !run.passed && run.unlock.saw_a_stranger() {
             let now = session.now();
             session.lockout.failed(now);
         }
@@ -472,13 +451,8 @@ mod tests {
     #[test]
     fn tells_the_page_progress_and_nothing_else() {
         assert_eq!(
-            serde_json::to_value(UnlockProgress::Looking {
-                prompt: Prompt::TurnLeft,
-                done: 1,
-                of: 2
-            })
-            .unwrap(),
-            serde_json::json!({ "state": "looking", "prompt": "turnLeft", "done": 1, "of": 2 })
+            serde_json::to_value(UnlockProgress::Looking).unwrap(),
+            serde_json::json!({ "state": "looking" })
         );
         assert_eq!(
             serde_json::to_value(UnlockProgress::Passed).unwrap(),
@@ -500,7 +474,7 @@ mod tests {
     #[test]
     fn logs_numbers_only() {
         let template = embed::tests::towards(0, 1, 0.1);
-        let unlock = Unlock::new(template, attempt::challenges(0), 0);
+        let unlock = Unlock::new(template, 0);
         let face = attempt::Seen::Face(attempt::Face {
             embedding: template,
             yaw: 0.2,
@@ -511,20 +485,6 @@ mod tests {
             "cosine 1.000, yaw +0.200, box width 0.250 of the frame"
         );
         assert_eq!(measured(&unlock, &attempt::Seen::NoFace), "no face");
-        assert_eq!(
-            answered(&Unlocking::Going {
-                prompt: Prompt::TurnLeft,
-                done: 1
-            }),
-            "prompt TurnLeft, 1 of 2 done"
-        );
-    }
-
-    #[test]
-    fn varies_the_challenges() {
-        let orders: std::collections::HashSet<_> = (0..200)
-            .map(|_| format!("{:?}", attempt::challenges(random())))
-            .collect();
-        assert!(orders.len() > 1);
+        assert_eq!(answered(&Unlocking::Looking), "looking");
     }
 }

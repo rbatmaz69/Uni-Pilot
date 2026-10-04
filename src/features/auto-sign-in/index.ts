@@ -7,6 +7,7 @@
 
 export { AutoSignInSettings } from './components/AutoSignInSettings';
 export { CredentialsDialog } from './components/CredentialsDialog';
-export { FaceUnlockDialog } from './components/FaceUnlockDialog';
+export { FaceUnlockBar } from './components/FaceUnlockBar';
+export { useFaceBar } from './components/useFaceBar';
 export { useAutoSignInStore, type KnownSignIn, type SignInResult } from './store/autoSignInStore';
 export { installationHost } from './lib/autoSignIn';

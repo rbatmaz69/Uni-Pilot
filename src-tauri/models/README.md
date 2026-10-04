@@ -16,6 +16,7 @@ SHA-256. Without them the app runs, and face unlock says it is unavailable.
 - SFace is the fp32 file: the int8 one uses `QLinearMul`, which tract does not
   implement.
 - **No anti-spoofing model.** There is no official MiniFASNet ONNX, and none
-  whose origin and licence were checked. Until one is, face unlock relies on
-  the head-movement challenges alone (`docs/face-unlock-plan.md`, Phase 4).
+  whose origin and licence were checked. Unlocking asks for no movement
+  either (`docs/face-unlock-plan.md`, the bar revision), so a good photo or
+  video of the student unlocks.
 - Licence texts go to `THIRD-PARTY-LICENSES.md` with Phase 6.
