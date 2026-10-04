@@ -262,29 +262,37 @@ Same User-Agent as `fetch.rs`. Log page kinds and cookie names, never values.
   the fixtures (hosts injectable for tests); "one POST each" asserted on the mock.
 - **Done when:** a temporary dev-only button signs in a real HHN account end to end on macOS.
 
-**Built (04.10.2026), `src-tauri/src/ilias_sync/sign_in/`** — the local part only; nothing was sent
-to `login.hs-heilbronn.de`, and the dev button is not built. Where it differs from the above:
+**Built (04.10.2026), `src-tauri/src/ilias_sync/sign_in/`** — nothing was sent to
+`login.hs-heilbronn.de` while building it; the run against a real account is Ermir's. Where it
+differs from the above:
 
-- `sign_in_to_ilias(app, base_url, client_id, realm, credentials)` in `mod.rs` chains
-  `keycloak::sign_in` (HTTP only, returns the jar) and `handoff::hand_off`. The values come in as
-  arguments (`vault::Credentials`). Reading the vault, `NotSetUp`, and marking the credentials
-  `stale` on `WrongPassword` belong to the Phase 3 command that will call it; until then it is
-  `#[allow(dead_code)]`.
-- The sign-on is passed in as the realm's address, `https://login.hs-heilbronn.de/realms/hhn`; the
-  origin and `/realms/<realm>/` come from it. HTTPS only (loopback allowed, for the tests).
-  `knownInstallations.ts` does not carry it yet.
+- **Dev button:** "Test sign-in" in `FailureNotice`'s "Sign in to ILIAS" notice, only under
+  `import.meta.env.DEV`. It calls the command `sign_in_to_ilias(baseUrl, clientId)`, which exists
+  only in debug builds (`#[cfg(debug_assertions)]`, also in `generate_handler!`), and on success
+  runs the read again. Credentials are stored for now through `auto_sign_in_save`; there is no
+  set-up UI yet (Phase 3).
+- The command calls `sign_in_stored`: it reads `{ username, password, otpauth, device }` from the
+  vault for that ILIAS host (`vault::stored_sign_in`, on a blocking thread), then `sign_in_with` →
+  `keycloak::sign_in` (HTTP only, returns the jar) → `handoff::hand_off`. Nothing is stored →
+  `NotSetUp`. `WrongPassword` marks the entry `stale` (`vault::mark_stale`); a stale entry answers
+  `WrongPassword` **without a request** until the student saves the password again, so a wrong
+  password is never sent twice. Nothing of the vault is logged.
+- **The sign-on is chosen in Rust, by ILIAS host** (`SIGN_ONS` in `sign_in/mod.rs`, HHN only): the
+  page names the ILIAS, never the sign-on. A page that could name the sign-on could send the stored
+  password to any HTTPS host. So the plan's "put it in `knownInstallations.ts` and pass it in" is
+  dropped. HTTPS only (loopback allowed, for the tests).
 - `classify(url, html)` is a method on `Hosts`, which knows both origins. `Error` is
   `#kc-form-login` holding an element whose id starts with `input-error` — an id, not words.
   `Unknown`: `#kc-select-credential-form`; two of the known forms on one page; a form that does not
   post to the realm's `login-actions/` (after `..` is resolved); a page outside the realm; Keycloak's
   own error page (`#kc-error-message`), so an expired sign-in after the password does not read as a
   wrong password.
-- **The code goes only to the radio labelled with the stored device name**; `checked` is never
-  used. No such radio → `Unrecognised`, no code POST — **including the recorded page, which has no
-  radios** because that account has one authenticator. Keycloak lists radios only for two or more,
-  so the set-up needs Uni Pilot's authenticator _next to_ the phone's (Phase 3 says so); with one,
-  Uni Pilot cannot tell whose it is. Labels are compared with whitespace squashed, case-sensitive;
-  two radios with the name → `Unrecognised`.
+- **Radio rule.** No radio on the code page (the account has one authenticator, as on the recorded
+  page) → the code goes to that one, without `selectedCredentialId`, as from a browser. Radios →
+  only the one labelled with the stored device name, `checked` is never used; none or two with that
+  name → `Unrecognised`, no code POST. Labels are compared with whitespace squashed,
+  case-sensitive. With one authenticator, a code from the wrong secret costs one failed attempt
+  (`WrongCode`), never two.
 - The status decides only redirects and trouble (429, 5xx → `Unreachable`). 2xx and 4xx bodies are
   classified: Keycloak may show a refused password or code with 400/401.
 - Redirects: followed with GET within the realm, at most 5; to the ILIAS origin → `BackToIlias`, not
@@ -303,9 +311,10 @@ to `login.hs-heilbronn.de`, and the dev button is not built. Where it differs fr
   sign-on, serving the four fixtures with HHN's host replaced by the local one. A catch-all mock on
   each asserts nothing else was asked. The code page with two authenticators is derived in the test
   from `keycloak-otp.html` and Keycloak 26's `login-otp.ftl`, not a new fixture. The test
-  authenticator has `period=4000000000`, so its code stays 755224.
-- Not covered: `hand_off` (`set_cookie` needs a real webview) and anything against HHN — the
-  **Done when** above is still open.
+  authenticator has `period=4000000000`, so its code stays 755224. The radio rule is tested for no
+  radio, one, two with the name and two without, by itself and through the whole flow.
+- Not covered: `hand_off` and the command (they need a real webview and Keychain) and anything
+  against HHN — the **Done when** above is still open.
 
 ### Phase 3 — Settings and a manual "Sign in automatically" (UI, no face)
 

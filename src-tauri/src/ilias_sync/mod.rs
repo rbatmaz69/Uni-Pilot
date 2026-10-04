@@ -37,7 +37,7 @@ pub mod mirror;
 mod parse;
 pub mod reauth;
 mod session;
-mod sign_in;
+pub mod sign_in;
 
 use serde::Serialize;
 use tauri::State;

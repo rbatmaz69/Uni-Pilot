@@ -227,16 +227,30 @@ fn authenticators(page: &Html, form: ElementRef) -> Vec<Authenticator> {
         .collect()
 }
 
-/// The authenticator to answer with: the one named like Uni Pilot's, wherever
-/// Keycloak put its check — that is its own choice, the student's phone as
-/// often as not. `None` when no radio carries the name, or several do.
-fn pick<'a>(authenticators: &'a [Authenticator], device: &str) -> Option<&'a Authenticator> {
+/// Which authenticator the code is for.
+#[derive(Debug, PartialEq)]
+enum Recipient<'a> {
+    /// The form lists none: the account has one authenticator, and the code
+    /// goes to it, without `selectedCredentialId`, as from a browser.
+    TheOnlyOne,
+    /// The one listed under Uni Pilot's name.
+    Listed(&'a Authenticator),
+}
+
+/// Who gets the code. Without a list, the account's only authenticator. With
+/// one, the authenticator named like Uni Pilot's, wherever Keycloak put its
+/// check — that is its own choice, the student's phone as often as not.
+/// `None` when the list has no such name, or has it twice: then no code is sent.
+fn recipient<'a>(authenticators: &'a [Authenticator], device: &str) -> Option<Recipient<'a>> {
+    if authenticators.is_empty() {
+        return Some(Recipient::TheOnlyOne);
+    }
     let device = squash(device);
     let mut named = authenticators
         .iter()
         .filter(|offered| offered.label == device);
     match (named.next(), named.next()) {
-        (Some(one), None) => Some(one),
+        (Some(one), None) => Some(Recipient::Listed(one)),
         _ => None,
     }
 }
@@ -283,17 +297,25 @@ pub(crate) async fn sign_in(hosts: &Hosts, credentials: &Credentials) -> Result<
         other => return Err(stopped("after the password", &other)),
     };
 
-    let Some(authenticator) = pick(&authenticators, &credentials.device) else {
+    let Some(recipient) = recipient(&authenticators, &credentials.device) else {
         return Err(SignInError::Unrecognised(format!(
             "HHN's code page does not list Uni Pilot's authenticator, \"{}\". Uni Pilot sent no code.",
             squash(&credentials.device)
         )));
     };
     let code = vault::code(&credentials.otpauth).map_err(|_| no_code())?;
-    let answer = [
-        ("otp", code.as_str()),
-        ("selectedCredentialId", authenticator.id.as_str()),
-    ];
+    let mut answer = vec![("otp", code.as_str())];
+    match recipient {
+        Recipient::Listed(chosen) => {
+            eprintln!(
+                "ILIAS sign-in: the code is for the authenticator listed by Uni Pilot's name."
+            );
+            answer.push(("selectedCredentialId", chosen.id.as_str()));
+        }
+        Recipient::TheOnlyOne => {
+            eprintln!("ILIAS sign-in: no list of authenticators; the code is for the only one.");
+        }
+    }
     match flow.visit(action, Some(&answer)).await? {
         Page::BackToIlias => Ok(flow.jar),
         Page::Otp { .. } => Err(SignInError::WrongCode),
@@ -594,19 +616,57 @@ mod tests {
         assert!(Hosts::new(ilias, url("https://login.hs-heilbronn.de/realms/hhn/")).is_ok());
     }
 
-    #[test]
-    fn picks_uni_pilots_authenticator_never_the_checked_one() {
-        let Page::Otp { authenticators, .. } =
-            hhn().classify(&form_action(), &phone_and_uni_pilot())
-        else {
+    /// The id `recipient` chose on a code page, `Some(None)` for "the only
+    /// one", `None` for "no code".
+    fn chosen(page: &str, device: &str) -> Option<Option<String>> {
+        let Page::Otp { authenticators, .. } = hhn().classify(&form_action(), page) else {
             panic!("not the code form");
         };
+        recipient(&authenticators, device).map(|chosen| match chosen {
+            Recipient::TheOnlyOne => None,
+            Recipient::Listed(listed) => Some(listed.id.clone()),
+        })
+    }
+
+    /// No radio, one, two with Uni Pilot's name, two without — on the
+    /// recorded code page and the ones derived from it.
+    #[test]
+    fn follows_the_radio_rule() {
         assert_eq!(
-            pick(&authenticators, " Uni  Pilot ").unwrap().id,
-            "uni-pilot-id"
+            chosen(OTP, "Uni Pilot"),
+            Some(None),
+            "no radio: the only one"
         );
-        assert_eq!(pick(&authenticators, "Laptop"), None, "not listed");
-        assert_eq!(pick(&[], "Uni Pilot"), None, "no list at all");
+        assert_eq!(
+            chosen(
+                &otp_with(&[("uni-pilot-id", "Uni Pilot", true)]),
+                "Uni Pilot"
+            ),
+            Some(Some("uni-pilot-id".into())),
+            "one radio, Uni Pilot's"
+        );
+        assert_eq!(
+            chosen(&otp_with(&[("phone-id", "iPhone", true)]), "Uni Pilot"),
+            None,
+            "one radio, someone else's"
+        );
+        assert_eq!(
+            chosen(&phone_and_uni_pilot(), " Uni  Pilot "),
+            Some(Some("uni-pilot-id".into())),
+            "two radios: Uni Pilot's, not the checked one"
+        );
+        assert_eq!(
+            chosen(
+                &otp_with(&[("phone-id", "iPhone", true), ("tablet-id", "iPad", false)]),
+                "Uni Pilot"
+            ),
+            None,
+            "two radios, neither Uni Pilot's"
+        );
+    }
+
+    #[test]
+    fn sends_no_code_when_two_radios_share_the_name() {
         let twice = [
             Authenticator {
                 id: "a".into(),
@@ -619,7 +679,7 @@ mod tests {
                 checked: true,
             },
         ];
-        assert_eq!(pick(&twice, "Uni Pilot"), None, "which one?");
+        assert_eq!(recipient(&twice, "Uni Pilot"), None, "which one?");
     }
 
     // The whole sign-in, against ILIAS and the sign-on on two local servers.
@@ -695,10 +755,12 @@ mod tests {
 
     /// ILIAS and the sign-on as HHN answered on 03.10.2026, with Keycloak's
     /// cookies (values made up); what follows the password and the code is
-    /// the test's to say.
+    /// the test's to say. The code POST matches only with
+    /// `selectedCredentialId=<code_for>`, or without the field for `None`.
     fn hhn_at<'a>(
         local: &'a Local,
         after_password: impl FnOnce(Then) -> Then,
+        code_for: Option<&str>,
         after_code: impl FnOnce(Then) -> Then,
     ) -> Hhn<'a> {
         let entry = local.ilias.mock(|when, then| {
@@ -739,14 +801,18 @@ mod tests {
             after_password(then);
         });
         let code = local.sign_on.mock(|when, then| {
-            when.method(POST)
+            let when = when
+                .method(POST)
                 .path(ACTIONS)
                 .query_param("session_code", "REDACTED")
                 .form_urlencoded_tuple("otp", "755224")
-                .form_urlencoded_tuple("selectedCredentialId", "uni-pilot-id")
                 .form_urlencoded_tuple_missing("password")
                 .cookie("AUTH_SESSION_ID", "session.node1")
                 .cookie("hhn-login-bs", "node1");
+            match code_for {
+                Some(id) => when.form_urlencoded_tuple("selectedCredentialId", id),
+                None => when.form_urlencoded_tuple_missing("selectedCredentialId"),
+            };
             after_code(then);
         });
         let stray = [
@@ -785,6 +851,7 @@ mod tests {
         let hhn = hhn_at(
             &local,
             shows(local.page(&phone_and_uni_pilot()), 200),
+            Some("uni-pilot-id"),
             signed_in(&local),
         );
 
@@ -820,6 +887,7 @@ mod tests {
         let hhn = hhn_at(
             &local,
             shows(local.page(LOGIN_ERROR), 401),
+            Some("uni-pilot-id"),
             signed_in(&local),
         );
 
@@ -835,6 +903,7 @@ mod tests {
         let hhn = hhn_at(
             &local,
             shows(local.page(&phone_and_uni_pilot()), 200),
+            Some("uni-pilot-id"),
             shows(local.page(&phone_and_uni_pilot()), 401),
         );
 
@@ -844,24 +913,56 @@ mod tests {
         hhn.assert_nothing_else();
     }
 
-    /// No code is sent unless the form lists Uni Pilot's authenticator by
-    /// name — not to the only one there, not to the one Keycloak checked.
+    /// The radio rule through the whole sign-in. No radio: one code POST
+    /// without `selectedCredentialId`, for the account's only authenticator.
+    /// Radios: one code POST for Uni Pilot's, never the checked one. Radios
+    /// without Uni Pilot's: no code POST at all.
     #[test]
-    fn sends_no_code_unless_uni_pilot_is_listed() {
-        for code_page in [
-            OTP.to_string(),
-            otp_with(&[("phone-id", "iPhone", true), ("tablet-id", "iPad", false)]),
-        ] {
+    fn sends_the_code_by_the_radio_rule() {
+        /// `Some(field)`: one code POST with that `selectedCredentialId`.
+        type Sent = Option<Option<&'static str>>;
+        let cases: [(&str, String, Sent); 4] = [
+            ("no radio", OTP.to_string(), Some(None)),
+            (
+                "one radio, Uni Pilot's",
+                otp_with(&[("uni-pilot-id", "Uni Pilot", true)]),
+                Some(Some("uni-pilot-id")),
+            ),
+            (
+                "two radios, one Uni Pilot's",
+                phone_and_uni_pilot(),
+                Some(Some("uni-pilot-id")),
+            ),
+            (
+                "two radios, neither Uni Pilot's",
+                otp_with(&[("phone-id", "iPhone", true), ("tablet-id", "iPad", false)]),
+                None,
+            ),
+        ];
+        for (case, code_page, sent) in cases {
             let local = Local::start();
             let hhn = hhn_at(
                 &local,
                 shows(local.page(&code_page), 200),
+                sent.flatten(),
                 signed_in(&local),
             );
 
-            assert!(matches!(local.sign_in(), Err(SignInError::Unrecognised(_))));
-            assert_eq!(hhn.password.calls(), 1);
-            assert_eq!(hhn.code.calls(), 0);
+            let result = local.sign_in();
+            assert_eq!(hhn.password.calls(), 1, "{case}");
+            match sent {
+                Some(_) => {
+                    assert!(result.is_ok(), "{case}: {:?}", result.err());
+                    assert_eq!(hhn.code.calls(), 1, "{case}");
+                }
+                None => {
+                    assert!(
+                        matches!(result, Err(SignInError::Unrecognised(_))),
+                        "{case}"
+                    );
+                    assert_eq!(hhn.code.calls(), 0, "{case}");
+                }
+            }
             hhn.assert_nothing_else();
         }
     }
@@ -872,6 +973,7 @@ mod tests {
         let hhn = hhn_at(
             &local,
             shows(local.page(SELECT_METHOD), 200),
+            Some("uni-pilot-id"),
             signed_in(&local),
         );
 
@@ -891,6 +993,7 @@ mod tests {
         let hhn = hhn_at(
             &local,
             shows(local.page(&phone_and_uni_pilot()), 200),
+            Some("uni-pilot-id"),
             move |then| then.status(307).header("location", again),
         );
 
