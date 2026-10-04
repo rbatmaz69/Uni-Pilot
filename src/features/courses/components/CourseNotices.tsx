@@ -1,13 +1,12 @@
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { LogIn, RefreshCw, TriangleAlert } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { formatTimeAgo } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
-import { DevSignInDialog } from '@/features/courses/components/DevSignInDialog';
+import { installationHost, useAutoSignInStore } from '@/features/auto-sign-in';
 import { useCourseStore } from '@/features/courses/store/courseStore';
-import { signInFailureText, testIliasSignIn } from '@/features/integrations/lib/iliasSync';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
 interface EmptyStateProps {
@@ -70,59 +69,87 @@ export function SyncBar({ label, loadedAt, loading, onRefresh }: SyncBarProps) {
 }
 
 /**
- * Development builds only: "Store sign-in…" keeps the password and
- * authenticator for this ILIAS, and "Test sign-in" lets Rust sign in with them
- * — one password, one code, nothing retried — then reads again once ILIAS has
- * a session (`docs/face-unlock-plan.md`, Phase 2, checked against a real
- * account by hand).
+ * ILIAS wants a sign-in. When the student set up signing in automatically and
+ * the university has not refused the stored password, Uni Pilot offers to do
+ * it: one try, then the read runs again. Otherwise, or alongside, the student
+ * signs in themselves in ILIAS mode. Whether it is set up comes from
+ * `autoSignInStore`, so this notice never asks the credential store itself.
  */
-function DevSignIn({ onSignedIn }: { onSignedIn: () => void }) {
+function SignInNotice({ onRetry }: { onRetry: () => void }) {
+  const navigate = useNavigate();
   const connection = useIliasStore((state) => state.connection);
-  const [storing, setStoring] = useState(false);
-  const [running, setRunning] = useState(false);
+  const known = useAutoSignInStore((state) =>
+    connection ? state.byHost[installationHost(connection)] : undefined,
+  );
+  const signIn = useAutoSignInStore((state) => state.signIn);
+  const signingIn = useAutoSignInStore((state) => state.signingIn);
   const [said, setSaid] = useState<string | null>(null);
-  if (!connection) return null;
+  const automatic = Boolean(connection && known?.credentials && !known.stale);
+  const signInYourself = () => void navigate(NAV_ITEMS.ilias.path);
 
-  const run = async () => {
-    setRunning(true);
+  const signInAutomatically = async () => {
+    if (!connection) return;
     setSaid(null);
-    try {
-      const signedIn = await testIliasSignIn(connection);
-      setSaid(signedIn ? 'Signed in.' : 'Signed in at the sign-on, but ILIAS did not take it.');
-      if (signedIn) onSignedIn();
-    } catch (failure) {
-      setSaid(signInFailureText(failure));
-    } finally {
-      setRunning(false);
-    }
+    const result = await signIn(connection);
+    if (result.signedIn) onRetry();
+    else setSaid(result.message);
   };
 
   return (
-    <>
-      <Button size="sm" onClick={() => setStoring(true)}>
-        Store sign-in…
-      </Button>
-      <Button size="sm" onClick={() => void run()} disabled={running}>
-        Test sign-in
-      </Button>
-      {storing ? (
-        <DevSignInDialog
-          connection={connection}
-          onClose={() => setStoring(false)}
-          onSaved={(status) => {
-            setStoring(false);
-            setSaid(
-              `Stored for ${status.username ?? 'you'}, authenticator “${status.device ?? 'Uni Pilot'}”. “Test sign-in” uses it now.`,
-            );
-          }}
-        />
-      ) : null}
-      {said ? (
-        <p role="status" className="order-last basis-full text-right text-[12px] text-secondary">
-          {said}
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-accent-soft px-5 py-4"
+    >
+      <div className="max-w-xl">
+        <p className="text-[13px] font-semibold text-primary">Sign in to ILIAS to update</p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-secondary">
+          {automatic
+            ? 'ILIAS ends its sign-in when Uni Pilot quits. Uni Pilot can sign in again for you, as you set up in Settings.'
+            : 'ILIAS ends its sign-in when Uni Pilot quits. Sign in once with your password and authenticator code — while Uni Pilot runs, it keeps the sign-in alive.'}
         </p>
-      ) : null}
-    </>
+        {known?.credentials && known.stale ? (
+          <p className="mt-1 text-[12.5px] leading-relaxed text-secondary">
+            HHN did not accept the stored password.{' '}
+            <Link to={NAV_ITEMS.settings.path} className="text-accent hover:underline">
+              Set it up again in Settings
+            </Link>
+            .
+          </p>
+        ) : null}
+        {said ? (
+          <p role="status" className="mt-1 text-[12.5px] leading-relaxed text-primary">
+            {said}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {automatic ? (
+          <>
+            <Button size="sm" onClick={signInYourself} disabled={signingIn}>
+              Sign in yourself
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void signInAutomatically()}
+              disabled={signingIn}
+              leadingIcon={<LogIn size={14} strokeWidth={1.8} aria-hidden />}
+            >
+              {signingIn ? 'Signing in…' : 'Sign in automatically'}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={signInYourself}
+            leadingIcon={<LogIn size={14} strokeWidth={1.8} aria-hidden />}
+          >
+            Sign in to ILIAS
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -132,36 +159,9 @@ function DevSignIn({ onSignedIn }: { onSignedIn: () => void }) {
  */
 export function FailureNotice({ onRetry }: { onRetry: () => void }) {
   const failure = useCourseStore((state) => state.failure);
-  const navigate = useNavigate();
   if (!failure) return null;
 
-  if (failure.kind === 'session-expired') {
-    return (
-      <div
-        role="alert"
-        className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-accent-soft px-5 py-4"
-      >
-        <div className="max-w-xl">
-          <p className="text-[13px] font-semibold text-primary">Sign in to ILIAS to update</p>
-          <p className="mt-1 text-[12.5px] leading-relaxed text-secondary">
-            ILIAS ends its sign-in when Uni Pilot quits. Sign in once with your password and
-            authenticator code — while Uni Pilot runs, it keeps the sign-in alive.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {import.meta.env.DEV ? <DevSignIn onSignedIn={onRetry} /> : null}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void navigate(NAV_ITEMS.ilias.path)}
-            leadingIcon={<LogIn size={14} strokeWidth={1.8} aria-hidden />}
-          >
-            Sign in to ILIAS
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (failure.kind === 'session-expired') return <SignInNotice onRetry={onRetry} />;
 
   return (
     <div

@@ -9,13 +9,9 @@ import {
   readIliasCourses,
   renewIliasSession,
   saveCourseFile,
-  saveIliasSignIn,
-  signInFailureText,
   stopSyncingCourse,
   syncCourseFiles,
-  testIliasSignIn,
   toIliasError,
-  vaultFailureText,
   type CourseTarget,
   type IliasContentItem,
 } from './iliasSync';
@@ -160,46 +156,5 @@ describe('when Rust gives nothing', () => {
     const error = toIliasError('command ilias_sync_courses not found');
     expect(error.kind).toBe('provider-error');
     expect(error.providerMessage).toBe('command ilias_sync_courses not found');
-  });
-});
-
-describe('the automatic sign-in, in development', () => {
-  /** The sign-on and the secrets are Rust's: the page sends no address but ILIAS's. */
-  it('names the installation, nothing more', async () => {
-    invoke.mockResolvedValue(true);
-    await expect(testIliasSignIn(HHN)).resolves.toBe(true);
-    expect(invoke.mock.calls).toEqual([['sign_in_to_ilias', INSTALLATION]]);
-  });
-
-  /** Stored under the ILIAS host, where `sign_in_to_ilias` looks. */
-  it('stores the values for the ILIAS the page is connected to', async () => {
-    invoke.mockResolvedValue({ credentials: true });
-    const values = { username: 'student', password: 'pw', authenticator: 'SECRET' };
-    await saveIliasSignIn(HHN, { ...values, device: ' Laptop ' });
-    await saveIliasSignIn(HHN, { ...values, device: '  ' });
-    expect(invoke.mock.calls).toEqual([
-      ['auto_sign_in_save', { baseUrl: INSTALLATION.baseUrl, ...values, device: 'Laptop' }],
-      ['auto_sign_in_save', { baseUrl: INSTALLATION.baseUrl, ...values, device: null }],
-    ]);
-  });
-
-  it('says why storing did not work, in Rust’s words', () => {
-    expect(vaultFailureText({ kind: 'invalid', message: 'Your HHN password is missing.' })).toBe(
-      'Your HHN password is missing.',
-    );
-    expect(vaultFailureText({ kind: 'refused' })).toMatch(/declined/);
-    expect(vaultFailureText(undefined)).toBe('The sign-in could not be stored.');
-  });
-
-  it('says why it did not work', () => {
-    expect(signInFailureText({ kind: 'notSetUp' })).toBe('No sign-in is stored for this ILIAS.');
-    expect(signInFailureText({ kind: 'wrongPassword' })).toMatch(/password was refused/);
-    expect(signInFailureText({ kind: 'wrongCode' })).toMatch(/code .* was refused/);
-    expect(signInFailureText({ kind: 'unreachable', message: 'The sign-on is busy (503).' })).toBe(
-      'The sign-on is busy (503).',
-    );
-    expect(signInFailureText('command sign_in_to_ilias not found')).toBe(
-      'The sign-in did not work.',
-    );
   });
 });

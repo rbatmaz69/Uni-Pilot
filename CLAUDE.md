@@ -71,6 +71,8 @@ src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
                   courses/   {components,store,lib}/ + index.ts — ILIAS-Kurse; Kursdateien
                              landen in Documents (siehe docs/integrations/ilias-course-files.md)
                   reminders/ {components,store,lib}/
+                  auto-sign-in/ {components,store,lib}/ — HHN-Anmeldung durch Rust, opt-in
+                                (siehe docs/face-unlock-plan.md); Geheimnisse bleiben in Rust
                   integrations/ {components,store,lib}/ — ILIAS in der App (siehe
                                 docs/ilias-window.md); SOAP-Connector noch Prototyp
 src/pages/        Eine schlanke Komponente pro Route

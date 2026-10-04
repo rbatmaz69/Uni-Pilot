@@ -266,15 +266,9 @@ Same User-Agent as `fetch.rs`. Log page kinds and cookie names, never values.
 `login.hs-heilbronn.de` while building it; the run against a real account is Ermir's. Where it
 differs from the above:
 
-- **Dev button:** "Test sign-in" in `FailureNotice`'s "Sign in to ILIAS" notice, only under
-  `import.meta.env.DEV`. It calls the command `sign_in_to_ilias(baseUrl, clientId)`, which exists
-  only in debug builds (`#[cfg(debug_assertions)]`, also in `generate_handler!`), and on success
-  runs the read again. Next to it, "Store sign-in…" (same notice, same `DEV` gate) opens
-  `DevSignInDialog`: user name, password, authenticator (`otpauth://` link or bare secret, both
-  fields masked) and its name (default "Uni Pilot"), saved through `auto_sign_in_save` for the
-  connected ILIAS — the entry "Test sign-in" reads. The dialog is mounted only while open, so the
-  password is gone once it closes; the answer carries only user name and device. Saving again
-  clears `stale`. Phase 3's `CredentialsDialog` in Settings replaces it.
+- **Dev button** (since replaced by Phase 3, see there): "Store sign-in…" and "Test sign-in" in the
+  "Sign in to ILIAS" notice, under `import.meta.env.DEV`, with `sign_in_to_ilias` behind
+  `#[cfg(debug_assertions)]`. Ermir signed in to HHN with it on 04.10.2026.
 - The command calls `sign_in_stored`: it reads `{ username, password, otpauth, device }` from the
   vault for that ILIAS host (`vault::stored_sign_in`, on a blocking thread), then `sign_in_with` →
   `keycloak::sign_in` (HTTP only, returns the jar) → `handoff::hand_off`. Nothing is stored →
@@ -337,6 +331,33 @@ differs from the above:
 - **Tests:** `renderApp('/settings')` set-up flow with `invoke` mocked (pattern:
   `src/features/courses/store/courseStore.test.ts`); the password is never echoed back into the
   DOM after saving; `FailureNotice` shows the right buttons for set-up / not set up.
+
+**Built (04.10.2026), `src/features/auto-sign-in/`** — no face. Where it differs from the above:
+
+- The feature is `auto-sign-in`, not `face-unlock`: `lib/autoSignIn.ts` (invoke wrappers, texts),
+  `store/autoSignInStore.ts`, `components/AutoSignInSettings.tsx` and `CredentialsDialog.tsx`,
+  `AutoSignIn.test.tsx` at the root. The face can build on it later.
+- **No `DEV` gate.** "Sign in automatically" shows in release builds whenever a sign-in is stored
+  and not stale: `sign_in_to_ilias` is a normal command now. It answers only Uni Pilot's own
+  page — checked by **webview** label, because the ILIAS view is a webview of the `main` window
+  (Tauri's ACL already turns away remote pages; this turns away any other local webview). The page
+  still sends only `baseUrl` and `clientId`. The dev-only "Store sign-in…" / "Test sign-in" are
+  gone.
+- **The notice never reads the credential store.** Whether a sign-in is stored is remembered per
+  ILIAS host in `autoSignInStore` (persisted; user name, device name, `stale` — never a secret).
+  Settings asks Rust once while nothing is remembered; save, forget and every sign-in keep it up
+  to date. Reason: on a Mac the read can bring up the Keychain's password prompt after an update
+  (§12, 0.6), and that should follow a click, not a notice appearing.
+- `stale` (HHN refused the password) → the notice offers only "Sign in to ILIAS", with a link to
+  Settings; Settings says so and disables Test sign-in. Save and Forget clear it.
+- **The code to confirm the authenticator at HHN** comes from a new command,
+  `auto_sign_in_code(authenticator)`: made from what was just typed, nothing stored, the store not
+  read — so a stored authenticator's codes never reach the page. The dialog shows it and quietly
+  replaces it when it changes; no countdown.
+- The dialog explains the set-up in three steps (second authenticator app on HHN's account page,
+  "Unable to scan?", code and name) and asks for nothing else — no recovery codes. It is mounted
+  only while open, so password and secret leave the page once saved.
+- Copy names HHN, like the rest of the ILIAS feature; Rust only knows HHN's sign-on so far.
 
 ### Phase 4 — Face pipeline in Rust (no UI)
 

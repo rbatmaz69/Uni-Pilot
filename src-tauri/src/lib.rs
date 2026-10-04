@@ -38,12 +38,11 @@ pub fn run() {
             ilias_sync::mirror::ilias_mirror_configure,
             ilias_sync::mirror::ilias_mirror_detach,
             ilias_sync::reauth::ilias_sync_reauth,
-            // "Test sign-in" in development builds; a release has no such command.
-            #[cfg(debug_assertions)]
             ilias_sync::sign_in::sign_in_to_ilias,
             vault::auto_sign_in_status,
             vault::auto_sign_in_save,
             vault::auto_sign_in_forget,
+            vault::auto_sign_in_code,
             apple_mail::mail_accounts,
             apple_mail::mail_inbox,
             apple_mail::mail_open,

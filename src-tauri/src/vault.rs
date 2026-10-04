@@ -176,6 +176,33 @@ fn refused_link(error: TotpError) -> VaultError {
     )
 }
 
+/// What an authenticator shows now, and for how many more seconds.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentCode {
+    code: String,
+    valid_for: u64,
+}
+
+fn current_code(input: &str) -> Result<CurrentCode, VaultError> {
+    let link = authenticator(input)?;
+    let totp = Totp::from_url(link.as_str()).map_err(refused_link)?;
+    Ok(CurrentCode {
+        code: totp.generate_current().to_string(),
+        valid_for: totp.ttl(),
+    })
+}
+
+/// The code for an authenticator being set up: HHN asks for one before it
+/// accepts a new authenticator. Made from what the student just entered;
+/// nothing is stored and the store is not read, so a stored authenticator's
+/// codes never reach the page.
+#[tauri::command]
+pub fn auto_sign_in_code(authenticator: String) -> Result<CurrentCode, VaultError> {
+    let authenticator = Zeroizing::new(authenticator);
+    current_code(&authenticator)
+}
+
 /// The code the authenticator shows right now.
 pub(crate) fn code(otpauth: &str) -> Result<Zeroizing<String>, VaultError> {
     let totp = Totp::from_url(otpauth).map_err(refused_link)?;
@@ -426,6 +453,25 @@ mod tests {
         assert!(!json.contains(RFC_SECRET), "{json}");
         assert!(!json.contains("otpauth"), "{json}");
         assert!(json.contains("\"device\":\"Laptop\""), "{json}");
+    }
+
+    /// HHN's set-up asks for a code from the new authenticator.
+    #[test]
+    fn shows_the_code_of_an_authenticator_being_set_up() {
+        // RFC 4226's key with a period past 2096: counter 0's code.
+        let link = format!("otpauth://totp/HHN:x?secret={RFC_SECRET}&period=4000000000");
+        let shown = current_code(&link).unwrap();
+        assert_eq!(shown.code, "755224");
+        assert!(shown.valid_for > 0);
+
+        let bare = current_code("gezd gnbv gy3t qojq gezd gnbv gy3t qojq").unwrap();
+        assert_eq!(bare.code.len(), 6);
+        assert!((1..=30).contains(&bare.valid_for));
+
+        assert!(matches!(
+            current_code("not a secret"),
+            Err(VaultError::Invalid(_))
+        ));
     }
 
     #[test]

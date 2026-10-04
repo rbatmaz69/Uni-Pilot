@@ -1,4 +1,5 @@
 import { Check, Moon, PanelLeft, Sun } from 'lucide-react';
+import { AutoSignInSettings } from '@/features/auto-sign-in';
 import { ReminderSettings } from '@/features/reminders/components/ReminderSettings';
 import { Page } from '@/components/layout';
 import { NAV_ITEMS } from '@/lib/navigation';
@@ -102,6 +103,7 @@ export function SettingsPage() {
         </div>
       </section>
       <ReminderSettings />
+      <AutoSignInSettings />
     </Page>
   );
 }

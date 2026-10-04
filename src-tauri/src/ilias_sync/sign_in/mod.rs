@@ -25,6 +25,7 @@ mod keycloak;
 use serde::Serialize;
 use tauri::Url;
 
+use crate::ilias_view::MAIN;
 use crate::ilias_window::resolve_target;
 use crate::vault::{self, Credentials, VaultError};
 
@@ -57,23 +58,39 @@ pub enum SignInError {
     Local(String),
 }
 
-/// Development builds only, for now: the "Test sign-in" button next to "Sign
-/// in to ILIAS", Phase 2's check against a real account. Signs in with what
-/// the vault holds for this ILIAS; `true` when ILIAS has a session again.
-#[cfg(debug_assertions)]
+/// Signs in with what the vault holds for this ILIAS: "Sign in automatically"
+/// in the notice that ILIAS wants a sign-in, "Test sign-in" in Settings. The
+/// page names the ILIAS and nothing else. Only Uni Pilot's own page may ask —
+/// not the ILIAS view, which lives in the same window. Tauri already turns
+/// away remote pages; this turns away every other webview. `true` when ILIAS
+/// has a session again.
 #[tauri::command]
 pub async fn sign_in_to_ilias(
     app: tauri::AppHandle,
+    webview: tauri::Webview,
     base_url: String,
     client_id: String,
 ) -> Result<bool, SignInError> {
+    from_main(webview.label())?;
     sign_in_stored(&app, &base_url, &client_id).await
+}
+
+/// By the webview's label, not the window's: the ILIAS view is a webview of
+/// the main window.
+fn from_main(webview: &str) -> Result<(), SignInError> {
+    if webview == MAIN {
+        Ok(())
+    } else {
+        eprintln!("ILIAS sign-in: refused, asked from the webview \"{webview}\".");
+        Err(SignInError::Local(
+            "Only Uni Pilot's own window can sign in.".into(),
+        ))
+    }
 }
 
 /// Signs in with the student's stored values. A password HHN refused once is
 /// not sent again — the answer is `WrongPassword` without asking — until the
 /// student saves a new one; a refusal now marks it so.
-#[cfg_attr(not(debug_assertions), allow(dead_code))] // Only the debug command calls it until Phase 3.
 pub(crate) async fn sign_in_stored(
     app: &tauri::AppHandle,
     base_url: &str,
@@ -138,7 +155,7 @@ async fn sign_in_with(
 
 #[cfg(test)]
 mod tests {
-    use super::{sign_on_for, SignInError};
+    use super::{from_main, sign_on_for, SignInError};
 
     /// The shape the page reads in `iliasSync.ts`, like `SyncError`'s.
     #[test]
@@ -155,6 +172,18 @@ mod tests {
             serde_json::to_value(SignInError::Unrecognised("A page.".into())).unwrap(),
             serde_json::json!({ "kind": "unrecognised", "message": "A page." })
         );
+    }
+
+    /// The ILIAS view shares the main window; its webview's label tells it apart.
+    #[test]
+    fn signs_in_for_uni_pilots_own_page_only() {
+        assert_eq!(from_main("main"), Ok(()));
+        for other in ["ilias-view", "ilias-sign-on", "ilias", ""] {
+            assert!(
+                matches!(from_main(other), Err(SignInError::Local(_))),
+                "{other}"
+            );
+        }
     }
 
     /// The page names the ILIAS; Rust alone knows where its sign-on is.
