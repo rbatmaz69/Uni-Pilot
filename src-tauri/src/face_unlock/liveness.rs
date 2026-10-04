@@ -5,9 +5,12 @@
 //!
 //! - **Yaw:** how far the nose tip sits from the middle between the eyes,
 //!   along the line through the eyes, in eye distances. About 0 looking
-//!   straight on; positive when the head turns to the person's **left**, which
-//!   moves the nose to the right of the picture. Frames are not mirrored; only
-//!   the preview on the page is.
+//!   straight on; **positive when the student turns to their left** — to the
+//!   left in the mirrored preview, which is what the prompts mean. The sign is
+//!   measured, not derived: in the first real run (04.10.2026) the opposite
+//!   sign read −0.06 for a turn to the left and +0.31 for one to the right. In
+//!   the landmarks as YuNet reports them, a turn to the left moves the nose
+//!   towards the first eye.
 //! - **Size:** the face box's width as a share of the frame's width.
 //!
 //! There is no anti-spoofing model yet (`models/README.md`): these challenges
@@ -49,7 +52,8 @@ pub fn yaw(face: &Detection) -> f32 {
         (left_eye.x + right_eye.x) / 2.0,
         (left_eye.y + right_eye.y) / 2.0,
     );
-    ((nose.x - mx) * ex + (nose.y - my) * ey) / (distance * distance)
+    // Towards the first eye is to the student's left: see above.
+    ((mx - nose.x) * ex + (my - nose.y) * ey) / (distance * distance)
 }
 
 pub fn size(face: &Detection, frame_width: usize) -> f32 {
@@ -61,8 +65,9 @@ pub(super) mod tests {
     use super::*;
     use crate::face_unlock::detect::Point;
 
-    /// A face 160 px wide at (240, 160) with the nose `turn` eye distances
-    /// from the middle, the whole face rolled by `roll` degrees.
+    /// A face 160 px wide at (240, 160), turned `turn` eye distances to the
+    /// student's left — the nose that far towards the first eye, as measured —
+    /// and the whole face rolled by `roll` degrees.
     pub fn face(turn: f32, roll: f32) -> Detection {
         let (sin, cos) = roll.to_radians().sin_cos();
         let at = |x: f32, y: f32| Point {
@@ -77,7 +82,7 @@ pub(super) mod tests {
             landmarks: [
                 at(-30.0, -20.0),
                 at(30.0, -20.0),
-                at(60.0 * turn, 10.0),
+                at(-60.0 * turn, 10.0),
                 at(-25.0, 40.0),
                 at(25.0, 40.0),
             ],
@@ -90,11 +95,11 @@ pub(super) mod tests {
         assert!(yaw(&face(0.0, 0.0)).abs() < 1e-5);
         assert!(
             (yaw(&face(0.35, 0.0)) - 0.35).abs() < 1e-4,
-            "to the person's left"
+            "to the student's left"
         );
         assert!(
             (yaw(&face(-0.35, 0.0)) + 0.35).abs() < 1e-4,
-            "to the person's right"
+            "to the student's right"
         );
     }
 
@@ -105,13 +110,14 @@ pub(super) mod tests {
         assert!((yaw(&face(0.35, -25.0)) - 0.35).abs() < 1e-4);
     }
 
-    /// A head as the camera sees it: eyes 63 mm apart, the nose tip `depth`
-    /// mm in front of them, turned by `degrees` to the person's left.
+    /// A head as Rust sees it: eyes 63 mm apart, the nose tip `depth` mm in
+    /// front of them, turned by `degrees` to the student's left — which
+    /// moves the nose towards the first eye in YuNet's landmarks.
     fn head(degrees: f32, depth: f32) -> Detection {
         let (sin, cos) = degrees.to_radians().sin_cos();
         // Millimetres on the face → pixels, turned about the vertical axis.
         let at = |x: f32, y: f32, z: f32| Point {
-            x: 320.0 + 2.5 * (x * cos + z * sin),
+            x: 320.0 + 2.5 * (x * cos - z * sin),
             y: 240.0 + 2.5 * y,
         };
         Detection {
