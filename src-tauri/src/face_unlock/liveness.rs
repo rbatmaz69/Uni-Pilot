@@ -5,12 +5,17 @@
 //!
 //! - **Yaw:** how far the nose tip sits from the middle between the eyes,
 //!   along the line through the eyes, in eye distances. About 0 looking
-//!   straight on; **positive when the student turns to their left** — to the
-//!   left in the mirrored preview, which is what the prompts mean. The sign is
-//!   measured, not derived: in the first real run (04.10.2026) the opposite
-//!   sign read −0.06 for a turn to the left and +0.31 for one to the right. In
-//!   the landmarks as YuNet reports them, a turn to the left moves the nose
-//!   towards the first eye.
+//!   straight on; **positive when the head turns to the left of the preview**
+//!   — the mirrored picture the student sees, which is what the prompts mean.
+//!
+//!   The preview is the frame flipped by CSS, and Rust gets the frame as the
+//!   page drew it, unflipped. So a head turning to the preview's left moves
+//!   its nose to the **right of the frame**, whatever else is true: whether
+//!   the camera mirrors its own picture, and which eye YuNet names first. Two
+//!   earlier signs leaned on exactly those and were wrong in turn — the first
+//!   real runs (04.10.2026) passed "turn left" on turns to the preview's right
+//!   with one and then with the other. Yaw now follows the frame's x axis
+//!   alone.
 //! - **Size:** the face box's width as a share of the frame's width.
 //!
 //! There is no anti-spoofing model yet (`models/README.md`): these challenges
@@ -36,24 +41,33 @@ pub const TURNED: f32 = 0.16;
 /// A slight turn, for the enrolment's side views: between these, about
 /// 10°–16° up to 30°–36°.
 pub const SLIGHT: (f32, f32) = (0.10, 0.30);
-/// Coming closer means a face this much wider than when the challenge began.
+/// Coming closer means a face this much wider than when the challenge began…
 pub const CLOSER: f32 = 1.25;
+/// …or this wide already. At laptop distance faces are 0.22–0.28 of the
+/// frame (§12 of the plan); the second real run started "come closer" at 0.27
+/// and could not grow a quarter more within the time.
+pub const CLOSE_ENOUGH: f32 = 0.28;
 /// Smaller than this, and SFace has too few pixels to go on.
 pub const LARGE_ENOUGH: f32 = 0.12;
 
 pub fn yaw(face: &Detection) -> f32 {
-    let [right_eye, left_eye, nose, ..] = face.landmarks;
-    let (ex, ey) = (left_eye.x - right_eye.x, left_eye.y - right_eye.y);
+    let [first_eye, second_eye, nose, ..] = face.landmarks;
+    // The line through the eyes, pointing to the right of the frame — the
+    // same whichever eye YuNet names first.
+    let (mut ex, mut ey) = (second_eye.x - first_eye.x, second_eye.y - first_eye.y);
+    if ex < 0.0 {
+        (ex, ey) = (-ex, -ey);
+    }
     let distance = (ex * ex + ey * ey).sqrt();
     if distance <= f32::EPSILON {
         return 0.0;
     }
     let (mx, my) = (
-        (left_eye.x + right_eye.x) / 2.0,
-        (left_eye.y + right_eye.y) / 2.0,
+        (first_eye.x + second_eye.x) / 2.0,
+        (first_eye.y + second_eye.y) / 2.0,
     );
-    // Towards the first eye is to the student's left: see above.
-    ((mx - nose.x) * ex + (my - nose.y) * ey) / (distance * distance)
+    // Nose to the frame's right: head to the preview's left.
+    ((nose.x - mx) * ex + (nose.y - my) * ey) / (distance * distance)
 }
 
 pub fn size(face: &Detection, frame_width: usize) -> f32 {
@@ -66,8 +80,8 @@ pub(super) mod tests {
     use crate::face_unlock::detect::Point;
 
     /// A face 160 px wide at (240, 160), turned `turn` eye distances to the
-    /// student's left — the nose that far towards the first eye, as measured —
-    /// and the whole face rolled by `roll` degrees.
+    /// left of the mirrored preview — the nose that far to the right of the
+    /// frame — and the whole face rolled by `roll` degrees.
     pub fn face(turn: f32, roll: f32) -> Detection {
         let (sin, cos) = roll.to_radians().sin_cos();
         let at = |x: f32, y: f32| Point {
@@ -82,7 +96,7 @@ pub(super) mod tests {
             landmarks: [
                 at(-30.0, -20.0),
                 at(30.0, -20.0),
-                at(-60.0 * turn, 10.0),
+                at(60.0 * turn, 10.0),
                 at(-25.0, 40.0),
                 at(25.0, 40.0),
             ],
@@ -95,12 +109,23 @@ pub(super) mod tests {
         assert!(yaw(&face(0.0, 0.0)).abs() < 1e-5);
         assert!(
             (yaw(&face(0.35, 0.0)) - 0.35).abs() < 1e-4,
-            "to the student's left"
+            "to the preview's left"
         );
         assert!(
             (yaw(&face(-0.35, 0.0)) + 0.35).abs() < 1e-4,
-            "to the student's right"
+            "to the preview's right"
         );
+    }
+
+    /// Which eye YuNet names first does not change the side.
+    #[test]
+    fn reads_the_side_from_the_frame_not_from_the_eye_order() {
+        let mut swapped = face(0.35, 0.0);
+        swapped.landmarks.swap(0, 1);
+        assert!((yaw(&swapped) - 0.35).abs() < 1e-4);
+        let mut swapped = face(-0.35, 15.0);
+        swapped.landmarks.swap(0, 1);
+        assert!((yaw(&swapped) + 0.35).abs() < 1e-4);
     }
 
     /// Tilting the head sideways is not turning it.
@@ -110,14 +135,14 @@ pub(super) mod tests {
         assert!((yaw(&face(0.35, -25.0)) - 0.35).abs() < 1e-4);
     }
 
-    /// A head as Rust sees it: eyes 63 mm apart, the nose tip `depth` mm in
-    /// front of them, turned by `degrees` to the student's left — which
-    /// moves the nose towards the first eye in YuNet's landmarks.
+    /// A head in the frame: eyes 63 mm apart, the nose tip `depth` mm in front
+    /// of them, turned by `degrees` to the left of the mirrored preview —
+    /// which moves the nose to the right of the frame.
     fn head(degrees: f32, depth: f32) -> Detection {
         let (sin, cos) = degrees.to_radians().sin_cos();
         // Millimetres on the face → pixels, turned about the vertical axis.
         let at = |x: f32, y: f32, z: f32| Point {
-            x: 320.0 + 2.5 * (x * cos - z * sin),
+            x: 320.0 + 2.5 * (x * cos + z * sin),
             y: 240.0 + 2.5 * y,
         };
         Detection {
