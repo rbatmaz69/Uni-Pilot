@@ -405,7 +405,10 @@ differs from the above:
   Until one is, the head-movement challenges are the only defence against a photo, and the
   threat-model row "Photo / printout" is weaker than §7 says.
 - Challenges from the landmarks: yaw = nose offset from the eyes' midpoint along the eye line, in
-  eye distances, positive to the student's left (frames are not mirrored). Closer = face ≥ 1.25 ×
+  eye distances, positive to the student's left — left in the mirrored preview, as the prompts mean
+  it. **Sign corrected 04.10.2026** from the first real run's log: with the sign first assumed, a turn
+  to the left read −0.06 and one to the right +0.31 (TurnLeft passed on the right turn); in YuNet's
+  landmarks a turn to the left moves the nose towards the first eye. Closer = face ≥ 1.25 ×
   its width at the challenge's start; faces under 12 % of the frame's width rejected.
   **Thresholds, revised 04.10.2026** after the first real run did not see a turn: a head turned by θ
   reads (d / D)·tan θ, with D the eye distance (~63 mm) and d how far the nose tip stands in front

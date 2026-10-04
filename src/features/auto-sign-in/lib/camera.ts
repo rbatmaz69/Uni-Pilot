@@ -13,7 +13,7 @@ export const FRAME_HEIGHT = 480;
 const JPEG_QUALITY = 0.85;
 
 export interface Camera {
-  /** The picture now, as JPEG bytes — not mirrored; only the preview is. */
+  /** The picture now, as JPEG bytes, as the camera delivers it: the page mirrors only the preview. */
   grab: () => Promise<Uint8Array>;
   /** Ends every track. Safe to call more than once. */
   stop: () => void;

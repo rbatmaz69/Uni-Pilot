@@ -9,8 +9,9 @@ interface CameraViewProps {
 
 /**
  * The camera's picture, mirrored like a mirror, with an oval to put the face
- * in and a mark that says the camera is on. What Rust looks at is not
- * mirrored; "left" means the student's left either way.
+ * in and a mark that says the camera is on. "Turn your head to the left"
+ * means the student's left, which is left in this preview too; Rust's yaw is
+ * signed to match (`src-tauri/src/face_unlock/liveness.rs`).
  */
 export function CameraView({ video, cameraOn, prompt }: CameraViewProps) {
   return (

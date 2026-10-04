@@ -37,7 +37,7 @@ describe('the camera', () => {
     });
   });
 
-  it('gives frames as JPEG, unmirrored', async () => {
+  it('gives frames as JPEG, without mirroring them as the preview does', async () => {
     const video = document.createElement('video');
     const camera = await openCamera(video);
     expect(await camera.grab()).toEqual(JPEG);

@@ -18,7 +18,8 @@ pub enum Seen {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Face {
     pub embedding: Embedding,
-    /// `liveness::yaw`: positive turned to the person's left.
+    /// `liveness::yaw`: positive turned to the student's left, which is left
+    /// in the mirrored preview.
     pub yaw: f32,
     /// `liveness::size`: the face's width over the frame's.
     pub size: f32,
