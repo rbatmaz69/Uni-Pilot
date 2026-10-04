@@ -40,6 +40,11 @@ const RETURN_GAP_MS = 5 * 60 * 1000;
  * (`courseFilesStore`): the sign-in is known to work at that moment, and the
  * sync adds no reason of its own to wake ILIAS.
  *
+ * At start it asks once, right away: ILIAS ends its sign-in when Uni Pilot
+ * quits, and the student should hear about it now — with face unlock's bar,
+ * if they allowed it — not at the first quarter hour or when they happen to
+ * open a course.
+ *
  * Coming back from ILIAS mode while the sign-in was missing asks once more:
  * the student may have signed in there. Until that answer, the read is under
  * way, and face unlock's bar — which turns the camera on — waits for it.
@@ -72,6 +77,9 @@ export function CourseSync() {
     };
     window.addEventListener('focus', back);
     document.addEventListener('visibilitychange', back);
+
+    // At start, once: whether the sign-in survived the last quit.
+    ping();
 
     void listenToCourseFiles().catch(() => undefined);
     const stopWatching = useCourseStore.subscribe((state, before) => {

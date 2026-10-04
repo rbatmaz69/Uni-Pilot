@@ -58,20 +58,32 @@ describe('keeping the ILIAS sign-in alive', () => {
 
   it('does not ask on leaving ILIAS mode while the sign-in holds', async () => {
     render(<CourseSync />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
     act(() => useUiStore.getState().setImmersive(true));
     act(() => useUiStore.getState().setImmersive(false));
     await act(() => vi.advanceTimersByTimeAsync(0));
-    expect(courseReads()).toHaveLength(0);
+    expect(courseReads()).toHaveLength(1);
+  });
+
+  /**
+   * ILIAS ends its sign-in when Uni Pilot quits: asking at once lets the
+   * student — and face unlock's bar — know right after start.
+   */
+  it('asks once right at start', async () => {
+    render(<CourseSync />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(courseReads()).toHaveLength(1);
   });
 
   it('reads the course list every quarter of an hour while the app runs', async () => {
     render(<CourseSync />);
-    expect(courseReads()).toHaveLength(0);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(courseReads()).toHaveLength(1);
 
     await act(() => vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS));
-    expect(courseReads()).toHaveLength(1);
-    await act(() => vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS));
     expect(courseReads()).toHaveLength(2);
+    await act(() => vi.advanceTimersByTimeAsync(KEEP_ALIVE_MS));
+    expect(courseReads()).toHaveLength(3);
   });
 
   /** A ping cannot bring a sign-in back; asking again would only knock on the door. */
@@ -95,22 +107,23 @@ describe('keeping the ILIAS sign-in alive', () => {
   it('asks at once when the computer wakes from sleep', async () => {
     render(<CourseSync />);
     await act(() => vi.advanceTimersByTimeAsync(60 * 1000));
-    expect(courseReads()).toHaveLength(0);
+    expect(courseReads()).toHaveLength(1);
 
     // Twenty minutes asleep: the clock jumps, no timer ran in between.
     vi.setSystemTime(Date.now() + 20 * 60 * 1000);
     await act(() => vi.advanceTimersByTimeAsync(30 * 1000));
-    expect(courseReads()).toHaveLength(1);
+    expect(courseReads()).toHaveLength(2);
   });
 
   it('asks when the student comes back to the window after a while', async () => {
     render(<CourseSync />);
     window.dispatchEvent(new Event('focus'));
-    expect(courseReads()).toHaveLength(0);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(courseReads()).toHaveLength(1);
 
     await act(() => vi.advanceTimersByTimeAsync(6 * 60 * 1000));
     window.dispatchEvent(new Event('focus'));
     await act(() => vi.advanceTimersByTimeAsync(0));
-    expect(courseReads()).toHaveLength(1);
+    expect(courseReads()).toHaveLength(2);
   });
 });

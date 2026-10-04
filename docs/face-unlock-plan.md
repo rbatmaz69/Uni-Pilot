@@ -494,7 +494,9 @@ HHN is unchanged; how the face is asked for is not:
   set up, turned off again by Forget) or clicked **Unlock with your face** in the notice. The camera
   runs only inside the bar, and stops when Uni Pilot goes to the background (it looks again on
   coming back). The sign-out is never persisted, so nothing turns the camera on at start while the
-  session holds. Coming back from ILIAS mode with the session marked gone re-reads the course list
+  session holds. Right after start, `CourseSync` reads the course list once: ILIAS ends its
+  sign-in when Uni Pilot quits (⌘Q), so after a restart the bar comes at once instead of at the first
+  quarter hour. Coming back from ILIAS mode with the session marked gone re-reads the course list
   first (`CourseSync`): the student may have signed in there.
 - **Passing:** the enrolled face, matched (cosine ≥ 0.50, face ≥ 12 % of the frame) frame after
   frame for **1.5 s**. No turn, no "come closer", no prompt that jumps back; a frame without the

@@ -91,6 +91,10 @@ function answerLikeRust(refuse: Record<string, string> = {}, accounts = ACCOUNTS
     if (command === 'mail_previews') return Promise.resolve({});
     if (command === 'mail_message') return Promise.resolve(BODY);
     if (command === 'mail_reply') return Promise.resolve(true);
+    // The shell reads the course list at start (CourseSync): the student's courses, as set below.
+    if (command === 'ilias_sync_courses') {
+      return Promise.resolve(useCourseStore.getState().courses?.items ?? []);
+    }
     return Promise.resolve(undefined);
   });
 }
