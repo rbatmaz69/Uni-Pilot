@@ -371,7 +371,12 @@ pub async fn face_unlock_frame(
     if run.passed {
         return Ok(UnlockProgress::Passed);
     }
-    match run.unlock.frame(seen, now) {
+    #[cfg(debug_assertions)]
+    let measured = measured(&run.unlock, &seen);
+    let result = run.unlock.frame(seen, now);
+    #[cfg(debug_assertions)]
+    eprintln!("Face unlock: {measured} → {}", answered(&result));
+    match result {
         Unlocking::Going { prompt, done } => Ok(UnlockProgress::Looking {
             prompt,
             done,
@@ -389,6 +394,33 @@ pub async fn face_unlock_frame(
             eprintln!("Face unlock: not recognised in time.");
             Err(FaceError::NotRecognised)
         }
+    }
+}
+
+/// What one unlock frame measured, for the development log: numbers only —
+/// no frame, no template, no embedding.
+#[cfg(debug_assertions)]
+fn measured(unlock: &Unlock, seen: &attempt::Seen) -> String {
+    match seen {
+        attempt::Seen::NoFace => "no face".into(),
+        attempt::Seen::SeveralFaces => "several faces".into(),
+        attempt::Seen::Face(face) => format!(
+            "cosine {:.3}, yaw {:+.3}, box width {:.3} of the frame",
+            unlock.likeness(&face.embedding),
+            face.yaw,
+            face.size
+        ),
+    }
+}
+
+#[cfg(debug_assertions)]
+fn answered(result: &Unlocking) -> String {
+    match result {
+        Unlocking::Going { prompt, done } => {
+            format!("prompt {prompt:?}, {done} of {} done", attempt::CHALLENGES)
+        }
+        Unlocking::Passed => "passed".into(),
+        Unlocking::TimedOut => "timed out".into(),
     }
 }
 
@@ -459,6 +491,32 @@ mod tests {
         assert_eq!(
             serde_json::to_value(FaceError::Locked).unwrap(),
             serde_json::json!({ "kind": "locked" })
+        );
+    }
+
+    /// The development log carries three numbers and the answer — nothing of
+    /// the frame, the template or the embedding.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn logs_numbers_only() {
+        let template = embed::tests::towards(0, 1, 0.1);
+        let unlock = Unlock::new(template, attempt::challenges(0), 0);
+        let face = attempt::Seen::Face(attempt::Face {
+            embedding: template,
+            yaw: 0.2,
+            size: 0.25,
+        });
+        assert_eq!(
+            measured(&unlock, &face),
+            "cosine 1.000, yaw +0.200, box width 0.250 of the frame"
+        );
+        assert_eq!(measured(&unlock, &attempt::Seen::NoFace), "no face");
+        assert_eq!(
+            answered(&Unlocking::Going {
+                prompt: Prompt::TurnLeft,
+                done: 1
+            }),
+            "prompt TurnLeft, 1 of 2 done"
         );
     }
 

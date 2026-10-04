@@ -213,6 +213,13 @@ impl Unlock {
         self.saw_a_face
     }
 
+    /// How alike a face is to the template: a number for the development
+    /// log, never the template itself.
+    #[cfg(debug_assertions)]
+    pub fn likeness(&self, embedding: &Embedding) -> f32 {
+        cosine(&self.template, embedding)
+    }
+
     /// Every frame must show the student; one that does not sends the current
     /// challenge back to its start: look straight, then move.
     pub fn frame(&mut self, seen: Seen, now_ms: u64) -> Unlocking {

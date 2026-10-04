@@ -405,9 +405,15 @@ differs from the above:
   Until one is, the head-movement challenges are the only defence against a photo, and the
   threat-model row "Photo / printout" is weaker than §7 says.
 - Challenges from the landmarks: yaw = nose offset from the eyes' midpoint along the eye line, in
-  eye distances, positive to the student's left (frames are not mirrored). Straight ≤ 0.12, turned
-  ≥ 0.30, slight 0.10–0.40, closer = face ≥ 1.25 × its width at the challenge's start, faces under
-  12 % of the frame's width rejected. **All uncalibrated guesses**; calibration (student, others,
+  eye distances, positive to the student's left (frames are not mirrored). Closer = face ≥ 1.25 ×
+  its width at the challenge's start; faces under 12 % of the frame's width rejected.
+  **Thresholds, revised 04.10.2026** after the first real run did not see a turn: a head turned by θ
+  reads (d / D)·tan θ, with D the eye distance (~63 mm) and d how far the nose tip stands in front
+  of the eyes (22–35 mm) — 0.35–0.55 × tan θ. The first guess, turned ≥ 0.30, needed 29°–40°, where
+  SFace also stops matching and the challenge starts over. Now straight ≤ 0.10 (≈ 10°–16°), turned
+  ≥ 0.16 (≈ 16°–25°), slight 0.10–0.30 for the enrolment; a test turns a synthetic 3D head across
+  those nose depths. In debug builds `face_unlock_frame` logs each frame's cosine, yaw, box width
+  and the prompt — numbers only — to check them. Calibration with measured faces (student, others,
   photo, video, printout) is still open.
 - Enrolment: 4 frames straight, 2 slightly left, 2 slightly right, each the same person as the
   first (≥ 0.50); template = mean, renormalised; stored as `face-template` (base64 of 512 bytes).
