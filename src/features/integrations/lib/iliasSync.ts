@@ -235,6 +235,57 @@ export async function testIliasSignIn(connection: IliasConnection): Promise<bool
   return invoke<boolean>('sign_in_to_ilias', installation(connection));
 }
 
+/** What the vault holds for an ILIAS — never the password or the authenticator. `Status` in `src-tauri/src/vault.rs`. */
+export interface AutoSignInStatus {
+  credentials: boolean;
+  username: string | null;
+  /** The name of Uni Pilot's authenticator at the university. */
+  device: string | null;
+  /** The university refused the stored password; saving again clears it. */
+  stale: boolean;
+  face: boolean;
+}
+
+export interface AutoSignInValues {
+  username: string;
+  password: string;
+  /** An `otpauth://totp/…` link, or the bare secret. */
+  authenticator: string;
+  /** Empty for Rust's default, "Uni Pilot". */
+  device: string;
+}
+
+/**
+ * Stores what the automatic sign-in needs for this ILIAS, replacing what was
+ * there, in the platform's credential store under the ILIAS host —
+ * `testIliasSignIn` reads the same entry. Rust checks the values; the answer
+ * never carries the password or the authenticator back. Rejects with Rust's
+ * `VaultError` — see `vaultFailureText`.
+ */
+export async function saveIliasSignIn(
+  connection: IliasConnection,
+  values: AutoSignInValues,
+): Promise<AutoSignInStatus> {
+  const { invoke } = await (tauri ??= import('@tauri-apps/api/core'));
+  return invoke<AutoSignInStatus>('auto_sign_in_save', {
+    baseUrl: connection.baseUrl,
+    username: values.username,
+    password: values.password,
+    authenticator: values.authenticator,
+    device: values.device.trim() || null,
+  });
+}
+
+/** What a failed save says, from `VaultError` in `src-tauri/src/vault.rs`. Its messages never repeat the input. */
+export function vaultFailureText(failure: unknown): string {
+  const { kind, message } =
+    typeof failure === 'object' && failure !== null
+      ? (failure as { kind?: unknown; message?: unknown })
+      : {};
+  if (kind === 'refused') return 'Access to the credential store was declined.';
+  return typeof message === 'string' ? message : 'The sign-in could not be stored.';
+}
+
 /** What a failed automatic sign-in says, from `SignInError` in `src-tauri/src/ilias_sync/sign_in/`. */
 export function signInFailureText(failure: unknown): string {
   const { kind, message } =

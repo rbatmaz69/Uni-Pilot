@@ -5,6 +5,7 @@ import { Button } from '@/components/ui';
 import { formatTimeAgo } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
+import { DevSignInDialog } from '@/features/courses/components/DevSignInDialog';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { signInFailureText, testIliasSignIn } from '@/features/integrations/lib/iliasSync';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -69,13 +70,15 @@ export function SyncBar({ label, loadedAt, loading, onRefresh }: SyncBarProps) {
 }
 
 /**
- * Development builds only: Rust signs in with the password and authenticator
- * stored for this ILIAS — one password, one code, nothing retried — and the
- * read runs again once ILIAS has a session (`docs/face-unlock-plan.md`,
- * Phase 2, checked against a real account by hand).
+ * Development builds only: "Store sign-in…" keeps the password and
+ * authenticator for this ILIAS, and "Test sign-in" lets Rust sign in with them
+ * — one password, one code, nothing retried — then reads again once ILIAS has
+ * a session (`docs/face-unlock-plan.md`, Phase 2, checked against a real
+ * account by hand).
  */
-function TestSignIn({ onSignedIn }: { onSignedIn: () => void }) {
+function DevSignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const connection = useIliasStore((state) => state.connection);
+  const [storing, setStoring] = useState(false);
   const [running, setRunning] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   if (!connection) return null;
@@ -96,9 +99,24 @@ function TestSignIn({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <>
+      <Button size="sm" onClick={() => setStoring(true)}>
+        Store sign-in…
+      </Button>
       <Button size="sm" onClick={() => void run()} disabled={running}>
         Test sign-in
       </Button>
+      {storing ? (
+        <DevSignInDialog
+          connection={connection}
+          onClose={() => setStoring(false)}
+          onSaved={(status) => {
+            setStoring(false);
+            setSaid(
+              `Stored for ${status.username ?? 'you'}, authenticator “${status.device ?? 'Uni Pilot'}”. “Test sign-in” uses it now.`,
+            );
+          }}
+        />
+      ) : null}
       {said ? (
         <p role="status" className="order-last basis-full text-right text-[12px] text-secondary">
           {said}
@@ -131,7 +149,7 @@ export function FailureNotice({ onRetry }: { onRetry: () => void }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {import.meta.env.DEV ? <TestSignIn onSignedIn={onRetry} /> : null}
+          {import.meta.env.DEV ? <DevSignIn onSignedIn={onRetry} /> : null}
           <Button
             variant="primary"
             size="sm"

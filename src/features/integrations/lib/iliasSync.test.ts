@@ -9,11 +9,13 @@ import {
   readIliasCourses,
   renewIliasSession,
   saveCourseFile,
+  saveIliasSignIn,
   signInFailureText,
   stopSyncingCourse,
   syncCourseFiles,
   testIliasSignIn,
   toIliasError,
+  vaultFailureText,
   type CourseTarget,
   type IliasContentItem,
 } from './iliasSync';
@@ -161,12 +163,32 @@ describe('when Rust gives nothing', () => {
   });
 });
 
-describe('the test sign-in', () => {
+describe('the automatic sign-in, in development', () => {
   /** The sign-on and the secrets are Rust's: the page sends no address but ILIAS's. */
   it('names the installation, nothing more', async () => {
     invoke.mockResolvedValue(true);
     await expect(testIliasSignIn(HHN)).resolves.toBe(true);
     expect(invoke.mock.calls).toEqual([['sign_in_to_ilias', INSTALLATION]]);
+  });
+
+  /** Stored under the ILIAS host, where `sign_in_to_ilias` looks. */
+  it('stores the values for the ILIAS the page is connected to', async () => {
+    invoke.mockResolvedValue({ credentials: true });
+    const values = { username: 'student', password: 'pw', authenticator: 'SECRET' };
+    await saveIliasSignIn(HHN, { ...values, device: ' Laptop ' });
+    await saveIliasSignIn(HHN, { ...values, device: '  ' });
+    expect(invoke.mock.calls).toEqual([
+      ['auto_sign_in_save', { baseUrl: INSTALLATION.baseUrl, ...values, device: 'Laptop' }],
+      ['auto_sign_in_save', { baseUrl: INSTALLATION.baseUrl, ...values, device: null }],
+    ]);
+  });
+
+  it('says why storing did not work, in Rust’s words', () => {
+    expect(vaultFailureText({ kind: 'invalid', message: 'Your HHN password is missing.' })).toBe(
+      'Your HHN password is missing.',
+    );
+    expect(vaultFailureText({ kind: 'refused' })).toMatch(/declined/);
+    expect(vaultFailureText(undefined)).toBe('The sign-in could not be stored.');
   });
 
   it('says why it did not work', () => {
