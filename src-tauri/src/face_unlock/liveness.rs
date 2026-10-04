@@ -18,35 +18,23 @@
 //!   alone.
 //! - **Size:** the face box's width as a share of the frame's width.
 //!
-//! There is no anti-spoofing model yet (`models/README.md`): these challenges
-//! are all that stands between a photo and the sign-in.
+//! Unlocking asks for no movement any more (`attempt::Unlock`): only the
+//! enrolment uses yaw, to take its side views. With no anti-spoofing model
+//! (`models/README.md`), a good photo of the student can unlock.
 //!
 //! **What a yaw means.** A head turned by θ puts the nose tip `d·sin θ` to the
 //! side while the eyes come `D·cos θ` apart, so yaw = (d / D)·tan θ — with D
 //! the eye distance (about 63 mm) and d how far the nose tip stands in front
-//! of the eyes (22–35 mm, by face). That is 0.35–0.55 × tan θ: a turn of 30°
-//! reads 0.20–0.32, a look 10° off 0.06–0.10. The first guess, 0.30 for a
-//! turn, asked for 29°–40° — further than people turn when asked, and far
-//! enough for SFace to stop recognising the face, which starts the challenge
-//! over. The thresholds below come from this geometry, not from measured
-//! faces; the debug log of `face_unlock_frame` prints the numbers to check them.
+//! of the eyes (22–35 mm, by face): 0.35–0.55 × tan θ. A look 10° off reads
+//! 0.06–0.10, a turn of 20° 0.13–0.20.
 
 use super::detect::Detection;
 
 /// Facing the camera: within about 10°–16°.
 pub const STRAIGHT: f32 = 0.10;
-/// A clear turn, for unlocking: from about 16°–25° on. Well clear of
-/// `STRAIGHT`, so a straight look with a jittery landmark never counts.
-pub const TURNED: f32 = 0.16;
 /// A slight turn, for the enrolment's side views: between these, about
 /// 10°–16° up to 30°–36°.
 pub const SLIGHT: (f32, f32) = (0.10, 0.30);
-/// Coming closer means a face this much wider than when the challenge began…
-pub const CLOSER: f32 = 1.25;
-/// …or this wide already. At laptop distance faces are 0.22–0.28 of the
-/// frame (§12 of the plan); the second real run started "come closer" at 0.27
-/// and could not grow a quarter more within the time.
-pub const CLOSE_ENOUGH: f32 = 0.28;
 /// Smaller than this, and SFace has too few pixels to go on.
 pub const LARGE_ENOUGH: f32 = 0.12;
 
@@ -161,25 +149,24 @@ pub(super) mod tests {
         }
     }
 
-    /// For every nose depth people have: a clear turn of about 30° counts,
-    /// a look a few degrees off is straight and never a turn.
+    /// For every nose depth people have, as the enrolment asks: a look a few
+    /// degrees off is straight, a turn of 20° either way is a slight one.
     #[test]
-    fn counts_a_clear_turn_and_not_a_straight_look() {
+    fn tells_a_straight_look_from_a_slight_turn() {
         for depth in [22.0, 27.0, 35.0] {
             for degrees in [-6.0, 0.0, 6.0] {
                 let seen = yaw(&head(degrees, depth));
                 assert!(seen.abs() <= STRAIGHT, "{degrees}° at {depth} mm: {seen}");
             }
-            for degrees in [28.0, 35.0, 45.0] {
-                let left = yaw(&head(degrees, depth));
-                let right = yaw(&head(-degrees, depth));
-                assert!(left >= TURNED, "{degrees}° left at {depth} mm: {left}");
-                assert!(right <= -TURNED, "{degrees}° right at {depth} mm: {right}");
-            }
-            let slight = yaw(&head(20.0, depth));
+            let left = yaw(&head(20.0, depth));
+            let right = yaw(&head(-20.0, depth));
             assert!(
-                (SLIGHT.0..=SLIGHT.1).contains(&slight),
-                "20° at {depth} mm: {slight}"
+                (SLIGHT.0..=SLIGHT.1).contains(&left),
+                "20° at {depth} mm: {left}"
+            );
+            assert!(
+                (SLIGHT.0..=SLIGHT.1).contains(&-right),
+                "-20° at {depth} mm: {right}"
             );
         }
     }

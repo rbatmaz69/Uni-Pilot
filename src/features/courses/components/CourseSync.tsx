@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
+import { useUiStore } from '@/store/uiStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import {
   listenToCourseFiles,
@@ -39,6 +40,10 @@ const RETURN_GAP_MS = 5 * 60 * 1000;
  * (`courseFilesStore`): the sign-in is known to work at that moment, and the
  * sync adds no reason of its own to wake ILIAS.
  *
+ * Coming back from ILIAS mode while the sign-in was missing asks once more:
+ * the student may have signed in there. Until that answer, the read is under
+ * way, and face unlock's bar — which turns the camera on — waits for it.
+ *
  * Mounted with the app, not a route: leaving the Courses page must not end it.
  */
 export function CourseSync() {
@@ -76,7 +81,15 @@ export function CourseSync() {
       void useCourseFilesStore.getState().syncDue(connection, state.courses.items);
     });
 
+    const stopLeaving = useUiStore.subscribe((state, before) => {
+      if (state.immersive || !before.immersive) return;
+      const connection = useIliasStore.getState().connection;
+      const { failure, loadCourses } = useCourseStore.getState();
+      if (connection && failure?.kind === 'session-expired') void loadCourses(connection);
+    });
+
     return () => {
+      stopLeaving();
       clearInterval(keepAlive);
       clearInterval(clock);
       window.removeEventListener('focus', back);

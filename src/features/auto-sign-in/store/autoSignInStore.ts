@@ -10,6 +10,10 @@
  *
  * Never a password, an authenticator or a face: only what Rust's status
  * says about them.
+ *
+ * Also here: whether the student allowed the camera to turn on by itself when
+ * ILIAS signs them out (`autoUnlock`, off until they turn it on in Settings),
+ * and where the face bar stands for the current sign-out (`faceBar`).
  */
 
 import { create } from 'zustand';
@@ -26,7 +30,12 @@ import {
   type AutoSignInStatus,
   type AutoSignInValues,
 } from '@/features/auto-sign-in/lib/autoSignIn';
-import { faceFailureKind } from '@/features/auto-sign-in/lib/faceUnlock';
+import {
+  faceFailureKind,
+  faceFailureText,
+  finishUnlock,
+} from '@/features/auto-sign-in/lib/faceUnlock';
+import { useCourseStore, type CourseFailure } from '@/features/courses/store/courseStore';
 
 export interface KnownSignIn {
   credentials: boolean;
@@ -36,6 +45,20 @@ export interface KnownSignIn {
   stale: boolean;
   /** A face is enrolled. */
   face: boolean;
+}
+
+/**
+ * The face bar for one sign-out — tied to the very failure ILIAS gave, so a
+ * new sign-out starts afresh. `requested`: the student asked for it.
+ * `dismissed`: they closed it. `signingIn`: the face passed, Rust signs in
+ * in the background and the bar is gone. `stopped`: it ended with `text`.
+ */
+export interface FaceBar {
+  for: CourseFailure;
+  state: 'requested' | 'dismissed' | 'signingIn' | 'stopped';
+  text?: string;
+  /** For `stopped`: whether another look could help. */
+  again?: boolean;
 }
 
 export interface SignInResult {
@@ -56,6 +79,17 @@ interface AutoSignInState {
   faceEnrolled: (connection: IliasConnection) => void;
   /** What a face unlock that stopped says about what is stored. */
   noteFaceFailure: (connection: IliasConnection, failure: unknown) => void;
+
+  /** The camera may turn on by itself when ILIAS signs the student out. Off until allowed. */
+  autoUnlock: boolean;
+  setAutoUnlock: (allowed: boolean) => void;
+  faceBar: FaceBar | null;
+  setFaceBar: (bar: FaceBar | null) => void;
+  /**
+   * The face passed: the bar goes at once, Rust signs in in the background,
+   * and the course list is read again. Nobody waits for it.
+   */
+  finishFaceUnlock: (connection: IliasConnection, failure: CourseFailure) => Promise<void>;
 }
 
 const NOTHING: KnownSignIn = {
@@ -89,6 +123,37 @@ export const useAutoSignInStore = create<AutoSignInState>()(
       return {
         byHost: {},
         signingIn: false,
+        autoUnlock: false,
+        faceBar: null,
+
+        setAutoUnlock: (allowed) => set({ autoUnlock: allowed }),
+        setFaceBar: (bar) => set({ faceBar: bar }),
+
+        finishFaceUnlock: async (connection, failure) => {
+          set({ faceBar: { for: failure, state: 'signingIn' } });
+          const stop = (on: CourseFailure, text: string) =>
+            set({ faceBar: { for: on, state: 'stopped', text, again: false } });
+          try {
+            if (!(await finishUnlock())) {
+              stop(
+                failure,
+                'HHN let Uni Pilot in, but ILIAS did not take the sign-in. Sign in with your password this time.',
+              );
+              return;
+            }
+            await useCourseStore.getState().loadCourses(connection);
+            const after = useCourseStore.getState().failure;
+            if (after?.kind === 'session-expired') {
+              // Not again with the camera: the face did its part.
+              stop(after, 'Signed in, but ILIAS still asks. Sign in with your password this time.');
+            } else {
+              set({ faceBar: null });
+            }
+          } catch (cause) {
+            get().noteFaceFailure(connection, cause);
+            stop(failure, faceFailureText(cause));
+          }
+        },
 
         load: async (connection) => remember(connection, known(await readAutoSignIn(connection))),
 
@@ -98,6 +163,8 @@ export const useAutoSignInStore = create<AutoSignInState>()(
         forget: async (connection) => {
           await forgetAutoSignIn(connection);
           remember(connection, NOTHING);
+          // The face went with it; turning the camera on by itself waits for a new one.
+          set({ autoUnlock: false });
         },
 
         faceEnrolled: (connection) => {
@@ -155,7 +222,7 @@ export const useAutoSignInStore = create<AutoSignInState>()(
     },
     {
       name: 'uni-pilot.auto-sign-in',
-      partialize: (state) => ({ byHost: state.byHost }),
+      partialize: (state) => ({ byHost: state.byHost, autoUnlock: state.autoUnlock }),
     },
   ),
 );

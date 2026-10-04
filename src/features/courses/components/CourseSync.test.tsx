@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import { useUiStore } from '@/store/uiStore';
 import { CourseSync, KEEP_ALIVE_MS } from './CourseSync';
 
 const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>();
@@ -36,6 +37,33 @@ afterEach(() => {
 });
 
 describe('keeping the ILIAS sign-in alive', () => {
+  /**
+   * The student may have signed in there; asking again comes before the face
+   * bar could turn the camera on for a session that is back.
+   */
+  it('asks again on coming back from ILIAS mode while the sign-in was missing', async () => {
+    useCourseStore.setState({
+      failure: { kind: 'session-expired', message: 'Sign in to ILIAS again.' },
+    });
+    render(<CourseSync />);
+    act(() => useUiStore.getState().setImmersive(true));
+    expect(courseReads()).toHaveLength(0);
+
+    act(() => useUiStore.getState().setImmersive(false));
+    expect(useCourseStore.getState().loading['courses']).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(courseReads()).toHaveLength(1);
+    expect(useCourseStore.getState().failure).toBeNull();
+  });
+
+  it('does not ask on leaving ILIAS mode while the sign-in holds', async () => {
+    render(<CourseSync />);
+    act(() => useUiStore.getState().setImmersive(true));
+    act(() => useUiStore.getState().setImmersive(false));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(courseReads()).toHaveLength(0);
+  });
+
   it('reads the course list every quarter of an hour while the app runs', async () => {
     render(<CourseSync />);
     expect(courseReads()).toHaveLength(0);

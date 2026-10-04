@@ -1,6 +1,7 @@
 import { PanelLeftOpen } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { IconButton } from '@/components/ui';
+import { FaceUnlockBar } from '@/features/auto-sign-in';
 import { CourseSync } from '@/features/courses/components/CourseSync';
 import { FocusService } from '@/features/focus/components/FocusService';
 import { useFocusStore } from '@/features/focus/store/focusStore';
@@ -56,6 +57,9 @@ export function AppLayout() {
             !immersive && 'workspace',
           )}
         >
+          {/* Face unlock's bar sits above everything and blocks nothing; in ILIAS
+              mode there is no room for it, so the camera stays off there. */}
+          {immersive ? null : <FaceUnlockBar />}
           {immersive || documents || focusMode ? null : <Header />}
           {documents && collapsed && !immersive ? (
             <IconButton

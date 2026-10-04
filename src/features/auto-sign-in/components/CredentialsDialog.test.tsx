@@ -23,7 +23,7 @@ const HHN: IliasConnection = {
 
 beforeEach(() => {
   invoke.mockReset();
-  useAutoSignInStore.setState({ byHost: {}, signingIn: false });
+  useAutoSignInStore.setState({ byHost: {}, signingIn: false, autoUnlock: false, faceBar: null });
 });
 
 afterEach(() => {

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,10 +11,6 @@ const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: (command: string, args: Record<string, unknown>) => invoke(command, args),
-}));
-
-vi.mock('@/features/auto-sign-in/lib/camera', () => ({
-  openCamera: () => Promise.reject(new Error('No camera in tests.')),
 }));
 
 const HOST = 'ilias.hs-heilbronn.de';
@@ -45,7 +41,7 @@ beforeEach(() => {
       message: 'The ILIAS sign-in has ended. Sign in to ILIAS again.',
     },
   });
-  useAutoSignInStore.setState({ byHost: {}, signingIn: false });
+  useAutoSignInStore.setState({ byHost: {}, signingIn: false, autoUnlock: false, faceBar: null });
 });
 
 function renderNotice() {
@@ -98,24 +94,47 @@ describe('the notice that ILIAS wants a sign-in', () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it('offers to unlock with the face when one is set up, with the password always beside it', async () => {
-    useAutoSignInStore.setState({ byHost: { [HOST]: { ...SET_UP, face: true } } });
-    invoke.mockRejectedValue({ kind: 'locked' });
+  /** Not a dialog: the click asks for the bar at the top, which turns the camera on. */
+  it('asks for the face bar when a face is set up, with the password always beside it', async () => {
+    useAutoSignInStore.setState({
+      byHost: { [HOST]: { ...SET_UP, face: true } },
+      autoUnlock: false,
+      faceBar: null,
+    });
     const { user } = renderNotice();
 
     expect(screen.queryByRole('button', { name: 'Sign in automatically' })).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Sign in with password instead' }),
     ).toBeInTheDocument();
-    expect(invoke).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Unlock with your face' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Unlock with your face' });
-    expect(await within(dialog).findByText(/paused after three tries/)).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith('face_unlock_start', {
-      baseUrl: 'https://ilias.hs-heilbronn.de',
-      clientId: 'iliashhn',
+    expect(useAutoSignInStore.getState().faceBar).toEqual({
+      for: useCourseStore.getState().failure,
+      state: 'requested',
     });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('points at the bar while it is up, instead of offering it twice', () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
+    try {
+      useAutoSignInStore.setState({
+        byHost: { [HOST]: { ...SET_UP, face: true } },
+        autoUnlock: true,
+        faceBar: null,
+      });
+      renderNotice();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Look at the camera in the bar at the top',
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Unlock with your face' }),
+      ).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    }
   });
 
   it('stops offering the stored password once HHN refused it, and says where to fix that', () => {

@@ -1,8 +1,8 @@
 /**
  * Face unlock — the TypeScript side of `src-tauri/src/face_unlock/`.
  *
- * The page turns the camera on, sends frames as raw JPEG bytes and shows the
- * prompts Rust answers with. Rust decides: it never tells the page whether a
+ * The page turns the camera on, sends frames as raw JPEG bytes and shows what
+ * Rust answers: the enrolment's prompts, the unlock's "still looking". Rust decides: it never tells the page whether a
  * face matched, and never hands over the face template, the password or a
  * code. When the face passes, Rust signs in itself (`finishUnlock`).
  *
@@ -16,13 +16,7 @@ import { signInFailureText } from '@/features/auto-sign-in/lib/autoSignIn';
 
 /** `Prompt` in `src-tauri/src/face_unlock/attempt.rs`. */
 export type FacePrompt =
-  | 'lookAtCamera'
-  | 'oneFaceOnly'
-  | 'comeCloser'
-  | 'turnLeft'
-  | 'turnRight'
-  | 'turnSlightlyLeft'
-  | 'turnSlightlyRight';
+  'lookAtCamera' | 'oneFaceOnly' | 'comeCloser' | 'turnSlightlyLeft' | 'turnSlightlyRight';
 
 export interface EnrolProgress {
   prompt: FacePrompt;
@@ -31,8 +25,8 @@ export interface EnrolProgress {
   done: boolean;
 }
 
-export type UnlockProgress =
-  { state: 'looking'; prompt: FacePrompt; done: number; of: number } | { state: 'passed' };
+/** Unlocking asks nothing but to be seen for a second and a half. */
+export type UnlockProgress = { state: 'looking' } | { state: 'passed' };
 
 /** `FaceError` in `src-tauri/src/face_unlock/mod.rs`. */
 export type FaceFailureKind =
@@ -49,8 +43,6 @@ export const PROMPTS: Record<FacePrompt, string> = {
   lookAtCamera: 'Look straight at the camera',
   oneFaceOnly: 'Only one face, please',
   comeCloser: 'Come a little closer',
-  turnLeft: 'Turn your head to the left',
-  turnRight: 'Turn your head to the right',
   turnSlightlyLeft: 'Turn your head slightly to the left',
   turnSlightlyRight: 'Turn your head slightly to the right',
 };

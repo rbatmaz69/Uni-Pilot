@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { KeyRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
 import { isDesktopRuntime } from '@/lib/icsFetch';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -37,6 +38,8 @@ export function AutoSignInSettings() {
   const forget = useAutoSignInStore((state) => state.forget);
   const signIn = useAutoSignInStore((state) => state.signIn);
   const signingIn = useAutoSignInStore((state) => state.signingIn);
+  const autoUnlock = useAutoSignInStore((state) => state.autoUnlock);
+  const setAutoUnlock = useAutoSignInStore((state) => state.setAutoUnlock);
   const [settingUp, setSettingUp] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -128,18 +131,49 @@ export function AutoSignInSettings() {
               </p>
             ) : null}
             {usable ? (
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-5">
-                <div>
-                  <h3 className="text-sm font-medium">Face unlock</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-secondary">
-                    {known?.face
-                      ? 'Set up. When ILIAS asks you to sign in, a look into the camera will do.'
-                      : 'Instead of a click, a look into the camera before Uni Pilot signs in. The camera turns on only when you ask.'}
-                  </p>
+              <div className="mt-5 border-t border-line-soft pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-medium">Face unlock</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-secondary">
+                      {known?.face
+                        ? 'Set up. When ILIAS asks you to sign in, a look into the camera will do.'
+                        : 'Instead of a click, a look into the camera before Uni Pilot signs in.'}
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => setEnrolling(true)}>
+                    {known?.face ? 'Set up face unlock again' : 'Set up face unlock'}
+                  </Button>
                 </div>
-                <Button size="sm" onClick={() => setEnrolling(true)}>
-                  {known?.face ? 'Set up face unlock again' : 'Set up face unlock'}
-                </Button>
+                <div className="mt-4 flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium">Unlock as soon as ILIAS signs you out</h4>
+                    <p className="mt-1 text-xs leading-relaxed text-secondary">
+                      {known?.face
+                        ? 'The camera turns on by itself, in a thin bar at the top — only while ILIAS wants a sign-in and the bar shows. Off until you turn it on.'
+                        : 'Set up face unlock first.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(known?.face) && autoUnlock}
+                    aria-label="Unlock as soon as ILIAS signs you out"
+                    disabled={!known?.face}
+                    onClick={() => setAutoUnlock(!autoUnlock)}
+                    className={cn(
+                      'flex h-6 w-10 flex-none items-center rounded-full p-1 transition-colors disabled:opacity-50',
+                      known?.face && autoUnlock ? 'bg-accent' : 'bg-line-strong',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'h-4 w-4 rounded-full bg-surface shadow-soft transition-transform',
+                        known?.face && autoUnlock && 'translate-x-4',
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
             ) : null}
             {enrolling ? (

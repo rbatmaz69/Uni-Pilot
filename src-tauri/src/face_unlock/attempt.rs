@@ -5,7 +5,7 @@
 use serde::Serialize;
 
 use super::embed::{cosine, mean, Embedding, SAME_PERSON};
-use super::liveness::{CLOSER, CLOSE_ENOUGH, LARGE_ENOUGH, SLIGHT, STRAIGHT, TURNED};
+use super::liveness::{LARGE_ENOUGH, SLIGHT, STRAIGHT};
 
 /// What one frame showed, as far as the state machines care. No pixels.
 #[derive(Debug, Clone, PartialEq)]
@@ -32,8 +32,6 @@ pub enum Prompt {
     LookAtCamera,
     OneFaceOnly,
     ComeCloser,
-    TurnLeft,
-    TurnRight,
     TurnSlightlyLeft,
     TurnSlightlyRight,
 }
@@ -137,82 +135,44 @@ impl Enrolment {
 // Unlock ------------------------------------------------------------------
 
 pub const UNLOCK_MS: u64 = 10_000;
-pub const CHALLENGES: usize = 2;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Challenge {
-    TurnLeft,
-    TurnRight,
-    ComeCloser,
-}
-
-impl Challenge {
-    fn prompt(self) -> Prompt {
-        match self {
-            Challenge::TurnLeft => Prompt::TurnLeft,
-            Challenge::TurnRight => Prompt::TurnRight,
-            Challenge::ComeCloser => Prompt::ComeCloser,
-        }
-    }
-
-    fn met(self, face: &Face, start_size: f32) -> bool {
-        match self {
-            Challenge::TurnLeft => face.yaw >= TURNED,
-            Challenge::TurnRight => face.yaw <= -TURNED,
-            // Closer than at the start, or close already.
-            Challenge::ComeCloser => face.size >= start_size * CLOSER || face.size >= CLOSE_ENOUGH,
-        }
-    }
-}
-
-/// Two different challenges in one of the six orders, picked by `random`.
-pub fn challenges(random: u64) -> [Challenge; CHALLENGES] {
-    use Challenge::*;
-    const ORDERS: [[Challenge; CHALLENGES]; 6] = [
-        [TurnLeft, TurnRight],
-        [TurnRight, TurnLeft],
-        [TurnLeft, ComeCloser],
-        [ComeCloser, TurnLeft],
-        [TurnRight, ComeCloser],
-        [ComeCloser, TurnRight],
-    ];
-    ORDERS[(random % ORDERS.len() as u64) as usize]
-}
+/// How long the enrolled face has to be seen, frame after frame, to pass.
+pub const HOLD_MS: u64 = 1_500;
 
 #[derive(Debug, PartialEq)]
 pub enum Unlocking {
-    Going { prompt: Prompt, done: usize },
+    Looking,
     Passed,
     TimedOut,
 }
 
+/// Passes once the enrolled face has matched for `HOLD_MS` without a break:
+/// no challenges, nothing to do but look. A frame without it — no face, two
+/// faces, a face too small, a stranger — only starts the count again.
 pub struct Unlock {
     template: Embedding,
-    challenges: [Challenge; CHALLENGES],
-    done: usize,
-    /// Set once the current challenge has seen the student straight on: the
-    /// face's size then, for "come closer".
-    start: Option<f32>,
+    /// When the face began to match, frame after frame.
+    matching_since: Option<u64>,
     started_ms: u64,
-    saw_a_face: bool,
+    passed: bool,
+    saw_a_stranger: bool,
 }
 
 impl Unlock {
-    pub fn new(template: Embedding, challenges: [Challenge; CHALLENGES], now_ms: u64) -> Self {
+    pub fn new(template: Embedding, now_ms: u64) -> Self {
         Self {
             template,
-            challenges,
-            done: 0,
-            start: None,
+            matching_since: None,
             started_ms: now_ms,
-            saw_a_face: false,
+            passed: false,
+            saw_a_stranger: false,
         }
     }
 
-    /// Whether any frame had a face in it. An attempt given up before that
-    /// does not count against the student.
-    pub fn saw_a_face(&self) -> bool {
-        self.saw_a_face
+    /// Whether a face that is not the student's was seen. An attempt that
+    /// ends without passing counts against the student only then: nobody
+    /// looking, or looking away, is no attempt to get in.
+    pub fn saw_a_stranger(&self) -> bool {
+        self.saw_a_stranger
     }
 
     /// How alike a face is to the template: a number for the development
@@ -222,57 +182,32 @@ impl Unlock {
         cosine(&self.template, embedding)
     }
 
-    /// Every frame must show the student; one that does not sends the current
-    /// challenge back to its start: look straight, then move.
     pub fn frame(&mut self, seen: Seen, now_ms: u64) -> Unlocking {
-        if self.done == CHALLENGES {
+        if self.passed {
             return Unlocking::Passed;
         }
         if now_ms.saturating_sub(self.started_ms) >= UNLOCK_MS {
             return Unlocking::TimedOut;
         }
-        let current = self.challenges[self.done];
-        let face = match seen {
-            Seen::NoFace => return self.start_over(Prompt::LookAtCamera),
-            Seen::SeveralFaces => return self.start_over(Prompt::OneFaceOnly),
-            Seen::Face(face) => face,
-        };
-        self.saw_a_face = true;
-        if face.size < LARGE_ENOUGH {
-            return self.start_over(Prompt::ComeCloser);
-        }
-        if cosine(&self.template, &face.embedding) < SAME_PERSON {
-            return self.start_over(Prompt::LookAtCamera);
-        }
-        let Some(start) = self.start else {
-            if face.yaw.abs() <= STRAIGHT {
-                self.start = Some(face.size);
-                return self.going(current.prompt());
+        let matches = match seen {
+            Seen::Face(face) if face.size >= LARGE_ENOUGH => {
+                let same = cosine(&self.template, &face.embedding) >= SAME_PERSON;
+                self.saw_a_stranger |= !same;
+                same
             }
-            return self.going(Prompt::LookAtCamera);
+            _ => false,
         };
-        if !current.met(&face, start) {
-            return self.going(current.prompt());
+        if !matches {
+            self.matching_since = None;
+            return Unlocking::Looking;
         }
-        self.done += 1;
-        self.start = None;
-        if self.done == CHALLENGES {
+        let since = *self.matching_since.get_or_insert(now_ms);
+        if now_ms.saturating_sub(since) >= HOLD_MS {
+            self.passed = true;
             Unlocking::Passed
         } else {
-            self.going(Prompt::LookAtCamera)
+            Unlocking::Looking
         }
-    }
-
-    fn going(&self, prompt: Prompt) -> Unlocking {
-        Unlocking::Going {
-            prompt,
-            done: self.done,
-        }
-    }
-
-    fn start_over(&mut self, prompt: Prompt) -> Unlocking {
-        self.start = None;
-        self.going(prompt)
     }
 }
 
@@ -419,119 +354,69 @@ mod tests {
 
     // Unlock
 
-    fn unlock(challenges: [Challenge; 2]) -> Unlock {
-        Unlock::new(student(), challenges, 1_000)
+    fn unlock() -> Unlock {
+        Unlock::new(student(), 1_000)
     }
 
     #[test]
-    fn passes_when_both_challenges_are_met_by_the_student() {
-        let mut attempt = unlock([Challenge::TurnLeft, Challenge::ComeCloser]);
-        let going = |prompt, done| Unlocking::Going { prompt, done };
-        assert_eq!(attempt.frame(straight(), 1_100), going(Prompt::TurnLeft, 0));
+    fn passes_once_the_student_was_seen_for_a_second_and_a_half() {
+        let mut attempt = unlock();
+        assert_eq!(attempt.frame(straight(), 1_100), Unlocking::Looking);
+        // Looking aside is fine: nothing to do but be recognised.
         assert_eq!(
-            attempt.frame(face(student(), 0.15, 0.25), 1_200),
-            going(Prompt::TurnLeft, 0)
+            attempt.frame(face(student(), 0.3, 0.25), 1_900),
+            Unlocking::Looking
         );
-        assert_eq!(
-            attempt.frame(face(student(), 0.35, 0.25), 1_300),
-            going(Prompt::LookAtCamera, 1)
-        );
-        assert_eq!(
-            attempt.frame(face(student(), 0.0, 0.18), 1_400),
-            going(Prompt::ComeCloser, 1)
-        );
-        assert_eq!(
-            attempt.frame(face(student(), 0.0, 0.20), 1_500),
-            going(Prompt::ComeCloser, 1)
-        );
-        assert_eq!(
-            attempt.frame(face(student(), 0.0, 0.23), 1_600),
-            Unlocking::Passed
-        );
-        assert!(attempt.saw_a_face());
+        assert_eq!(attempt.frame(straight(), 2_599), Unlocking::Looking);
+        assert_eq!(attempt.frame(straight(), 2_600), Unlocking::Passed);
+        assert!(!attempt.saw_a_stranger());
     }
 
-    /// Close to the camera already, a quarter more is not possible: close counts.
+    /// A stranger, a second face, no face, a face too small: the count
+    /// starts again — the prompt does not change.
     #[test]
-    fn come_closer_passes_when_the_face_is_close_already() {
-        let mut attempt = unlock([Challenge::ComeCloser, Challenge::TurnLeft]);
-        attempt.frame(face(student(), 0.0, 0.27), 1_100);
-        assert_eq!(
-            attempt.frame(face(student(), 0.0, 0.28), 1_200),
-            Unlocking::Going {
-                prompt: Prompt::LookAtCamera,
-                done: 1
-            }
-        );
-    }
-
-    #[test]
-    fn needs_a_straight_look_before_each_move() {
-        let mut attempt = unlock([Challenge::TurnRight, Challenge::TurnLeft]);
-        // Already turned: does not count until seen straight on first.
-        assert_eq!(
-            attempt.frame(face(student(), -0.4, 0.25), 1_100),
-            Unlocking::Going {
-                prompt: Prompt::LookAtCamera,
-                done: 0
-            }
-        );
-    }
-
-    /// A photo held up for one frame, a stranger, a second face, no face: the
-    /// challenge starts over.
-    #[test]
-    fn starts_the_challenge_over_on_any_frame_that_does_not_match() {
+    fn counts_again_after_any_frame_without_the_student() {
         for interruption in [
-            face(stranger(), 0.35, 0.25),
+            face(stranger(), 0.0, 0.25),
             Seen::SeveralFaces,
             Seen::NoFace,
-            face(student(), 0.35, 0.05),
+            face(student(), 0.0, 0.05),
         ] {
-            let mut attempt = unlock([Challenge::TurnLeft, Challenge::TurnRight]);
+            let mut attempt = unlock();
             attempt.frame(straight(), 1_100);
-            attempt.frame(interruption.clone(), 1_200);
+            attempt.frame(interruption.clone(), 2_000);
             assert_eq!(
-                attempt.frame(face(student(), 0.35, 0.25), 1_300),
-                Unlocking::Going {
-                    prompt: Prompt::LookAtCamera,
-                    done: 0
-                },
+                attempt.frame(straight(), 2_700),
+                Unlocking::Looking,
+                "{interruption:?}"
+            );
+            assert_eq!(
+                attempt.frame(straight(), 4_200),
+                Unlocking::Passed,
                 "{interruption:?}"
             );
         }
     }
 
     #[test]
-    fn a_stranger_never_gets_past_the_first_challenge() {
-        let mut attempt = unlock([Challenge::TurnLeft, Challenge::TurnRight]);
-        for (i, yaw) in [0.0, 0.35, 0.0, -0.35].into_iter().enumerate() {
-            let result = attempt.frame(face(stranger(), yaw, 0.25), 1_100 + i as u64 * 100);
-            assert!(matches!(result, Unlocking::Going { done: 0, .. }));
+    fn a_stranger_never_passes_and_is_noted() {
+        let mut attempt = unlock();
+        for at in (1_100..10_900).step_by(300) {
+            assert_eq!(
+                attempt.frame(face(stranger(), 0.0, 0.25), at),
+                Unlocking::Looking
+            );
         }
         assert_eq!(attempt.frame(straight(), 11_000), Unlocking::TimedOut);
+        assert!(attempt.saw_a_stranger());
     }
 
     #[test]
-    fn times_out_after_ten_seconds() {
-        let mut attempt = unlock([Challenge::TurnLeft, Challenge::TurnRight]);
-        assert!(matches!(
-            attempt.frame(straight(), 10_999),
-            Unlocking::Going { .. }
-        ));
-        assert_eq!(attempt.frame(straight(), 11_000), Unlocking::TimedOut);
-        assert!(!unlock([Challenge::TurnLeft, Challenge::TurnRight]).saw_a_face());
-    }
-
-    #[test]
-    fn picks_two_different_challenges_in_every_order() {
-        let orders: std::collections::HashSet<_> =
-            (0..60u64).map(|r| format!("{:?}", challenges(r))).collect();
-        assert_eq!(orders.len(), 6);
-        for random in 0..6u64 {
-            let [first, second] = challenges(random);
-            assert_ne!(first, second);
-        }
+    fn times_out_after_ten_seconds_without_counting_an_empty_room() {
+        let mut attempt = unlock();
+        assert_eq!(attempt.frame(Seen::NoFace, 10_999), Unlocking::Looking);
+        assert_eq!(attempt.frame(Seen::NoFace, 11_000), Unlocking::TimedOut);
+        assert!(!attempt.saw_a_stranger());
     }
 
     // Lockout
