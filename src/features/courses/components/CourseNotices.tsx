@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import { useState, type ComponentType, type ReactNode } from 'react';
 import { LogIn, RefreshCw, TriangleAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui';
@@ -6,6 +6,8 @@ import { formatTimeAgo } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import { signInFailureText, testIliasSignIn } from '@/features/integrations/lib/iliasSync';
+import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
 interface EmptyStateProps {
   icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
@@ -67,6 +69,46 @@ export function SyncBar({ label, loadedAt, loading, onRefresh }: SyncBarProps) {
 }
 
 /**
+ * Development builds only: Rust signs in with the password and authenticator
+ * stored for this ILIAS — one password, one code, nothing retried — and the
+ * read runs again once ILIAS has a session (`docs/face-unlock-plan.md`,
+ * Phase 2, checked against a real account by hand).
+ */
+function TestSignIn({ onSignedIn }: { onSignedIn: () => void }) {
+  const connection = useIliasStore((state) => state.connection);
+  const [running, setRunning] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  if (!connection) return null;
+
+  const run = async () => {
+    setRunning(true);
+    setSaid(null);
+    try {
+      const signedIn = await testIliasSignIn(connection);
+      setSaid(signedIn ? 'Signed in.' : 'Signed in at the sign-on, but ILIAS did not take it.');
+      if (signedIn) onSignedIn();
+    } catch (failure) {
+      setSaid(signInFailureText(failure));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <>
+      <Button size="sm" onClick={() => void run()} disabled={running}>
+        Test sign-in
+      </Button>
+      {said ? (
+        <p role="status" className="order-last basis-full text-right text-[12px] text-secondary">
+          {said}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/**
  * Why ILIAS gave nothing this time. What was read before stays on the page
  * underneath: a failure never empties it.
  */
@@ -88,14 +130,17 @@ export function FailureNotice({ onRetry }: { onRetry: () => void }) {
             authenticator code — while Uni Pilot runs, it keeps the sign-in alive.
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => void navigate(NAV_ITEMS.ilias.path)}
-          leadingIcon={<LogIn size={14} strokeWidth={1.8} aria-hidden />}
-        >
-          Sign in to ILIAS
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {import.meta.env.DEV ? <TestSignIn onSignedIn={onRetry} /> : null}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void navigate(NAV_ITEMS.ilias.path)}
+            leadingIcon={<LogIn size={14} strokeWidth={1.8} aria-hidden />}
+          >
+            Sign in to ILIAS
+          </Button>
+        </div>
       </div>
     );
   }

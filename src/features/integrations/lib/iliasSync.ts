@@ -223,6 +223,35 @@ export function renewIliasSession(connection: IliasConnection): Promise<boolean>
   return call('ilias_sync_reauth', installation(connection));
 }
 
+/**
+ * Development builds only: Rust signs in to the university's sign-on with the
+ * password and authenticator stored for this ILIAS, then lets ILIAS sign in
+ * through it (`docs/face-unlock-plan.md`, Phase 2). The page names the ILIAS;
+ * Rust picks the sign-on and reads the vault. `true` when ILIAS has a session
+ * again. Rejects with Rust's `SignInError` — see `signInFailureText`.
+ */
+export async function testIliasSignIn(connection: IliasConnection): Promise<boolean> {
+  const { invoke } = await (tauri ??= import('@tauri-apps/api/core'));
+  return invoke<boolean>('sign_in_to_ilias', installation(connection));
+}
+
+/** What a failed automatic sign-in says, from `SignInError` in `src-tauri/src/ilias_sync/sign_in/`. */
+export function signInFailureText(failure: unknown): string {
+  const { kind, message } =
+    typeof failure === 'object' && failure !== null
+      ? (failure as { kind?: unknown; message?: unknown })
+      : {};
+  switch (kind) {
+    case 'notSetUp':
+      return 'No sign-in is stored for this ILIAS.';
+    case 'wrongPassword':
+      return 'The stored password was refused. Save it again before the next try.';
+    case 'wrongCode':
+      return 'The code from Uni Pilot’s authenticator was refused.';
+  }
+  return typeof message === 'string' ? message : 'The sign-in did not work.';
+}
+
 /** The student's courses and groups, offline ones included. */
 export function readIliasCourses(connection: IliasConnection): Promise<IliasCourse[]> {
   return call('ilias_sync_courses', installation(connection));

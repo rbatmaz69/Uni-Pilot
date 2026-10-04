@@ -236,6 +236,18 @@ fn save_in(
     status_in(store, host)
 }
 
+fn mark_stale_in(store: &dyn Store, host: &str) -> Result<(), VaultError> {
+    let Some(mut credentials) = credentials_in(store, host)? else {
+        return Ok(());
+    };
+    credentials.stale = true;
+    let json = Zeroizing::new(
+        serde_json::to_string(&credentials)
+            .map_err(|_| VaultError::Unavailable("The sign-in could not be stored.".into()))?,
+    );
+    store.write(&sign_in_key(host), &json)
+}
+
 fn forget_in(store: &dyn Store, host: &str) -> Result<(), VaultError> {
     store.remove(&sign_in_key(host))?;
     store.remove(FACE)
@@ -281,6 +293,20 @@ pub async fn auto_sign_in_save(
         )
     })
     .await
+}
+
+/// What signing in needs, for the sign-in in Rust (`ilias_sync::sign_in`) —
+/// never for the page.
+pub(crate) async fn stored_sign_in(base_url: &str) -> Result<Option<Credentials>, VaultError> {
+    let host = host(base_url)?;
+    blocking(move || credentials_in(&Platform, &host)).await
+}
+
+/// HHN refused the stored password: it is not sent again until the student
+/// saves a new one, which clears the mark.
+pub(crate) async fn mark_stale(base_url: &str) -> Result<(), VaultError> {
+    let host = host(base_url)?;
+    blocking(move || mark_stale_in(&Platform, &host)).await
 }
 
 /// Forgets the sign-in and the face at once.
@@ -400,6 +426,22 @@ mod tests {
         assert!(!json.contains(RFC_SECRET), "{json}");
         assert!(!json.contains("otpauth"), "{json}");
         assert!(json.contains("\"device\":\"Laptop\""), "{json}");
+    }
+
+    #[test]
+    fn marks_a_refused_password_until_it_is_saved_again() {
+        let store = Memory::default();
+        mark_stale_in(&store, HOST).unwrap();
+        assert!(store.0.borrow().is_empty(), "nothing to mark, nothing written");
+
+        save_in(&store, HOST, "student", "hunter2", RFC_SECRET, None).unwrap();
+        mark_stale_in(&store, HOST).unwrap();
+        assert!(status_in(&store, HOST).unwrap().stale);
+        let kept = credentials_in(&store, HOST).unwrap().unwrap();
+        assert_eq!(kept.password, "hunter2", "the rest stays as it was");
+
+        let saved = save_in(&store, HOST, "student", "hunter3", RFC_SECRET, None).unwrap();
+        assert!(!saved.stale);
     }
 
     #[test]

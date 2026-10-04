@@ -9,8 +9,10 @@ import {
   readIliasCourses,
   renewIliasSession,
   saveCourseFile,
+  signInFailureText,
   stopSyncingCourse,
   syncCourseFiles,
+  testIliasSignIn,
   toIliasError,
   type CourseTarget,
   type IliasContentItem,
@@ -156,5 +158,26 @@ describe('when Rust gives nothing', () => {
     const error = toIliasError('command ilias_sync_courses not found');
     expect(error.kind).toBe('provider-error');
     expect(error.providerMessage).toBe('command ilias_sync_courses not found');
+  });
+});
+
+describe('the test sign-in', () => {
+  /** The sign-on and the secrets are Rust's: the page sends no address but ILIAS's. */
+  it('names the installation, nothing more', async () => {
+    invoke.mockResolvedValue(true);
+    await expect(testIliasSignIn(HHN)).resolves.toBe(true);
+    expect(invoke.mock.calls).toEqual([['sign_in_to_ilias', INSTALLATION]]);
+  });
+
+  it('says why it did not work', () => {
+    expect(signInFailureText({ kind: 'notSetUp' })).toBe('No sign-in is stored for this ILIAS.');
+    expect(signInFailureText({ kind: 'wrongPassword' })).toMatch(/password was refused/);
+    expect(signInFailureText({ kind: 'wrongCode' })).toMatch(/code .* was refused/);
+    expect(signInFailureText({ kind: 'unreachable', message: 'The sign-on is busy (503).' })).toBe(
+      'The sign-on is busy (503).',
+    );
+    expect(signInFailureText('command sign_in_to_ilias not found')).toBe(
+      'The sign-in did not work.',
+    );
   });
 });
