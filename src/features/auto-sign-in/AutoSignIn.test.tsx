@@ -147,6 +147,25 @@ describe('signing in automatically, in Settings', () => {
     expect(called('auto_sign_in_status')).toHaveLength(0);
   });
 
+  it('offers face unlock once a sign-in is stored, and says when it is set up', () => {
+    useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
+    const { unmount } = renderApp('/settings');
+    expect(
+      within(section()).getByRole('button', { name: 'Set up face unlock' }),
+    ).toBeInTheDocument();
+    unmount();
+
+    useAutoSignInStore.setState({
+      byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP, face: true } },
+    });
+    renderApp('/settings');
+    expect(within(section()).getByText(/a look into the camera will do/)).toBeInTheDocument();
+    expect(
+      within(section()).getByRole('button', { name: 'Set up face unlock again' }),
+    ).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith('face_enroll_start', expect.anything());
+  });
+
   it('forgets the sign-in', async () => {
     useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
     const user = userEvent.setup();

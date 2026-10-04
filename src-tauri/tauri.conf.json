@@ -38,7 +38,8 @@
     "resources": [
       "../THIRD-PARTY-LICENSES.md",
       "../licenses/heic-to-LICENSE",
-      "../licenses/mermaid-notices.txt"
+      "../licenses/mermaid-notices.txt",
+      "models"
     ],
     "publisher": "Uni Pilot",
     "homepage": "https://github.com/rbatmaz69/Uni-Pilot",

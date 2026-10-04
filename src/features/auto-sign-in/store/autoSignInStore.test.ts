@@ -18,7 +18,13 @@ const HHN: IliasConnection = {
   checkedAt: '2026-09-25T10:00:00.000Z',
 };
 const HOST = 'ilias.hs-heilbronn.de';
-const SET_UP = { credentials: true, username: 'student', device: 'Uni Pilot', stale: false };
+const SET_UP = {
+  credentials: true,
+  username: 'student',
+  device: 'Uni Pilot',
+  stale: false,
+  face: false,
+};
 
 const known = () => useAutoSignInStore.getState().byHost[HOST];
 
@@ -28,10 +34,23 @@ beforeEach(() => {
 });
 
 describe('what Uni Pilot remembers about the stored sign-in', () => {
-  it('keeps what Rust said, without the face', async () => {
-    invoke.mockResolvedValue({ ...SET_UP, face: false });
+  it('keeps what Rust said, the face among it', async () => {
+    invoke.mockResolvedValue({ ...SET_UP, face: true });
     await useAutoSignInStore.getState().load(HHN);
-    expect(known()).toEqual(SET_UP);
+    expect(known()).toEqual({ ...SET_UP, face: true });
+  });
+
+  it('learns from face unlock what is stored', () => {
+    const store = useAutoSignInStore.getState();
+    useAutoSignInStore.setState({ byHost: { [HOST]: SET_UP } });
+    store.faceEnrolled(HHN);
+    expect(known()?.face).toBe(true);
+    store.noteFaceFailure(HHN, { kind: 'noFace' });
+    expect(known()?.face).toBe(false);
+    store.noteFaceFailure(HHN, { kind: 'signIn', message: { kind: 'wrongPassword' } });
+    expect(known()?.stale).toBe(true);
+    store.noteFaceFailure(HHN, { kind: 'notSetUp' });
+    expect(known()?.credentials).toBe(false);
   });
 
   it('marks a refused password, so the notice stops offering it', async () => {
@@ -54,7 +73,7 @@ describe('what Uni Pilot remembers about the stored sign-in', () => {
 
   it('counts a saved password as accepted again', async () => {
     useAutoSignInStore.setState({ byHost: { [HOST]: { ...SET_UP, stale: true } } });
-    invoke.mockResolvedValue({ ...SET_UP, face: false });
+    invoke.mockResolvedValue({ ...SET_UP });
     await useAutoSignInStore
       .getState()
       .save(HHN, { username: 'student', password: 'new', authenticator: 'S', device: '' });

@@ -1,5 +1,6 @@
 mod apple_mail;
 mod documents;
+mod face_unlock;
 mod ilias_browser;
 mod ilias_links;
 mod ilias_sign_out;
@@ -43,6 +44,13 @@ pub fn run() {
             vault::auto_sign_in_save,
             vault::auto_sign_in_forget,
             vault::auto_sign_in_code,
+            face_unlock::face_enroll_start,
+            face_unlock::face_enroll_frame,
+            face_unlock::face_enroll_cancel,
+            face_unlock::face_unlock_start,
+            face_unlock::face_unlock_frame,
+            face_unlock::face_unlock_finish,
+            face_unlock::face_unlock_cancel,
             apple_mail::mail_accounts,
             apple_mail::mail_inbox,
             apple_mail::mail_open,
@@ -55,7 +63,8 @@ pub fn run() {
         ])
         .manage(ilias_view::Mode::default())
         .manage(ilias_browser::Downloads::default())
-        .manage(ilias_sync::Pace::default());
+        .manage(ilias_sync::Pace::default())
+        .manage(face_unlock::FaceUnlock::default());
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());
     builder

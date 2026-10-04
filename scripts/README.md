@@ -57,3 +57,14 @@ committing anything.**
 Credentials are read from the environment only. Never put them in a file in
 this repository, and never paste real output containing a session id into an
 issue: the script masks session ids in its own output for that reason.
+
+## `fetch-face-models.js`
+
+Downloads the two ONNX models face unlock runs on — YuNet and SFace, from
+OpenCV's model zoo — into `src-tauri/models/`, and keeps each only if its
+SHA-256 matches `src-tauri/models/README.md`. They are not in git; run this
+once per checkout. Files already there with the right checksum are left alone.
+
+```bash
+node scripts/fetch-face-models.js
+```

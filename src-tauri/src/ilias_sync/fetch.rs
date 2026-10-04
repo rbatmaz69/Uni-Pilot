@@ -85,6 +85,12 @@ pub async fn fetch<R: Runtime>(
     let mut last = pace.turn().await;
     let result = page(&url, &home, cookie).await;
     *last = Some(Instant::now());
+    if result.is_ok() {
+        // Signed in — by hand, most likely, after face unlock locked itself.
+        if let Some(face) = app.try_state::<crate::face_unlock::FaceUnlock>() {
+            face.signed_in();
+        }
+    }
     result
 }
 

@@ -39,6 +39,13 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 totp-rs = { version = "6", features = ["otpauth", "zeroize"] }
 zeroize = "1"
+# Face unlock (src/face_unlock/): YuNet and SFace run here, on the CPU, from
+# ONNX files in models/ — the camera frames never leave Rust. tract loads both
+# at a fixed input size (spike 0.5 in docs/face-unlock-plan.md); SFace int8
+# does not load in tract, so it is the fp32 file.
+tract-onnx = "0.23.8"
+# The page sends camera frames as JPEG; nothing else is decoded.
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
 
 # Back and forward in ILIAS, and downloads the macOS webview would otherwise
 # show (src/ilias_browser.rs), go straight to each platform's webview, which

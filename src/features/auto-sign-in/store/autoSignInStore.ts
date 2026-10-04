@@ -1,5 +1,5 @@
 /**
- * Whether signing in automatically is set up, by ILIAS host.
+ * Whether signing in automatically, and face unlock, are set up, by ILIAS host.
  *
  * Remembered here so the notice that ILIAS wants a sign-in can offer "Sign in
  * automatically" without asking the credential store: on a Mac, reading it can
@@ -8,8 +8,8 @@
  * once, in Settings, while nothing is remembered; after that every save,
  * forget and sign-in keeps this up to date.
  *
- * Never a password or an authenticator: only what Rust's status carries, the
- * face left out.
+ * Never a password, an authenticator or a face: only what Rust's status
+ * says about them.
  */
 
 import { create } from 'zustand';
@@ -26,6 +26,7 @@ import {
   type AutoSignInStatus,
   type AutoSignInValues,
 } from '@/features/auto-sign-in/lib/autoSignIn';
+import { faceFailureKind } from '@/features/auto-sign-in/lib/faceUnlock';
 
 export interface KnownSignIn {
   credentials: boolean;
@@ -33,6 +34,8 @@ export interface KnownSignIn {
   device: string | null;
   /** The university did not accept the stored password; Rust will not send it again. */
   stale: boolean;
+  /** A face is enrolled. */
+  face: boolean;
 }
 
 export interface SignInResult {
@@ -50,9 +53,18 @@ interface AutoSignInState {
   save: (connection: IliasConnection, values: AutoSignInValues) => Promise<KnownSignIn>;
   forget: (connection: IliasConnection) => Promise<void>;
   signIn: (connection: IliasConnection) => Promise<SignInResult>;
+  faceEnrolled: (connection: IliasConnection) => void;
+  /** What a face unlock that stopped says about what is stored. */
+  noteFaceFailure: (connection: IliasConnection, failure: unknown) => void;
 }
 
-const NOTHING: KnownSignIn = { credentials: false, username: null, device: null, stale: false };
+const NOTHING: KnownSignIn = {
+  credentials: false,
+  username: null,
+  device: null,
+  stale: false,
+  face: false,
+};
 
 function known(status: AutoSignInStatus): KnownSignIn {
   return {
@@ -60,6 +72,7 @@ function known(status: AutoSignInStatus): KnownSignIn {
     username: status.username,
     device: status.device,
     stale: status.stale,
+    face: status.face,
   };
 }
 
@@ -85,6 +98,32 @@ export const useAutoSignInStore = create<AutoSignInState>()(
         forget: async (connection) => {
           await forgetAutoSignIn(connection);
           remember(connection, NOTHING);
+        },
+
+        faceEnrolled: (connection) => {
+          remember(connection, { ...current(connection), face: true });
+        },
+
+        noteFaceFailure: (connection, failure) => {
+          switch (faceFailureKind(failure)) {
+            case 'notSetUp':
+              remember(connection, NOTHING);
+              break;
+            case 'passwordRefused':
+              remember(connection, { ...current(connection), credentials: true, stale: true });
+              break;
+            case 'noFace':
+              remember(connection, { ...current(connection), face: false });
+              break;
+            case 'signIn':
+              if (
+                signInFailureKind((failure as { message?: unknown }).message) === 'wrongPassword'
+              ) {
+                remember(connection, { ...current(connection), credentials: true, stale: true });
+              }
+              break;
+            default:
+          }
         },
 
         signIn: async (connection) => {

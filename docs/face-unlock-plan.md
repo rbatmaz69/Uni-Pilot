@@ -390,6 +390,37 @@ differs from the above:
   person, spoof score, success); model-load smoke test (runs in CI if the models are committed;
   record the time).
 
+**Built (04.10.2026), `src-tauri/src/face_unlock/`** — `frame`, `detect`, `align`, `embed`,
+`liveness`, `attempt`, `models`, commands in `mod.rs`. Where it differs from the above:
+
+- **Models are not in git.** `src-tauri/models/README.md` names source, licence and SHA-256;
+  `node scripts/fetch-face-models.js` downloads and checks them (`/models/*.onnx` is ignored).
+  `bundle.resources` takes the folder, so a checkout without them builds and runs, and face unlock
+  answers `unavailable`. Reason: SFace fp32 is 38.7 MB. Releases need a fetch step before they
+  ship the feature (not added). tract-onnx 0.23.8 (as in the spike), `image` with JPEG only.
+- YuNet runs at **320×256**, the frame letterboxed into it (BGR 0–255); exactly one face at
+  √(cls·obj) ≥ 0.85 after NMS 0.3, else a prompt. Alignment by least squares as planned; SFace fp32
+  on RGB 0–255; cosine ≥ **0.50**.
+- **MiniFASNet: open.** No official ONNX, none whose origin and licence were checked — left out.
+  Until one is, the head-movement challenges are the only defence against a photo, and the
+  threat-model row "Photo / printout" is weaker than §7 says.
+- Challenges from the landmarks: yaw = nose offset from the eyes' midpoint along the eye line, in
+  eye distances, positive to the student's left (frames are not mirrored). Straight ≤ 0.12, turned
+  ≥ 0.30, slight 0.10–0.40, closer = face ≥ 1.25 × its width at the challenge's start, faces under
+  12 % of the frame's width rejected. **All uncalibrated guesses**; calibration (student, others,
+  photo, video, printout) is still open.
+- Enrolment: 4 frames straight, 2 slightly left, 2 slightly right, each the same person as the
+  first (≥ 0.50); template = mean, renormalised; stored as `face-template` (base64 of 512 bytes).
+- Unlock: two different challenges in one of six orders, 10 s. Every challenge starts with a
+  straight look; any frame without a matching face (stranger, no face, two faces, too small) sends
+  it back there. The prompt never says "not recognised" during an attempt.
+- Lockout: a timed-out attempt, or one closed after a face was seen, counts as failed; after 3,
+  face unlock answers `locked` for 5 minutes or until a sign-in by hand — any ILIAS page read as
+  signed in (`fetch.rs`) lifts it. **In memory only**: quitting Uni Pilot lifts it too (open).
+- Timing (debug build, M3): models load in 0.96 s, one frame in 313 ms. Release not measured yet.
+- Tests: synthetic tensors and embeddings only, no face photos; one smoke test runs the real
+  models where they were fetched.
+
 ### Phase 5 — Face UI and wiring
 
 - `camera.ts`: `getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })`,
@@ -413,6 +444,33 @@ differs from the above:
 - **Tests:** `FaceUnlock.test.tsx` with `renderApp`, stubbed `navigator.mediaDevices`, mocked
   `invoke`: success, wrong face, cancel stops the camera tracks, lockout after 3, fallback to
   manual sign-in. Accessible names and roles throughout.
+
+**Built (04.10.2026), in `src/features/auto-sign-in/`** — `lib/camera.ts`, `lib/faceUnlock.ts`,
+`components/CameraView.tsx`, `useFaceSession.ts`, `FaceEnrollDialog.tsx`, `FaceUnlockDialog.tsx`.
+Where it differs from the above:
+
+- Commands: `face_enroll_start/frame/cancel`, `face_unlock_start/frame/finish/cancel`. A passed
+  face answers `passed` and **`face_unlock_finish` signs in separately**, so the camera is off
+  before Rust talks to HHN. `face_unlock_start` checks the lockout, reads the stored sign-in and
+  the face, loads the models — only then may the page turn the camera on; any failure leaves it
+  off. Every face command answers only Uni Pilot's own webview.
+- `useFaceSession`: camera after the start answered, frames sequentially at most every 166 ms
+  (~6 fps, fewer while Rust looks), `stop()` on success, failure, close and unmount, and on window
+  blur or hidden — but only while the camera runs, so the Keychain's own prompt taking the focus
+  during the start does not cancel. Starting waits a tick so React's development double mount does
+  not read the Keychain twice. The camera's own refusals get plain words.
+- Settings: "Set up face unlock" once a sign-in is stored and not refused; the enrolment explains
+  what is kept and starts the camera only on "Start camera". `autoSignInStore` remembers `face`.
+- `FailureNotice`: with a face, **Unlock with your face** and **Sign in with password instead**;
+  without, as in Phase 3. The dialog always offers the password, and "Try again" after a timeout.
+- `NSCameraUsageDescription` (Phase 6's wording) is in `Info.plist` now: without it macOS ends a
+  bundled app that asks for the camera.
+- Not done: Settings has no "Remove face" apart from Forget; `sign_in_to_ilias` still signs in at a
+  click when a face is set up — if the face is to be a gate, Rust has to refuse that.
+- Tests: `FaceUnlockDialog` and `FaceEnrollDialog` with `invoke` mocked and the camera module
+  stubbed (order of start → camera → frames → camera off → finish, lockout, timeout and try again,
+  close and blur stop the camera), `camera.ts` against stubbed `getUserMedia` and canvas, Settings
+  through `renderApp`. Rust's lockout after 3 is tested in `attempt.rs`.
 
 ### Phase 6 — Platforms, packaging, privacy, docs
 

@@ -11,6 +11,7 @@ import {
   type KnownSignIn,
 } from '@/features/auto-sign-in/store/autoSignInStore';
 import { CredentialsDialog } from '@/features/auto-sign-in/components/CredentialsDialog';
+import { FaceEnrollDialog } from '@/features/auto-sign-in/components/FaceEnrollDialog';
 
 function describe(known: KnownSignIn | undefined): string | null {
   if (!known) return null;
@@ -37,6 +38,7 @@ export function AutoSignInSettings() {
   const signIn = useAutoSignInStore((state) => state.signIn);
   const signingIn = useAutoSignInStore((state) => state.signingIn);
   const [settingUp, setSettingUp] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const desktop = isDesktopRuntime();
 
@@ -83,7 +85,8 @@ export function AutoSignInSettings() {
       <p className="mt-1 text-xs leading-relaxed text-secondary">
         Your HHN user name and password and Uni Pilot’s authenticator, in this computer’s credential
         store — the Keychain on a Mac. Not in a file and not on this page, and sent nowhere but to
-        HHN’s sign-in. Forget removes them from this computer.
+        HHN’s sign-in. With face unlock, also 128 numbers that describe your face — never a picture.
+        Forget removes all of it from this computer.
       </p>
 
       <div className="mt-5 border-t border-line-soft pt-5">
@@ -123,6 +126,24 @@ export function AutoSignInSettings() {
               <p role="status" className="mt-3 text-xs leading-relaxed text-secondary">
                 {said}
               </p>
+            ) : null}
+            {usable ? (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-5">
+                <div>
+                  <h3 className="text-sm font-medium">Face unlock</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-secondary">
+                    {known?.face
+                      ? 'Set up. When ILIAS asks you to sign in, a look into the camera will do.'
+                      : 'Instead of a click, a look into the camera before Uni Pilot signs in. The camera turns on only when you ask.'}
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setEnrolling(true)}>
+                  {known?.face ? 'Set up face unlock again' : 'Set up face unlock'}
+                </Button>
+              </div>
+            ) : null}
+            {enrolling ? (
+              <FaceEnrollDialog connection={connection} onClose={() => setEnrolling(false)} />
             ) : null}
             {settingUp ? (
               <CredentialsDialog

@@ -1,2 +1,4 @@
 /target
 /gen/schemas
+# Face models are downloaded, not committed: see models/README.md.
+/models/*.onnx

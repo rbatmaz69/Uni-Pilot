@@ -275,6 +275,23 @@ fn mark_stale_in(store: &dyn Store, host: &str) -> Result<(), VaultError> {
     store.write(&sign_in_key(host), &json)
 }
 
+fn save_face_in(store: &dyn Store, template: &[u8]) -> Result<(), VaultError> {
+    use base64::Engine;
+    let encoded = Zeroizing::new(base64::engine::general_purpose::STANDARD.encode(template));
+    store.write(FACE, &encoded)
+}
+
+fn face_in(store: &dyn Store) -> Result<Option<Zeroizing<Vec<u8>>>, VaultError> {
+    use base64::Engine;
+    let Some(encoded) = store.read(FACE)? else {
+        return Ok(None);
+    };
+    base64::engine::general_purpose::STANDARD
+        .decode(encoded.as_bytes())
+        .map(|bytes| Some(Zeroizing::new(bytes)))
+        .map_err(|_| VaultError::Unavailable("The stored face could not be read.".into()))
+}
+
 fn forget_in(store: &dyn Store, host: &str) -> Result<(), VaultError> {
     store.remove(&sign_in_key(host))?;
     store.remove(FACE)
@@ -334,6 +351,18 @@ pub(crate) async fn stored_sign_in(base_url: &str) -> Result<Option<Credentials>
 pub(crate) async fn mark_stale(base_url: &str) -> Result<(), VaultError> {
     let host = host(base_url)?;
     blocking(move || mark_stale_in(&Platform, &host)).await
+}
+
+/// Keeps the face template (`face_unlock::embed::to_bytes`), replacing the
+/// one before. Never sent to the page.
+pub(crate) async fn save_face(template: Vec<u8>) -> Result<(), VaultError> {
+    let template = Zeroizing::new(template);
+    blocking(move || save_face_in(&Platform, &template)).await
+}
+
+/// The face template, for an unlock in Rust — never for the page.
+pub(crate) async fn stored_face() -> Result<Option<Zeroizing<Vec<u8>>>, VaultError> {
+    blocking(|| face_in(&Platform)).await
 }
 
 /// Forgets the sign-in and the face at once.
@@ -453,6 +482,26 @@ mod tests {
         assert!(!json.contains(RFC_SECRET), "{json}");
         assert!(!json.contains("otpauth"), "{json}");
         assert!(json.contains("\"device\":\"Laptop\""), "{json}");
+    }
+
+    #[test]
+    fn keeps_the_face_apart_and_forgets_it_with_the_sign_in() {
+        let store = Memory::default();
+        save_in(&store, HOST, "student", "hunter2", RFC_SECRET, None).unwrap();
+        assert_eq!(face_in(&store).unwrap(), None);
+
+        let template: Vec<u8> = (0..=255u8).chain(0..=255u8).collect();
+        save_face_in(&store, &template).unwrap();
+        assert_eq!(face_in(&store).unwrap().as_deref(), Some(&template));
+        assert!(status_in(&store, HOST).unwrap().face);
+        let json = serde_json::to_string(&status_in(&store, HOST).unwrap()).unwrap();
+        assert!(!json.contains(&base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            &template
+        )));
+
+        forget_in(&store, HOST).unwrap();
+        assert_eq!(face_in(&store).unwrap(), None);
     }
 
     /// HHN's set-up asks for a code from the new authenticator.

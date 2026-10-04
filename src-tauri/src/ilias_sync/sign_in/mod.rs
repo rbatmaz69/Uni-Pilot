@@ -75,10 +75,15 @@ pub async fn sign_in_to_ilias(
     sign_in_stored(&app, &base_url, &client_id).await
 }
 
-/// By the webview's label, not the window's: the ILIAS view is a webview of
-/// the main window.
+/// Whether a command was asked by Uni Pilot's own page. By the webview's
+/// label, not the window's: the ILIAS view is a webview of the main window.
+/// Face unlock asks the same.
+pub(crate) fn is_main(webview: &str) -> bool {
+    webview == MAIN
+}
+
 fn from_main(webview: &str) -> Result<(), SignInError> {
-    if webview == MAIN {
+    if is_main(webview) {
         Ok(())
     } else {
         eprintln!("ILIAS sign-in: refused, asked from the webview \"{webview}\".");
@@ -96,9 +101,9 @@ pub(crate) async fn sign_in_stored(
     base_url: &str,
     client_id: &str,
 ) -> Result<bool, SignInError> {
-    let realm = sign_on_for(base_url).ok_or_else(|| {
-        SignInError::Local("Uni Pilot does not know where this ILIAS signs students in.".into())
-    })?;
+    if !knows_sign_on(base_url) {
+        return Err(unknown_sign_on());
+    }
     let credentials = vault::stored_sign_in(base_url)
         .await
         .map_err(from_vault)?
@@ -107,13 +112,35 @@ pub(crate) async fn sign_in_stored(
         eprintln!("ILIAS sign-in: not tried; HHN refused the stored password before.");
         return Err(SignInError::WrongPassword);
     }
-    let result = sign_in_with(app, base_url, client_id, realm, &credentials).await;
+    sign_in_as(app, base_url, client_id, &credentials).await
+}
+
+/// Signs in with values read from the vault already — by face unlock, which
+/// reads them before the camera starts. A refused password marks the entry,
+/// as above.
+pub(crate) async fn sign_in_as(
+    app: &tauri::AppHandle,
+    base_url: &str,
+    client_id: &str,
+    credentials: &Credentials,
+) -> Result<bool, SignInError> {
+    let realm = sign_on_for(base_url).ok_or_else(unknown_sign_on)?;
+    let result = sign_in_with(app, base_url, client_id, realm, credentials).await;
     if result == Err(SignInError::WrongPassword) {
         if let Err(error) = vault::mark_stale(base_url).await {
             eprintln!("ILIAS sign-in: the refused password could not be marked: {error:?}");
         }
     }
     result
+}
+
+/// Whether Uni Pilot knows where this ILIAS signs its students in.
+pub(crate) fn knows_sign_on(base_url: &str) -> bool {
+    sign_on_for(base_url).is_some()
+}
+
+fn unknown_sign_on() -> SignInError {
+    SignInError::Local("Uni Pilot does not know where this ILIAS signs students in.".into())
 }
 
 fn sign_on_for(base_url: &str) -> Option<&'static str> {
