@@ -67,3 +67,6 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+[dev-dependencies]
+httpmock = "0.8"

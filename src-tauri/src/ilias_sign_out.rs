@@ -73,7 +73,7 @@ pub(crate) fn find_sign_out_link(html: &str, page: &Url) -> Option<Url> {
 }
 
 /// Whether a cookie set for `domain` is sent to `host`.
-fn cookie_reaches(domain: &str, host: &str) -> bool {
+pub(crate) fn cookie_reaches(domain: &str, host: &str) -> bool {
     let domain = domain.trim_start_matches('.').to_ascii_lowercase();
     let host = host.to_ascii_lowercase();
     host == domain || host.ends_with(&format!(".{domain}"))

@@ -39,7 +39,8 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 /// Enough for goto.php to land on the page; fewer than a loop.
 const REDIRECT_LIMIT: usize = 5;
-const USER_AGENT: &str = concat!(
+/// The automatic sign-in (`super::sign_in`) says the same.
+pub(super) const USER_AGENT: &str = concat!(
     "UniPilot/",
     env!("CARGO_PKG_VERSION"),
     " (ILIAS sync; +https://github.com/rbatmaz69/Uni-Pilot)"

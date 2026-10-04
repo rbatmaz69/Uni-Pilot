@@ -262,6 +262,51 @@ Same User-Agent as `fetch.rs`. Log page kinds and cookie names, never values.
   the fixtures (hosts injectable for tests); "one POST each" asserted on the mock.
 - **Done when:** a temporary dev-only button signs in a real HHN account end to end on macOS.
 
+**Built (04.10.2026), `src-tauri/src/ilias_sync/sign_in/`** — the local part only; nothing was sent
+to `login.hs-heilbronn.de`, and the dev button is not built. Where it differs from the above:
+
+- `sign_in_to_ilias(app, base_url, client_id, realm, credentials)` in `mod.rs` chains
+  `keycloak::sign_in` (HTTP only, returns the jar) and `handoff::hand_off`. The values come in as
+  arguments (`vault::Credentials`). Reading the vault, `NotSetUp`, and marking the credentials
+  `stale` on `WrongPassword` belong to the Phase 3 command that will call it; until then it is
+  `#[allow(dead_code)]`.
+- The sign-on is passed in as the realm's address, `https://login.hs-heilbronn.de/realms/hhn`; the
+  origin and `/realms/<realm>/` come from it. HTTPS only (loopback allowed, for the tests).
+  `knownInstallations.ts` does not carry it yet.
+- `classify(url, html)` is a method on `Hosts`, which knows both origins. `Error` is
+  `#kc-form-login` holding an element whose id starts with `input-error` — an id, not words.
+  `Unknown`: `#kc-select-credential-form`; two of the known forms on one page; a form that does not
+  post to the realm's `login-actions/` (after `..` is resolved); a page outside the realm; Keycloak's
+  own error page (`#kc-error-message`), so an expired sign-in after the password does not read as a
+  wrong password.
+- **The code goes only to the radio labelled with the stored device name**; `checked` is never
+  used. No such radio → `Unrecognised`, no code POST — **including the recorded page, which has no
+  radios** because that account has one authenticator. Keycloak lists radios only for two or more,
+  so the set-up needs Uni Pilot's authenticator _next to_ the phone's (Phase 3 says so); with one,
+  Uni Pilot cannot tell whose it is. Labels are compared with whitespace squashed, case-sensitive;
+  two radios with the name → `Unrecognised`.
+- The status decides only redirects and trouble (429, 5xx → `Unreachable`). 2xx and 4xx bodies are
+  classified: Keycloak may show a refused password or code with 400/401.
+- Redirects: followed with GET within the realm, at most 5; to the ILIAS origin → `BackToIlias`, not
+  followed; elsewhere → `Unknown`. A 307/308 after a POST → `Unknown`, since it would send the form
+  again.
+- `BackToIlias` right after the password (an account without a second factor) counts as signed in.
+- The authenticator is checked before the first request, so a broken one costs no password POST;
+  the code is made right before its POST.
+- `jar.rs` uses `tauri::webview::cookie` (cookie 0.18). A `Domain` must reach the host that set it
+  and contain a dot. Secure cookies are kept and sent only over HTTPS or to loopback, as browsers do,
+  which lets `httpmock` stand in for the sign-on. `cookie_reaches` is `pub(crate)` now.
+- `handoff.rs` rebuilds every live jar cookie that reaches the sign-on host with that host as domain
+  (as in spike 0.3), keeping path, Secure, HttpOnly, SameSite and expiry, and sets it on the `main`
+  webview. `reauth.rs` has `pub async fn renew(app, base_url, client_id)`; the command wraps it.
+- Tests (dev dependency `httpmock` 0.8): the whole flow against two local servers, ILIAS and the
+  sign-on, serving the four fixtures with HHN's host replaced by the local one. A catch-all mock on
+  each asserts nothing else was asked. The code page with two authenticators is derived in the test
+  from `keycloak-otp.html` and Keycloak 26's `login-otp.ftl`, not a new fixture. The test
+  authenticator has `period=4000000000`, so its code stays 755224.
+- Not covered: `hand_off` (`set_cookie` needs a real webview) and anything against HHN — the
+  **Done when** above is still open.
+
 ### Phase 3 — Settings and a manual "Sign in automatically" (UI, no face)
 
 - `AutoSignInSettings` in `SettingsPage`: what it does, what is stored and where, buttons
