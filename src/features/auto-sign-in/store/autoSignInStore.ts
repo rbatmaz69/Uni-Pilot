@@ -36,6 +36,7 @@ import {
   finishUnlock,
 } from '@/features/auto-sign-in/lib/faceUnlock';
 import { useCourseStore, type CourseFailure } from '@/features/courses/store/courseStore';
+import { useNotchStore } from '@/features/auto-sign-in/store/notchStore';
 
 export interface KnownSignIn {
   credentials: boolean;
@@ -148,6 +149,7 @@ export const useAutoSignInStore = create<AutoSignInState>()(
               stop(after, 'Signed in, but ILIAS still asks. Sign in with your password this time.');
             } else {
               set({ faceBar: null });
+              useNotchStore.getState().signedIn();
             }
           } catch (cause) {
             get().noteFaceFailure(connection, cause);

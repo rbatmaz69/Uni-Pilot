@@ -511,6 +511,26 @@ HHN is unchanged; how the face is asked for is not:
   of the student held to the camera unlocks (threat model, §7). And the camera now turns on without
   a click — only after the student allowed it once, and only with the bar showing.
 
+**Revised (04.10.2026): the notch.** On a MacBook with a notch, the bar's place on screen goes to
+an island that grows out of the notch, like Apple's own:
+
+- `src-tauri/src/notch.rs` (begun in an earlier session, wired in here): a see-through window above
+  the menu bar, centred under the notch (`NSScreen` safe-area insets and auxiliary areas, macOS 12+),
+  on every Space and next to full-screen apps, never key — a click there must not blur Uni Pilot's
+  window, which would stop the camera. Clicks beside the island fall through to the menu bar.
+  Commands `notch_show` / `notch_hide` answer Uni Pilot's page only; `notch_show` answers `false`
+  without a notch (or off macOS), and the bar stays in the window. Needs Tauri's
+  `macos-private-api` (`app.macOSPrivateApi`) for the transparent window.
+- The notch page (`notch.html`, `NotchIsland`) only paints: a phase, one sentence, "Camera on", and a
+  small face that wakes, looks about, smiles while signing in and beams once signed in. It gets no
+  frame, no score, nothing stored; its capability (`capabilities/notch.json`) allows events only.
+  Its buttons — Use password, Try again, Cancel/Close, Open Uni Pilot — come back as `notch-action`.
+- `NotchSync` (mounted with the app) derives what the island shows from the face bar and the
+  sign-in, and does what its buttons ask. The camera, the frames and every face command stay with
+  Uni Pilot's page; with a notch the bar stays mounted for them and for screen readers, out of sight.
+- Not seen yet on a real notch: the island's look and the click-through. The tests cover what the
+  page asks for and what the island reports.
+
 ### Phase 6 — Platforms, packaging, privacy, docs
 
 - `Info.plist`: `NSCameraUsageDescription` — "Uni Pilot uses the camera only when you choose to

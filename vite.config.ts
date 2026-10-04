@@ -215,6 +215,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: false,
+    rollupOptions: {
+      // The app, and the notch window's page (src-tauri/src/notch.rs).
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        notch: fileURLToPath(new URL('./notch.html', import.meta.url)),
+      },
+    },
   },
   test: {
     environment: 'jsdom',

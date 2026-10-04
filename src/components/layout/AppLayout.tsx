@@ -1,7 +1,7 @@
 import { PanelLeftOpen } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { IconButton } from '@/components/ui';
-import { FaceUnlockBar } from '@/features/auto-sign-in';
+import { FaceUnlockBar, NotchSync } from '@/features/auto-sign-in';
 import { CourseSync } from '@/features/courses/components/CourseSync';
 import { FocusService } from '@/features/focus/components/FocusService';
 import { useFocusStore } from '@/features/focus/store/focusStore';
@@ -42,6 +42,7 @@ export function AppLayout() {
     >
       <ReminderService />
       <CourseSync />
+      <NotchSync />
       <FocusService />
       <a
         href="#main-content"

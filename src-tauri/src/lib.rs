@@ -7,6 +7,7 @@ mod ilias_sign_out;
 mod ilias_sync;
 mod ilias_view;
 mod ilias_window;
+mod notch;
 mod reminders;
 mod vault;
 use tauri::Manager;
@@ -51,6 +52,8 @@ pub fn run() {
             face_unlock::face_unlock_frame,
             face_unlock::face_unlock_finish,
             face_unlock::face_unlock_cancel,
+            notch::notch_show,
+            notch::notch_hide,
             apple_mail::mail_accounts,
             apple_mail::mail_inbox,
             apple_mail::mail_open,
@@ -64,7 +67,12 @@ pub fn run() {
         .manage(ilias_view::Mode::default())
         .manage(ilias_browser::Downloads::default())
         .manage(ilias_sync::Pace::default())
-        .manage(face_unlock::FaceUnlock::default());
+        .manage(face_unlock::FaceUnlock::default())
+        .manage(notch::Notch::default())
+        .setup(|app| {
+            notch::listen(app.handle());
+            Ok(())
+        });
     #[cfg(target_os = "macos")]
     let builder = builder.manage(reminders::Runtime::default());
     builder

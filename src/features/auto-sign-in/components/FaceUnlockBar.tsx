@@ -12,7 +12,9 @@ import {
   unlockFrame,
   type UnlockProgress,
 } from '@/features/auto-sign-in/lib/faceUnlock';
-import { useAutoSignInStore } from '@/features/auto-sign-in/store/autoSignInStore';
+import { useAutoSignInStore, type FaceBar } from '@/features/auto-sign-in/store/autoSignInStore';
+import { useNotchStore } from '@/features/auto-sign-in/store/notchStore';
+import { cn } from '@/lib/utils';
 import { useFaceBar } from '@/features/auto-sign-in/components/useFaceBar';
 import { useFaceSession } from '@/features/auto-sign-in/components/useFaceSession';
 
@@ -32,6 +34,7 @@ function Watch({
   const setFaceBar = useAutoSignInStore((state) => state.setFaceBar);
   const noteFaceFailure = useAutoSignInStore((state) => state.noteFaceFailure);
   const finishFaceUnlock = useAutoSignInStore((state) => state.finishFaceUnlock);
+  const setCamera = useNotchStore((state) => state.setCamera);
   const { progress, cameraOn } = useFaceSession(
     {
       start: () => startUnlock(connection),
@@ -56,6 +59,10 @@ function Watch({
     video,
   );
 
+  // The island in the notch shows where the camera is.
+  useEffect(() => setCamera(cameraOn ? 'looking' : 'starting'), [cameraOn, setCamera]);
+  useEffect(() => () => setCamera(null), [setCamera]);
+
   return (
     <>
       <video
@@ -78,16 +85,21 @@ function Watch({
   );
 }
 
-/**
- * A thin bar at the top of the workspace: when ILIAS has signed the student
- * out and face unlock may run, a small preview, one sentence and the camera
- * mark. Not a dialog — everything below stays usable. The camera runs only
- * while the bar shows and Uni Pilot is in front; the moment the face passes,
- * the bar goes and Rust signs in in the background (`finishFaceUnlock`).
- */
-export function FaceUnlockBar() {
-  const { connection, failure, showing, bar } = useFaceBar();
+/** The bar for one sign-out; its state goes with it. */
+function Bar({
+  connection,
+  failure,
+  bar,
+}: {
+  connection: IliasConnection;
+  failure: CourseFailure;
+  bar: FaceBar | null;
+}) {
   const setFaceBar = useAutoSignInStore((state) => state.setFaceBar);
+  const setCamera = useNotchStore((state) => state.setCamera);
+  // With a notch, the island there shows all this: the bar stays for the
+  // camera and for screen readers, out of sight.
+  const inNotch = useNotchStore((state) => state.available === true);
   const navigate = useNavigate();
   const [round, setRound] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -95,15 +107,14 @@ export function FaceUnlockBar() {
   // Back in front after a pause: look again.
   useEffect(() => {
     if (!paused) return;
+    setCamera('paused');
     const back = () => {
       setPaused(false);
       setRound((value) => value + 1);
     };
     window.addEventListener('focus', back);
     return () => window.removeEventListener('focus', back);
-  }, [paused]);
-
-  if (!showing || !connection || !failure) return null;
+  }, [paused, setCamera]);
 
   const close = () => setFaceBar({ for: failure, state: 'dismissed' });
   const password = () => {
@@ -115,7 +126,11 @@ export function FaceUnlockBar() {
     <div
       role="region"
       aria-label="Face unlock"
-      className="flex min-h-12 flex-none items-center gap-3 border-b border-line-soft bg-accent-soft px-4 py-1.5"
+      className={cn(
+        inNotch
+          ? 'sr-only'
+          : 'flex min-h-12 flex-none items-center gap-3 border-b border-line-soft bg-accent-soft px-4 py-1.5',
+      )}
     >
       {bar?.state === 'stopped' ? (
         <>
@@ -152,4 +167,20 @@ export function FaceUnlockBar() {
       </Button>
     </div>
   );
+}
+
+/**
+ * A thin bar at the top of the workspace: when ILIAS has signed the student
+ * out and face unlock may run, a small preview, one sentence and the camera
+ * mark. Not a dialog — everything below stays usable. The camera runs only
+ * while the bar shows and Uni Pilot is in front; the moment the face passes,
+ * the bar goes and Rust signs in in the background (`finishFaceUnlock`).
+ *
+ * On a Mac with a notch the island there takes the bar's place on screen
+ * (`NotchSync`, `src-tauri/src/notch.rs`); the bar stays, out of sight.
+ */
+export function FaceUnlockBar() {
+  const { connection, failure, showing, bar } = useFaceBar();
+  if (!showing || !connection || !failure) return null;
+  return <Bar connection={connection} failure={failure} bar={bar} />;
 }

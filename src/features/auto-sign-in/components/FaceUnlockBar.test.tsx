@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 import { useAutoSignInStore } from '@/features/auto-sign-in/store/autoSignInStore';
+import { useNotchStore } from '@/features/auto-sign-in/store/notchStore';
 import { FaceUnlockBar } from './FaceUnlockBar';
 
 /** What happened, in order: Rust's commands, the camera on and off. */
@@ -75,6 +76,7 @@ beforeEach(() => {
     faceBar: null,
     signingIn: false,
   });
+  useNotchStore.setState({ camera: null, signedInAt: null, available: null });
 });
 
 afterEach(() => {
@@ -201,6 +203,21 @@ describe('the face bar', () => {
     expect(screen.queryByText('Camera on')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(log.filter((entry) => entry === 'camera on')).toHaveLength(2));
+  });
+
+  /** On a Mac with a notch the island shows it; the camera keeps going here. */
+  it('steps out of sight when the notch shows it, and tells the notch where the camera is', async () => {
+    useNotchStore.setState({ available: true });
+    rust({
+      face_unlock_start: () => Promise.resolve({ state: 'looking' }),
+      face_unlock_frame: () => Promise.resolve({ state: 'looking' }),
+    });
+    renderBar();
+
+    expect(bar()).toHaveClass('sr-only');
+    expect(await screen.findByText('Camera on')).toBeInTheDocument();
+    expect(useNotchStore.getState().camera).toBe('looking');
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
   it('leaves the camera off when Rust cannot start', async () => {

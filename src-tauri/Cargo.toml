@@ -17,7 +17,8 @@ tauri-build = { version = "2", features = [] }
 # `unstable` for Window::add_child, which embeds ILIAS in the main window
 # (src/ilias_view.rs). Tauri marks multi-webview as unfinished; that module
 # keeps the separate ILIAS window in src/ilias_window.rs as the fallback.
-tauri = { version = "2", features = ["unstable"] }
+# `macos-private-api` for the notch window's see-through background (src/notch.rs).
+tauri = { version = "2", features = ["unstable", "macos-private-api"] }
 # Calendar subscriptions are fetched here rather than in the webview: feeds
 # carry no CORS headers, so the browser would refuse them.
 tauri-plugin-http = "2"
@@ -54,7 +55,10 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURLResponse"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURLResponse", "NSArray", "NSGeometry"] }
+# Face unlock in the notch (src/notch.rs): where the notch is, a window above
+# the menu bar that lets clicks beside it through. The version Tauri uses.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSScreen", "NSEvent", "NSWindow", "NSResponder", "NSGraphics"] }
 # The Keychain's own error codes, to tell "you clicked Deny" from a broken
 # Keychain (src/vault.rs). The version keyring uses; only named here.
 security-framework = "3"

@@ -9,5 +9,7 @@ export { AutoSignInSettings } from './components/AutoSignInSettings';
 export { CredentialsDialog } from './components/CredentialsDialog';
 export { FaceUnlockBar } from './components/FaceUnlockBar';
 export { useFaceBar } from './components/useFaceBar';
+export { NotchIsland } from './components/NotchIsland';
+export { NotchSync } from './components/NotchSync';
 export { useAutoSignInStore, type KnownSignIn, type SignInResult } from './store/autoSignInStore';
 export { installationHost } from './lib/autoSignIn';

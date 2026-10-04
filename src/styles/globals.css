@@ -484,10 +484,27 @@
 }
 
 /* ------------------------------------------------------------------
+   The notch (notch.html): face unlock's island under the MacBook's camera
+   housing. Black in every theme, because the hardware notch is.
+   ------------------------------------------------------------------ */
+:root {
+  --notch: #000000;
+  --notch-foreground: #f4f4f5;
+  --notch-muted: #a1a1aa;
+  --notch-control: #27272a;
+  --notch-control-hover: #3f3f46;
+}
+
+/* ------------------------------------------------------------------
    Tailwind theme bridge — tokens above become utilities
    (bg-surface, text-muted, border-soft, rounded-xl, …)
    ------------------------------------------------------------------ */
 @theme inline {
+  --color-notch: var(--notch);
+  --color-notch-foreground: var(--notch-foreground);
+  --color-notch-muted: var(--notch-muted);
+  --color-notch-control: var(--notch-control);
+  --color-notch-control-hover: var(--notch-control-hover);
   --color-app: var(--app-background);
   --color-surface: var(--surface);
   --color-surface-secondary: var(--surface-secondary);
@@ -933,6 +950,47 @@
   .animate-tooltip-enter {
     animation: tooltip-enter 0.12s ease-out both;
   }
+
+  /* The notch face: eyes that look about, and blink now and then. */
+  @keyframes notch-look {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-1.5px);
+    }
+    75% {
+      transform: translateX(1.5px);
+    }
+  }
+
+  @keyframes notch-blink {
+    0%,
+    92%,
+    100% {
+      transform: scaleY(1);
+    }
+    96% {
+      transform: scaleY(0.1);
+    }
+  }
+
+  .animate-notch-look {
+    animation: notch-look 2.4s ease-in-out infinite;
+  }
+
+  .animate-notch-blink {
+    animation: notch-blink 3.2s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+}
+
+/* The notch window paints the island only; everything else is see-through. */
+html.notch-window,
+html.notch-window body {
+  background: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
