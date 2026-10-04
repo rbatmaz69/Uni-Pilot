@@ -5,7 +5,7 @@
 use serde::Serialize;
 
 use super::embed::{cosine, mean, Embedding, SAME_PERSON};
-use super::liveness::{CLOSER, LARGE_ENOUGH, SLIGHT, STRAIGHT, TURNED};
+use super::liveness::{CLOSER, CLOSE_ENOUGH, LARGE_ENOUGH, SLIGHT, STRAIGHT, TURNED};
 
 /// What one frame showed, as far as the state machines care. No pixels.
 #[derive(Debug, Clone, PartialEq)]
@@ -159,7 +159,8 @@ impl Challenge {
         match self {
             Challenge::TurnLeft => face.yaw >= TURNED,
             Challenge::TurnRight => face.yaw <= -TURNED,
-            Challenge::ComeCloser => face.size >= start_size * CLOSER,
+            // Closer than at the start, or close already.
+            Challenge::ComeCloser => face.size >= start_size * CLOSER || face.size >= CLOSE_ENOUGH,
         }
     }
 }
@@ -436,18 +437,32 @@ mod tests {
             going(Prompt::LookAtCamera, 1)
         );
         assert_eq!(
-            attempt.frame(straight(), 1_400),
+            attempt.frame(face(student(), 0.0, 0.18), 1_400),
             going(Prompt::ComeCloser, 1)
         );
         assert_eq!(
-            attempt.frame(face(student(), 0.0, 0.29), 1_500),
+            attempt.frame(face(student(), 0.0, 0.20), 1_500),
             going(Prompt::ComeCloser, 1)
         );
         assert_eq!(
-            attempt.frame(face(student(), 0.0, 0.32), 1_600),
+            attempt.frame(face(student(), 0.0, 0.23), 1_600),
             Unlocking::Passed
         );
         assert!(attempt.saw_a_face());
+    }
+
+    /// Close to the camera already, a quarter more is not possible: close counts.
+    #[test]
+    fn come_closer_passes_when_the_face_is_close_already() {
+        let mut attempt = unlock([Challenge::ComeCloser, Challenge::TurnLeft]);
+        attempt.frame(face(student(), 0.0, 0.27), 1_100);
+        assert_eq!(
+            attempt.frame(face(student(), 0.0, 0.28), 1_200),
+            Unlocking::Going {
+                prompt: Prompt::LookAtCamera,
+                done: 1
+            }
+        );
     }
 
     #[test]
