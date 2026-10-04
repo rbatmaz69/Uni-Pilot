@@ -7,6 +7,7 @@ mod ilias_sync;
 mod ilias_view;
 mod ilias_window;
 mod reminders;
+mod vault;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -37,6 +38,9 @@ pub fn run() {
             ilias_sync::mirror::ilias_mirror_configure,
             ilias_sync::mirror::ilias_mirror_detach,
             ilias_sync::reauth::ilias_sync_reauth,
+            vault::auto_sign_in_status,
+            vault::auto_sign_in_save,
+            vault::auto_sign_in_forget,
             apple_mail::mail_accounts,
             apple_mail::mail_inbox,
             apple_mail::mail_open,
