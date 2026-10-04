@@ -5,5 +5,8 @@
 	<!-- Shown when macOS asks whether Uni Pilot may control Mail (src/apple_mail.rs). -->
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Uni Pilot shows your university inbox by asking Apple Mail, on this Mac only, and opens drafts in Mail for you to send. It never stores your mail, never passes it on and never sends mail itself.</string>
+	<!-- Shown the first time face unlock turns the camera on (src/face_unlock/). -->
+	<key>NSCameraUsageDescription</key>
+	<string>Uni Pilot uses the camera only when you choose to sign in with your face. Pictures stay on this Mac and are never saved.</string>
 </dict>
 </plist>

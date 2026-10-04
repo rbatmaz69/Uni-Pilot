@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,8 +13,18 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (command: string, args: Record<string, unknown>) => invoke(command, args),
 }));
 
+vi.mock('@/features/auto-sign-in/lib/camera', () => ({
+  openCamera: () => Promise.reject(new Error('No camera in tests.')),
+}));
+
 const HOST = 'ilias.hs-heilbronn.de';
-const SET_UP = { credentials: true, username: 'student', device: 'Uni Pilot', stale: false };
+const SET_UP = {
+  credentials: true,
+  username: 'student',
+  device: 'Uni Pilot',
+  stale: false,
+  face: false,
+};
 
 beforeEach(() => {
   invoke.mockReset();
@@ -86,6 +96,26 @@ describe('the notice that ILIAS wants a sign-in', () => {
       expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
     }
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('offers to unlock with the face when one is set up, with the password always beside it', async () => {
+    useAutoSignInStore.setState({ byHost: { [HOST]: { ...SET_UP, face: true } } });
+    invoke.mockRejectedValue({ kind: 'locked' });
+    const { user } = renderNotice();
+
+    expect(screen.queryByRole('button', { name: 'Sign in automatically' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign in with password instead' }),
+    ).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Unlock with your face' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unlock with your face' });
+    expect(await within(dialog).findByText(/paused after three tries/)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith('face_unlock_start', {
+      baseUrl: 'https://ilias.hs-heilbronn.de',
+      clientId: 'iliashhn',
+    });
   });
 
   it('stops offering the stored password once HHN refused it, and says where to fix that', () => {

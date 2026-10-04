@@ -1,11 +1,11 @@
 import { useState, type ComponentType, type ReactNode } from 'react';
-import { LogIn, RefreshCw, TriangleAlert } from 'lucide-react';
+import { LogIn, RefreshCw, ScanFace, TriangleAlert } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { formatTimeAgo } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/navigation';
-import { installationHost, useAutoSignInStore } from '@/features/auto-sign-in';
+import { FaceUnlockDialog, installationHost, useAutoSignInStore } from '@/features/auto-sign-in';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
@@ -71,8 +71,9 @@ export function SyncBar({ label, loadedAt, loading, onRefresh }: SyncBarProps) {
 /**
  * ILIAS wants a sign-in. When the student set up signing in automatically and
  * the university has not refused the stored password, Uni Pilot offers to do
- * it: one try, then the read runs again. Otherwise, or alongside, the student
- * signs in themselves in ILIAS mode. Whether it is set up comes from
+ * it — behind a look into the camera when a face is set up, else at a click:
+ * one try, then the read runs again. Signing in with the password, in ILIAS
+ * mode, is always on offer. Whether any of it is set up comes from
  * `autoSignInStore`, so this notice never asks the credential store itself.
  */
 function SignInNotice({ onRetry }: { onRetry: () => void }) {
@@ -84,7 +85,9 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
   const signIn = useAutoSignInStore((state) => state.signIn);
   const signingIn = useAutoSignInStore((state) => state.signingIn);
   const [said, setSaid] = useState<string | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
   const automatic = Boolean(connection && known?.credentials && !known.stale);
+  const face = automatic && Boolean(known?.face);
   const signInYourself = () => void navigate(NAV_ITEMS.ilias.path);
 
   const signInAutomatically = async () => {
@@ -123,7 +126,21 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
         ) : null}
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {automatic ? (
+        {face ? (
+          <>
+            <Button size="sm" onClick={signInYourself}>
+              Sign in with password instead
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setUnlocking(true)}
+              leadingIcon={<ScanFace size={14} strokeWidth={1.8} aria-hidden />}
+            >
+              Unlock with your face
+            </Button>
+          </>
+        ) : automatic ? (
           <>
             <Button size="sm" onClick={signInYourself} disabled={signingIn}>
               Sign in yourself
@@ -149,6 +166,20 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
           </Button>
         )}
       </div>
+      {unlocking && connection ? (
+        <FaceUnlockDialog
+          connection={connection}
+          onClose={() => setUnlocking(false)}
+          onSignedIn={() => {
+            setUnlocking(false);
+            onRetry();
+          }}
+          onPasswordInstead={() => {
+            setUnlocking(false);
+            signInYourself();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
