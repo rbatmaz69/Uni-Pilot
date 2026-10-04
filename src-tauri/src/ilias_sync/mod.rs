@@ -4,10 +4,11 @@
 //! student's app may use: SOAP is closed, there is no REST API, and the news
 //! feed carries no files (`docs/integrations/ilias-integration-research.md`).
 //! What remains is the page ILIAS shows the student. The student signs in
-//! themselves, in ILIAS mode; Rust asks for pages with that session and reads
-//! them. No password passes through Uni Pilot, no script touches the ILIAS
-//! page, and the HTML stays here: the webview only receives what the readers
-//! made of it. Background and design: `docs/integrations/ilias-sync-research.md`.
+//! themselves, in ILIAS mode — or, if they chose to, Uni Pilot signs in to the
+//! university's sign-on for them (`sign_in`); Rust asks for pages with that
+//! session and reads them. No script touches the ILIAS page, and the HTML stays
+//! here: the webview only receives what the readers made of it. Background and
+//! design: `docs/integrations/ilias-sync-research.md`.
 //!
 //! - `links`: the pages the sync may ask for, and the check every request
 //!   passes. ILIAS pages hold account actions as plain links; none is followed.
@@ -17,6 +18,9 @@
 //! - `dates`: ILIAS's "Heute, 10:12" into a date.
 //! - `reauth`: a new ILIAS session through the sign-on, while it still
 //!   remembers the student — no password, no code, no form.
+//! - `sign_in`: when the sign-on has forgotten the student, signing in to it
+//!   over HTTP with what they stored in the vault, opt-in
+//!   (`docs/face-unlock-plan.md`). Hands the result to `reauth`.
 //! - `mirror`: a course's files kept in the student's Documents, in the
 //!   course's `ILIAS` folder.
 //!
@@ -33,6 +37,7 @@ pub mod mirror;
 mod parse;
 pub mod reauth;
 mod session;
+mod sign_in;
 
 use serde::Serialize;
 use tauri::State;

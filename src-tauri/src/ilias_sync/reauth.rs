@@ -63,7 +63,17 @@ pub async fn ilias_sync_reauth(
     base_url: String,
     client_id: String,
 ) -> Result<bool, SyncError> {
-    let home = resolve_target(&base_url, &client_id, None).map_err(SyncError::Refused)?;
+    renew(&app, &base_url, &client_id).await
+}
+
+/// The same, for Rust: after an automatic sign-in (`super::sign_in`) handed
+/// the sign-on to the webview, this is where ILIAS gets its session.
+pub async fn renew(
+    app: &tauri::AppHandle,
+    base_url: &str,
+    client_id: &str,
+) -> Result<bool, SyncError> {
+    let home = resolve_target(base_url, client_id, None).map_err(SyncError::Refused)?;
     let entry = home
         .join("openidconnect.php")
         .map_err(|error| SyncError::Refused(error.to_string()))?;
@@ -74,7 +84,7 @@ pub async fn ilias_sync_reauth(
     }
 
     let (sender, mut landed) = tokio::sync::mpsc::unbounded_channel::<Url>();
-    let window = WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::External(entry))
+    let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(entry))
         .title("ILIAS")
         .visible(false)
         .skip_taskbar(true)

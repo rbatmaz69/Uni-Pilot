@@ -177,7 +177,6 @@ fn refused_link(error: TotpError) -> VaultError {
 }
 
 /// The code the authenticator shows right now.
-#[allow(dead_code)] // for the sign-in, next phase
 pub(crate) fn code(otpauth: &str) -> Result<Zeroizing<String>, VaultError> {
     let totp = Totp::from_url(otpauth).map_err(refused_link)?;
     Ok(Zeroizing::new(totp.generate_current().to_string()))
