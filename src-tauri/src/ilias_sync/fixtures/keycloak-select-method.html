@@ -1,0 +1,150 @@
+<!--
+  Keycloak's "try another way" page, login.hs-heilbronn.de (realm hhn, theme
+  "hhn"), recorded 2026-10-03 in Claude Code's browser pane with a real HHN
+  account: the response body (200) to posting #kc-select-try-another-way-form
+  from the code page (keycloak-otp.html). English because the pane asked for
+  English.
+  Markup as Keycloak sent it. Redacted, because they belong to one sign-in or
+  to the realm's configuration: the values of session_code, execution, tab_id
+  and client_data wherever they appear, both authenticationExecution values
+  (the first is the code page's execution), and the hash handed to
+  checkAuthSession(). Each is now REDACTED. The account's user name in
+  #kc-attempted-username is replaced with student@stud.hs-heilbronn.de.
+  Keycloak lists only methods this account can use: an authenticator app and
+  HHN's recovery steps. No passkey. Uni Pilot never posts this form — a sign-in
+  that lands here stops as unrecognised.
+-->
+<!DOCTYPE html>
+<html class="login-pf" lang="en" dir="ltr">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="robots" content="noindex, nofollow">
+
+            <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Sign in to HHN</title>
+    <link rel="icon" href="/resources/w735s/login/hhn/img/favicon.ico" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v4/patternfly.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v3/css/patternfly.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v3/css/patternfly-additions.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/lib/pficon/pficon.css" rel="stylesheet" />
+            <link href="/resources/w735s/login/hhn/css/login.css" rel="stylesheet" />
+            <link href="/resources/w735s/login/hhn/css/styles.css" rel="stylesheet" />
+            <script src="/resources/w735s/login/hhn/js/script.js" type="text/javascript"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "rfc4648": "/resources/w735s/common/keycloak/vendor/rfc4648/rfc4648.js"
+            }
+        }
+    </script>
+    <script src="/resources/w735s/login/hhn/js/menu-button-links.js" type="module"></script>
+    <script type="module">
+        import { startSessionPolling } from "/resources/w735s/login/hhn/js/authChecker.js";
+
+        startSessionPolling(
+          "/realms/hhn/login-actions/restart?client_id=hhn_common_ilias&tab_id=REDACTED&client_data=REDACTED&skip_logout=true"
+        );
+    </script>
+        <script type="module">
+            import { checkAuthSession } from "/resources/w735s/login/hhn/js/authChecker.js";
+
+            checkAuthSession(
+                "REDACTED"
+            );
+        </script>
+<SCRIPT> if (typeof history.replaceState === 'function') {  history.replaceState({}, "some title", "https://login.hs-heilbronn.de/realms/hhn/login-actions/authenticate?execution=REDACTED&client_id=hhn_common_ilias&tab_id=REDACTED&client_data=REDACTED"); }</SCRIPT></head>
+
+<body class="">
+<div class="login-pf-page">
+    <div id="kc-header" class="login-pf-page-header">
+        <div id="kc-header-wrapper"
+             class=""><div class="kc-logo-text"><span>HHN</span></div></div>
+    </div>
+    <div class="card-pf">
+        <header class="login-pf-header">
+                <div class="pf-c-dropdown" id="kc-locale">
+                    <div id="kc-locale-wrapper" class="">
+                        <div id="kc-locale-dropdown" class="menu-button-links ">
+                            <button tabindex="1" id="kc-current-locale-link" aria-label="languages" aria-haspopup="true" aria-expanded="false" aria-controls="language-switch1">English</button>
+                            <ul role="menu" tabindex="-1" aria-labelledby="kc-current-locale-link" aria-activedescendant="" id="language-switch1" class="pf-c-dropdown__menu pf-m-align-right">
+                                    <li class="" role="none">
+                                        <a role="menuitem" id="language-1" class="pf-c-dropdown__menu-item" href="/realms/hhn/login-actions/authenticate?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;execution=REDACTED&amp;kc_locale=en">English</a>
+                                    </li>
+                                    <li class="" role="none">
+                                        <a role="menuitem" id="language-2" class="pf-c-dropdown__menu-item" href="/realms/hhn/login-actions/authenticate?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;execution=REDACTED&amp;kc_locale=de">German (Deutsch)</a>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div id="kc-username" class="form-group">
+                    <label id="kc-attempted-username">student@stud.hs-heilbronn.de</label>
+                    <a id="reset-login" href="/realms/hhn/login-actions/restart?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;skip_logout=false" aria-label="Restart login">
+                        <div class="kc-login-tooltip">
+                            <i class="pficon pficon-arrow fa"></i>
+                            <span class="kc-tooltip-text">Restart login</span>
+                        </div>
+                    </a>
+                </div>
+      </header>
+      <div id="kc-content">
+        <div id="kc-content-wrapper">
+
+
+
+        <form id="kc-select-credential-form" class="form-horizontal" action="https://login.hs-heilbronn.de/realms/hhn/login-actions/authenticate?session_code=REDACTED&amp;execution=REDACTED&amp;client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED" method="post">
+            <div class="pf-l-stack select-auth-container">
+                    <button class="pf-l-stack__item select-auth-box-parent pf-l-split" type="submit" name="authenticationExecution" value="REDACTED">
+
+                        <div class="pf-l-split__item select-auth-box-icon">
+                            <i class="fa fa-mobile list-view-pf-icon-lg fa-2x select-auth-box-icon-properties"></i>
+                        </div>
+                        <div class="pf-l-split__item pf-l-stack">
+                            <div class="pf-l-stack__item select-auth-box-headline pf-c-title">
+                                Authenticator Application
+                            </div>
+                            <div class="pf-l-stack__item select-auth-box-desc">
+                                Enter a verification code from authenticator application.
+                            </div>
+                        </div>
+                        <div class="pf-l-split__item pf-m-fill"></div>
+                        <div class="pf-l-split__item select-auth-box-arrow">
+                            <i class="fa fa-angle-right fa-lg"></i>
+                        </div>
+                    </button>
+                    <button class="pf-l-stack__item select-auth-box-parent pf-l-split" type="submit" name="authenticationExecution" value="REDACTED">
+
+                        <div class="pf-l-split__item select-auth-box-icon">
+                            <i class="fa fa-list list-view-pf-icon-lg fa-2x select-auth-box-icon-properties"></i>
+                        </div>
+                        <div class="pf-l-split__item pf-l-stack">
+                            <div class="pf-l-stack__item select-auth-box-headline pf-c-title">
+                                Lost your second factor?
+                            </div>
+                            <div class="pf-l-stack__item select-auth-box-desc">
+                                Steps in case of missing access to second factor
+                            </div>
+                        </div>
+                        <div class="pf-l-split__item pf-m-fill"></div>
+                        <div class="pf-l-split__item select-auth-box-arrow">
+                            <i class="fa fa-angle-right fa-lg"></i>
+                        </div>
+                    </button>
+            </div>
+        </form>
+
+
+
+
+        </div>
+      </div>
+
+<div id="hhn-footer">
+    <span><a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/ansprechpersonen-rechenzentrum-348b0edcbfdfc323">Support</a> | <a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/impressum">Imprint</a> | <a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/datenschutz">Privacy Policy</a></span>
+<div>
+    </div>
+  </div>
+</body>
+</html>

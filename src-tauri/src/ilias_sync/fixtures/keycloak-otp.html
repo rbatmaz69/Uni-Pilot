@@ -1,0 +1,144 @@
+<!--
+  Keycloak's code page, login.hs-heilbronn.de (realm hhn, theme "hhn"),
+  recorded 2026-10-03 in Claude Code's browser pane with a real HHN account:
+  the response body to the password POST, which Keycloak answers with 200 and
+  this page — no redirect between password and code. Its <SCRIPT> then rewrites
+  the address bar with history.replaceState, which is why a browser shows no
+  session_code there. English because the pane asked for English.
+  Markup as Keycloak sent it. Redacted, because they belong to one sign-in:
+  the values of session_code, execution, tab_id and client_data wherever they
+  appear, and the hash handed to checkAuthSession(). Each is now REDACTED.
+  The account's user name in #kc-attempted-username is replaced with
+  student@stud.hs-heilbronn.de.
+  The account has one authenticator app, so there are no selectedCredentialId
+  radios. It has another way to sign in as well, hence
+  #kc-select-try-another-way-form, posted by the link's onclick.
+-->
+<!DOCTYPE html>
+<html class="login-pf" lang="en" dir="ltr">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="robots" content="noindex, nofollow">
+
+            <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Sign in to HHN</title>
+    <link rel="icon" href="/resources/w735s/login/hhn/img/favicon.ico" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v4/patternfly.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v3/css/patternfly.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v3/css/patternfly-additions.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/lib/pficon/pficon.css" rel="stylesheet" />
+            <link href="/resources/w735s/login/hhn/css/login.css" rel="stylesheet" />
+            <link href="/resources/w735s/login/hhn/css/styles.css" rel="stylesheet" />
+            <script src="/resources/w735s/login/hhn/js/script.js" type="text/javascript"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "rfc4648": "/resources/w735s/common/keycloak/vendor/rfc4648/rfc4648.js"
+            }
+        }
+    </script>
+    <script src="/resources/w735s/login/hhn/js/menu-button-links.js" type="module"></script>
+    <script type="module">
+        import { startSessionPolling } from "/resources/w735s/login/hhn/js/authChecker.js";
+
+        startSessionPolling(
+          "/realms/hhn/login-actions/restart?client_id=hhn_common_ilias&tab_id=REDACTED&client_data=REDACTED&skip_logout=true"
+        );
+    </script>
+        <script type="module">
+            import { checkAuthSession } from "/resources/w735s/login/hhn/js/authChecker.js";
+
+            checkAuthSession(
+                "REDACTED"
+            );
+        </script>
+<SCRIPT> if (typeof history.replaceState === 'function') {  history.replaceState({}, "some title", "https://login.hs-heilbronn.de/realms/hhn/login-actions/authenticate?execution=REDACTED&client_id=hhn_common_ilias&tab_id=REDACTED&client_data=REDACTED"); }</SCRIPT></head>
+
+<body class="">
+<div class="login-pf-page">
+    <div id="kc-header" class="login-pf-page-header">
+        <div id="kc-header-wrapper"
+             class=""><div class="kc-logo-text"><span>HHN</span></div></div>
+    </div>
+    <div class="card-pf">
+        <header class="login-pf-header">
+                <div class="pf-c-dropdown" id="kc-locale">
+                    <div id="kc-locale-wrapper" class="">
+                        <div id="kc-locale-dropdown" class="menu-button-links ">
+                            <button tabindex="1" id="kc-current-locale-link" aria-label="languages" aria-haspopup="true" aria-expanded="false" aria-controls="language-switch1">English</button>
+                            <ul role="menu" tabindex="-1" aria-labelledby="kc-current-locale-link" aria-activedescendant="" id="language-switch1" class="pf-c-dropdown__menu pf-m-align-right">
+                                    <li class="" role="none">
+                                        <a role="menuitem" id="language-1" class="pf-c-dropdown__menu-item" href="/realms/hhn/login-actions/authenticate?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;execution=REDACTED&amp;kc_locale=en">English</a>
+                                    </li>
+                                    <li class="" role="none">
+                                        <a role="menuitem" id="language-2" class="pf-c-dropdown__menu-item" href="/realms/hhn/login-actions/authenticate?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;execution=REDACTED&amp;kc_locale=de">German (Deutsch)</a>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div id="kc-username" class="form-group">
+                    <label id="kc-attempted-username">student@stud.hs-heilbronn.de</label>
+                    <a id="reset-login" href="/realms/hhn/login-actions/restart?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;skip_logout=false" aria-label="Restart login">
+                        <div class="kc-login-tooltip">
+                            <i class="pficon pficon-arrow fa"></i>
+                            <span class="kc-tooltip-text">Restart login</span>
+                        </div>
+                    </a>
+                </div>
+      </header>
+      <div id="kc-content">
+        <div id="kc-content-wrapper">
+
+
+        <form id="kc-otp-login-form" class="form-horizontal" onsubmit="login.disabled = true; return true;" action="https://login.hs-heilbronn.de/realms/hhn/login-actions/authenticate?session_code=REDACTED&amp;execution=REDACTED&amp;client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED"
+            method="post">
+
+            <div class="form-group">
+                <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+                    <label for="otp" class="pf-c-form__label pf-c-form__label-text">One-time code</label>
+                </div>
+
+            <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+                <input id="otp" name="otp" autocomplete="one-time-code" type="text" class="pf-c-form-control"
+                       autofocus aria-invalid=""
+                       dir="ltr" />
+
+            </div>
+        </div>
+
+            <div class="form-group">
+                <div id="kc-form-options" class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+                    <div class="">
+                    </div>
+                </div>
+
+                <div id="kc-form-buttons" class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+                    <input
+                        class="pf-c-button pf-m-primary pf-m-block btn-lg"
+                        name="login" id="kc-login" type="submit" value="Sign In" />
+                </div>
+            </div>
+        </form>
+
+              <form id="kc-select-try-another-way-form" action="https://login.hs-heilbronn.de/realms/hhn/login-actions/authenticate?session_code=REDACTED&amp;execution=REDACTED&amp;client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED" method="post">
+                  <div class="form-group">
+                      <input type="hidden" name="tryAnotherWay" value="on"/>
+                      <a href="#" id="try-another-way"
+                         onclick="document.forms['kc-select-try-another-way-form'].submit();return false;">Try Another Way</a>
+                  </div>
+              </form>
+
+
+        </div>
+      </div>
+
+<div id="hhn-footer">
+    <span><a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/ansprechpersonen-rechenzentrum-348b0edcbfdfc323">Support</a> | <a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/impressum">Imprint</a> | <a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/datenschutz">Privacy Policy</a></span>
+<div>
+    </div>
+  </div>
+</body>
+</html>

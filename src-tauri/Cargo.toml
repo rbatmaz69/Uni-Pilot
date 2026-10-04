@@ -32,6 +32,13 @@ scraper = "0.24"
 tokio = { version = "1", features = ["time", "sync"] }
 # The local date, to read ILIAS's "Heute, 10:12". Already in the tree.
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Signing in automatically (src/vault.rs): the HHN password and Uni Pilot's own
+# authenticator live in the platform's credential store — Keychain, Credential
+# Manager, Secret Service (D-Bus, already in the tree through tao) — never in a
+# file. Secrets are wiped from memory when dropped.
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+totp-rs = { version = "6", features = ["otpauth", "zeroize"] }
+zeroize = "1"
 
 # Back and forward in ILIAS, and downloads the macOS webview would otherwise
 # show (src/ilias_browser.rs), go straight to each platform's webview, which
@@ -41,6 +48,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURLResponse"] }
+# The Keychain's own error codes, to tell "you clicked Deny" from a broken
+# Keychain (src/vault.rs). The version keyring uses; only named here.
+security-framework = "3"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

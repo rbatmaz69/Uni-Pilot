@@ -1,0 +1,150 @@
+<!--
+  Keycloak's password page, login.hs-heilbronn.de (realm hhn, theme "hhn"),
+  recorded 2026-10-03 with curl, no account: GET https://ilias.hs-heilbronn.de/openidconnect.php
+  answers 302 straight to /realms/hhn/protocol/openid-connect/auth with
+  client_id=hhn_common_ilias, and that answers 200 with this page.
+  Markup as Keycloak sent it. Redacted, because they belong to one sign-in:
+  the values of session_code, execution, tab_id and client_data wherever
+  they appear (form action, locale links, session polling), and the
+  auth-session hash handed to checkAuthSession(). Each is now REDACTED.
+  Note the locale links: they point at login-actions/authenticate too, so
+  the form's action has to be read from #kc-form-login, not from the first
+  matching link.
+-->
+<!DOCTYPE html>
+<html class="login-pf" lang="de" dir="ltr">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="robots" content="noindex, nofollow">
+
+            <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Anmeldung bei HHN</title>
+    <link rel="icon" href="/resources/w735s/login/hhn/img/favicon.ico" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v4/patternfly.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v3/css/patternfly.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/vendor/patternfly-v3/css/patternfly-additions.min.css" rel="stylesheet" />
+            <link href="/resources/w735s/common/keycloak/lib/pficon/pficon.css" rel="stylesheet" />
+            <link href="/resources/w735s/login/hhn/css/login.css" rel="stylesheet" />
+            <link href="/resources/w735s/login/hhn/css/styles.css" rel="stylesheet" />
+            <script src="/resources/w735s/login/hhn/js/script.js" type="text/javascript"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "rfc4648": "/resources/w735s/common/keycloak/vendor/rfc4648/rfc4648.js"
+            }
+        }
+    </script>
+    <script src="/resources/w735s/login/hhn/js/menu-button-links.js" type="module"></script>
+    <script type="module">
+        import { startSessionPolling } from "/resources/w735s/login/hhn/js/authChecker.js";
+
+        startSessionPolling(
+          "/realms/hhn/login-actions/restart?client_id=hhn_common_ilias&tab_id=REDACTED&client_data=REDACTED&skip_logout=true"
+        );
+    </script>
+        <script type="module">
+            import { checkAuthSession } from "/resources/w735s/login/hhn/js/authChecker.js";
+
+            checkAuthSession(
+                "REDACTED"
+            );
+        </script>
+</head>
+
+<body class="">
+<div class="login-pf-page">
+    <div id="kc-header" class="login-pf-page-header">
+        <div id="kc-header-wrapper"
+             class=""><div class="kc-logo-text"><span>HHN</span></div></div>
+    </div>
+    <div class="card-pf">
+        <header class="login-pf-header">
+                <div class="pf-c-dropdown" id="kc-locale">
+                    <div id="kc-locale-wrapper" class="">
+                        <div id="kc-locale-dropdown" class="menu-button-links ">
+                            <button tabindex="1" id="kc-current-locale-link" aria-label="languages" aria-haspopup="true" aria-expanded="false" aria-controls="language-switch1">Deutsch</button>
+                            <ul role="menu" tabindex="-1" aria-labelledby="kc-current-locale-link" aria-activedescendant="" id="language-switch1" class="pf-c-dropdown__menu pf-m-align-right">
+                                    <li class="" role="none">
+                                        <a role="menuitem" id="language-1" class="pf-c-dropdown__menu-item" href="/realms/hhn/login-actions/authenticate?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;execution=REDACTED&amp;kc_locale=de">Deutsch</a>
+                                    </li>
+                                    <li class="" role="none">
+                                        <a role="menuitem" id="language-2" class="pf-c-dropdown__menu-item" href="/realms/hhn/login-actions/authenticate?client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED&amp;execution=REDACTED&amp;kc_locale=en">Englisch (English)</a>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <h1 id="kc-page-title">        Mit HHN-Account anmelden
+
+</h1>
+      </header>
+      <div id="kc-content">
+        <div id="kc-content-wrapper">
+
+
+        <div id="kc-form">
+          <div id="kc-form-wrapper">
+                <form id="kc-form-login" onsubmit="login.disabled = true; return true;" action="https://login.hs-heilbronn.de/realms/hhn/login-actions/authenticate?session_code=REDACTED&amp;execution=REDACTED&amp;client_id=hhn_common_ilias&amp;tab_id=REDACTED&amp;client_data=REDACTED" method="post">
+                        <div class="form-group">
+                            <label for="username" class="pf-c-form__label pf-c-form__label-text">Anmeldename oder E-Mail</label>
+
+                            <input tabindex="2" id="username" class="pf-c-form-control" name="username" value=""  type="text"
+                                   autofocus autocomplete="username"
+                                   aria-invalid=""
+                                   dir="ltr"
+                            />
+
+
+                        </div>
+
+                    <div class="form-group">
+                        <label for="password" class="pf-c-form__label pf-c-form__label-text">Passwort</label>
+
+                        <div class="pf-c-input-group" dir="ltr">
+                            <input tabindex="3" id="password" class="pf-c-form-control" name="password" type="password" autocomplete="current-password"
+                                   aria-invalid=""
+                            />
+                            <button class="pf-c-button pf-m-control" type="button" aria-label="Passwort einblenden"
+                                    aria-controls="password" data-password-toggle tabindex="4"
+                                    data-icon-show="fa fa-eye" data-icon-hide="fa fa-eye-slash"
+                                    data-label-show="Passwort einblenden" data-label-hide="Passwort ausblenden">
+                                <i class="fa fa-eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+
+                    </div>
+
+                    <div class="form-group login-pf-settings">
+                        <div id="kc-form-options">
+                            </div>
+                            <div class="">
+                            </div>
+
+                      </div>
+
+                      <div id="kc-form-buttons" class="form-group">
+                          <input type="hidden" id="id-hidden-input" name="credentialId" />
+                          <input tabindex="7" class="pf-c-button pf-m-primary pf-m-block btn-lg" name="login" id="kc-login" type="submit" value="Anmelden"/>
+                      </div>
+                </form>
+            </div>
+        </div>
+        <script type="module" src="/resources/w735s/login/hhn/js/passwordVisibility.js"></script>
+
+
+
+
+
+        </div>
+      </div>
+
+<div id="hhn-footer">
+    <span><a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/ansprechpersonen-rechenzentrum-348b0edcbfdfc323">Support</a> | <a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/impressum">Impressum</a> | <a target="_blank" rel="noopener noreferrer" href="https://www.hs-heilbronn.de/de/datenschutz">Datenschutz</a></span>
+<div>
+    </div>
+  </div>
+</body>
+</html>
