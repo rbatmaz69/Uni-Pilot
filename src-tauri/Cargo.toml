@@ -32,6 +32,9 @@ scraper = "0.24"
 tokio = { version = "1", features = ["time", "sync"] }
 # The local date, to read ILIAS's "Heute, 10:12". Already in the tree.
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# The newest mail kept on this Mac, encrypted (src/mail_cache.rs): AES-256-GCM
+# and the random it needs. Already in the tree through rustls.
+ring = "0.17"
 
 # Back and forward in ILIAS, and downloads the macOS webview would otherwise
 # show (src/ilias_browser.rs), go straight to each platform's webview, which
@@ -41,6 +44,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURLResponse"] }
+# The key to the mail kept on this Mac (src/mail_cache.rs) lives in the
+# Keychain. Mail is Mac only, so the key is too.
+keyring = { version = "3.6.3", features = ["apple-native"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

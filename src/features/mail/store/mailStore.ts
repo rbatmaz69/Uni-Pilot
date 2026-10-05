@@ -2,15 +2,16 @@
  * The Inbox: which Mail account is the university's, its newest messages, the
  * one the student opened, and how the student sorted them.
  *
- * Kept on this computer: the account's name, the view (list or board), and
- * the triage — "needs reply", "waiting", "done" — by Message-ID. Not kept:
- * any message. The list, previews and the text of an opened message stay in
- * Apple Mail and live here in memory only, for this session; a second copy of
- * anyone's mail gains nothing.
+ * Kept on this computer: the account's name, the view (list or board), the
+ * triage — "needs reply", "waiting", "done" — by Message-ID, and, unless the
+ * student turned it off, an encrypted copy of the list and of the newest
+ * texts (`lib/mailCache.ts`). At start that copy is shown at once, and Mail is
+ * asked for what is new behind it.
  *
  * Mail answers one question at a time, so the store asks as little as it can:
  * the accounts once a session, a message's text once, previews a few at a
- * time and never ahead of a message the student is opening.
+ * time, the newest texts after them — and none of it ahead of a message the
+ * student is opening or sending.
  */
 
 import { create } from 'zustand';
@@ -21,14 +22,24 @@ import {
   readInbox,
   readMessage,
   readPreviews,
+  sendWithMail,
   toMailFailure,
   type MailAccount,
   type MailBody,
+  type MailDraft,
   type MailFailure,
   type MailMessage,
   type MailPreview,
   type MessageRef,
 } from '@/features/mail/lib/appleMail';
+import {
+  cacheOf,
+  clearMailCache,
+  previewsOf,
+  readMailCache,
+  textsToFetch,
+  writeMailCache,
+} from '@/features/mail/lib/mailCache';
 import { universityAccount, type TriageState } from '@/features/mail/lib/mail';
 
 export type InboxView = 'list' | 'board';
@@ -39,6 +50,8 @@ export type InboxView = 'list' | 'board';
  * with the student's click let in between.
  */
 const PREVIEW_CHUNK = 5;
+/** How long changes gather before the copy on this Mac is written again. */
+const SAVE_DELAY_MS = 1500;
 
 interface MailState {
   /** The Mail account the Inbox reads, by name. Kept. */
@@ -59,7 +72,7 @@ interface MailState {
 
   /** The message open in the reading pane. */
   selectedId: string | null;
-  /** Texts of opened messages, this session only. */
+  /** Texts of messages: opened, fetched ahead for the newest, or kept from last time. */
   bodies: Record<string, MailBody>;
   bodyLoading: string | null;
   bodyFailure: MailFailure | null;
@@ -67,6 +80,10 @@ interface MailState {
   /** How the student sorted messages, by Message-ID. Kept. */
   triage: Record<string, TriageState>;
   view: InboxView;
+  /** Whether the list and the newest texts are kept on this Mac. Kept. */
+  keepOnMac: boolean;
+  /** A message on its way to Mail to be sent; everything else waits. */
+  sending: boolean;
 
   /**
    * Asks Mail for the chosen account's inbox. Without a choice yet, takes the
@@ -86,6 +103,10 @@ interface MailState {
   setRead: (id: string, read: boolean) => Promise<void>;
   setTriage: (id: string, state: TriageState | null) => void;
   setView: (view: InboxView) => void;
+  /** Turning it off deletes the copy at once. */
+  setKeepOnMac: (keep: boolean) => void;
+  /** Has Mail send a message the student confirmed; answers whether Mail took it. */
+  send: (draft: MailDraft) => Promise<boolean>;
 }
 
 const withPreview = (message: MailMessage, previews: Record<string, MailPreview>) => {
@@ -100,6 +121,11 @@ export const useMailStore = create<MailState>()(
       const opening = new Map<string, Promise<MailBody>>();
       /** Whether previews are being fetched; one run at a time. */
       let previewing = false;
+      /** Whether the newest texts are being fetched; one run at a time. */
+      let fetchingTexts = false;
+      /** Texts asked for ahead this session — each once, whatever Mail answered. */
+      const fetchedAhead = new Set<string>();
+      let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
       /** How to find a listed message again: with Mail's own number, if the list has it. */
       const refOf = (id: string): MessageRef => ({
@@ -119,19 +145,83 @@ export const useMailStore = create<MailState>()(
             : state.bodies,
         }));
 
-      /** Resolves once no message is being opened. */
-      const openingDone = () =>
+      /**
+       * Resolves once Mail is free of what the student asked for — opening a
+       * message, sending one — so background work goes after it.
+       */
+      const studentServed = () =>
         new Promise<void>((resolve) => {
-          if (!get().bodyLoading) {
+          const busy = (state: MailState) => state.bodyLoading !== null || state.sending;
+          if (!busy(get())) {
             resolve();
             return;
           }
           const stop = api.subscribe((state) => {
-            if (state.bodyLoading) return;
+            if (busy(state)) return;
             stop();
             resolve();
           });
         });
+
+      /** Shows the copy kept last time while Mail is asked — until Mail has answered. */
+      const restore = async () => {
+        if (!get().keepOnMac) return;
+        const cache = await readMailCache();
+        const { account, messages } = get();
+        // Mail answered first, or this copy is another account's.
+        if (!cache || messages !== null || cache.account !== account) return;
+        set({
+          messages: cache.messages,
+          previews: previewsOf(cache.messages),
+          bodies: Object.fromEntries(cache.bodies.map((body) => [body.id, body])),
+        });
+      };
+
+      /** Writes the copy once changes have settled — only what Mail said this session. */
+      const saveSoon = () => {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          const { account, messages, bodies, checkedAt, keepOnMac } = get();
+          if (!keepOnMac || !account || !messages || checkedAt === null) return;
+          void writeMailCache(cacheOf(account, messages, bodies));
+        }, SAVE_DELAY_MS);
+      };
+      api.subscribe((state, before) => {
+        if (state.messages !== before.messages || state.bodies !== before.bodies) saveSoon();
+      });
+
+      /**
+       * Fetches the newest texts ahead, one at a time, after the previews: a
+       * click on one of them then opens it at once. A message the student opens
+       * meanwhile goes first; one being fetched here is not fetched twice.
+       */
+      const loadTexts = async () => {
+        if (fetchingTexts || !get().keepOnMac) return;
+        fetchingTexts = true;
+        try {
+          for (;;) {
+            await studentServed();
+            const { account, messages, bodies } = get();
+            const [next] = textsToFetch(messages ?? [], bodies).filter(
+              (message) => !fetchedAhead.has(message.id),
+            );
+            if (!account || !next) return;
+            fetchedAhead.add(next.id);
+            let pending = opening.get(next.id);
+            if (!pending) {
+              pending = readMessage(account, refOf(next.id)).finally(() => opening.delete(next.id));
+              opening.set(next.id, pending);
+            }
+            const body = await pending;
+            if (get().account !== account) return;
+            if (body) set((state) => ({ bodies: { ...state.bodies, [next.id]: body } }));
+          }
+        } catch {
+          // Fetching ahead is a nicety; the next refresh tries again.
+        } finally {
+          fetchingTexts = false;
+        }
+      };
 
       /**
        * The account to read. Mail's accounts are asked for once a session,
@@ -161,11 +251,18 @@ export const useMailStore = create<MailState>()(
         bodyFailure: null,
         triage: {},
         view: 'list',
+        keepOnMac: true,
+        sending: false,
 
         refresh: async (domain) => {
           if (get().loading) return;
           set({ loading: true });
           try {
+            if (get().messages === null) {
+              // A list from scratch: its texts may be fetched ahead again.
+              fetchedAhead.clear();
+              await restore();
+            }
             let account = await accountToRead(domain);
             let messages: MailMessage[] | null;
             try {
@@ -205,7 +302,7 @@ export const useMailStore = create<MailState>()(
           previewing = true;
           try {
             for (;;) {
-              await openingDone();
+              await studentServed();
               const { account, messages, previews } = get();
               const wanted = (messages ?? [])
                 .filter((message) => !(message.id in previews))
@@ -226,10 +323,15 @@ export const useMailStore = create<MailState>()(
             // A preview is a nicety; the list stands without it.
           } finally {
             previewing = false;
+            // The newest texts follow the previews.
+            void loadTexts();
           }
         },
 
-        chooseAccount: (name) =>
+        chooseAccount: (name) => {
+          // The copy is the old account's.
+          clearTimeout(saveTimer);
+          void clearMailCache();
           set({
             account: name,
             messages: null,
@@ -237,7 +339,8 @@ export const useMailStore = create<MailState>()(
             previews: {},
             selectedId: null,
             bodies: {},
-          }),
+          });
+        },
 
         select: async (id) => {
           set({ selectedId: id, bodyFailure: null });
@@ -292,22 +395,50 @@ export const useMailStore = create<MailState>()(
           }),
 
         setView: (view) => set({ view }),
+
+        setKeepOnMac: (keep) => {
+          set({ keepOnMac: keep });
+          if (keep) {
+            saveSoon();
+            void loadTexts();
+            return;
+          }
+          clearTimeout(saveTimer);
+          void clearMailCache();
+        },
+
+        send: async (draft) => {
+          set({ sending: true });
+          try {
+            return await sendWithMail(draft);
+          } finally {
+            set({ sending: false });
+          }
+        },
       };
     },
     {
       name: 'uni-pilot.mail',
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         account: state.account,
         triage: state.triage,
         view: state.view,
+        keepOnMac: state.keepOnMac,
       }),
       // Version 1 kept the account only; it stays, and sorting starts empty.
-      migrate: (persisted) => ({
-        account: (persisted as { account?: string | null } | null)?.account ?? null,
-        triage: {},
-        view: 'list' as const,
-      }),
+      // Version 2 had no copy on this Mac; keeping one starts on.
+      migrate: (persisted, version) => {
+        const kept = (persisted ?? {}) as Partial<
+          Pick<MailState, 'account' | 'triage' | 'view' | 'keepOnMac'>
+        >;
+        return {
+          account: kept.account ?? null,
+          triage: version >= 2 ? (kept.triage ?? {}) : {},
+          view: version >= 2 ? (kept.view ?? 'list') : ('list' as const),
+          keepOnMac: kept.keepOnMac ?? true,
+        };
+      },
     },
   ),
 );

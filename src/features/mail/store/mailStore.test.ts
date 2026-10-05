@@ -92,6 +92,8 @@ beforeEach(() => {
     bodies: {},
     bodyLoading: null,
     bodyFailure: null,
+    keepOnMac: true,
+    sending: false,
   });
 });
 
@@ -278,5 +280,120 @@ describe('the mail store', () => {
     await marking;
     expect(useMailStore.getState().messages?.[0]?.read).toBe(false);
     expect(useMailStore.getState().bodyFailure?.kind).toBe('noMessage');
+  });
+});
+
+describe('the copy kept on this Mac', () => {
+  const KEPT = {
+    account: 'HHN',
+    messages: [{ ...LISTED[0]!, snippet: 'Guten Tag,' }],
+    bodies: [BODY],
+  };
+  /** The copy is written once changes settle, 1.5 seconds after. */
+  const SETTLED = { timeout: 3000 };
+  const written = () => calls('mail_cache_write').map(([, args]) => args.cache as typeof KEPT);
+
+  /** Answers like `answer`, and with `kept` for the copy. */
+  function answerWithCopy(kept: unknown, inbox?: Promise<unknown>) {
+    answer((args) => Promise.resolve(previewsFor(args)));
+    const mail = invoke.getMockImplementation()!;
+    invoke.mockImplementation((command, args) => {
+      if (command === 'mail_cache_read') return Promise.resolve(kept);
+      if (command === 'mail_inbox' && inbox) return inbox;
+      return mail(command, args);
+    });
+  }
+
+  it('shows the copy at once, then what Mail says', async () => {
+    useMailStore.setState({ account: 'HHN' });
+    const inbox = later<unknown>();
+    answerWithCopy(KEPT, inbox.promise);
+
+    const refreshing = useMailStore.getState().refresh('hs-heilbronn.de');
+    await vi.waitFor(() => expect(useMailStore.getState().messages).toEqual(KEPT.messages));
+    expect(useMailStore.getState().bodies).toEqual({ [BODY.id]: BODY });
+    expect(useMailStore.getState().checkedAt).toBeNull();
+
+    inbox.resolve([{ ...LISTED[0]!, read: true }]);
+    await refreshing;
+    // Mail's word on what is read; the kept preview and text stand.
+    expect(useMailStore.getState().messages?.[0]).toMatchObject({
+      read: true,
+      snippet: 'Guten Tag,',
+    });
+    await vi.waitFor(() => expect(written()).toHaveLength(1), SETTLED);
+    expect(written()[0]).toMatchObject({ account: 'HHN', bodies: [BODY] });
+    expect(calls('mail_previews')).toHaveLength(0);
+    expect(calls('mail_message')).toHaveLength(0);
+  });
+
+  it("does not show another account's copy", async () => {
+    useMailStore.setState({ account: 'HHN' });
+    const inbox = later<unknown>();
+    answerWithCopy({ ...KEPT, account: 'Privat' }, inbox.promise);
+
+    const refreshing = useMailStore.getState().refresh('hs-heilbronn.de');
+    await vi.waitFor(() => expect(calls('mail_inbox')).toHaveLength(1));
+    expect(useMailStore.getState().messages).toBeNull();
+
+    inbox.resolve(LISTED);
+    await refreshing;
+    expect(useMailStore.getState().bodies).toEqual({});
+  });
+
+  it('fetches the newest texts ahead after the previews, and keeps them', async () => {
+    answerWithCopy(null);
+    await useMailStore.getState().refresh('hs-heilbronn.de');
+
+    await vi.waitFor(() => expect(useMailStore.getState().bodies[BODY.id]).toEqual(BODY));
+    expect(calls('mail_previews')).toHaveLength(1);
+    // Fetching ahead is not reading: nothing is marked read.
+    expect(calls('mail_mark_read')).toHaveLength(0);
+    await vi.waitFor(() => expect(written().at(-1)?.bodies).toEqual([BODY]), SETTLED);
+  });
+
+  it('keeps nothing once the student turns it off', async () => {
+    answerWithCopy(KEPT);
+    useMailStore.getState().setKeepOnMac(false);
+    await vi.waitFor(() => expect(calls('mail_cache_clear')).toHaveLength(1));
+
+    useMailStore.setState({ account: 'HHN' });
+    await useMailStore.getState().refresh('hs-heilbronn.de');
+    await vi.waitFor(() => expect(calls('mail_previews')).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 1700));
+
+    expect(calls('mail_cache_read')).toHaveLength(0);
+    expect(calls('mail_cache_write')).toHaveLength(0);
+    expect(calls('mail_message')).toHaveLength(0);
+  });
+
+  it('deletes the copy when the student switches account', async () => {
+    useMailStore.getState().chooseAccount(null);
+    await vi.waitFor(() => expect(calls('mail_cache_clear')).toHaveLength(1));
+  });
+
+  it('lets a message being sent go before the next previews', async () => {
+    answerWithCopy(null);
+    const sent = later<unknown>();
+    const mail = invoke.getMockImplementation()!;
+    invoke.mockImplementation((command, args) =>
+      command === 'mail_send' ? sent.promise : mail(command, args),
+    );
+    const sending = useMailStore.getState().send({
+      from: 's@stud.hs-heilbronn.de',
+      to: ['prof@hs-heilbronn.de'],
+      subject: 'Frage',
+      body: 'Guten Tag,',
+    });
+    expect(useMailStore.getState().sending).toBe(true);
+
+    await useMailStore.getState().refresh('hs-heilbronn.de');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(calls('mail_previews')).toHaveLength(0);
+
+    sent.resolve(true);
+    await expect(sending).resolves.toBe(true);
+    expect(useMailStore.getState().sending).toBe(false);
+    await vi.waitFor(() => expect(calls('mail_previews')).toHaveLength(1));
   });
 });

@@ -1,5 +1,6 @@
 import { Check, Moon, PanelLeft, Sun } from 'lucide-react';
 import { ReminderSettings } from '@/features/reminders/components/ReminderSettings';
+import { MailSettings } from '@/features/mail/components/MailSettings';
 import { Page } from '@/components/layout';
 import { NAV_ITEMS } from '@/lib/navigation';
 import { useUiStore } from '@/store/uiStore';
@@ -102,6 +103,7 @@ export function SettingsPage() {
         </div>
       </section>
       <ReminderSettings />
+      <MailSettings />
     </Page>
   );
 }
