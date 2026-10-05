@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NotchIsland, type NotchPainting } from './NotchIsland';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NotchIsland, TONGUE_MS, type NotchPainting } from './NotchIsland';
 
 let deliver: (payload: NotchPainting | null) => void = () => undefined;
 const emit = vi.fn<(event: string, payload?: unknown) => Promise<void>>();
@@ -28,6 +28,10 @@ const sent = (event: string) => emit.mock.calls.filter(([name]) => name === even
 
 beforeEach(() => {
   emit.mockReset().mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('the island in the notch', () => {
@@ -82,6 +86,28 @@ describe('the island in the notch', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     // Nothing to click any more: every click goes through to the menu bar.
     expect(sent('notch-hit').at(-1)?.[1]).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+
+  it('sticks its tongue out for a moment when face unlock stops, each time anew', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<NotchIsland />);
+    await waitFor(() => expect(sent('notch-ready')).toHaveLength(1));
+    act(() => deliver(painting()));
+    expect(screen.getByRole('img', { name: 'Uni Pilot, looking for you' })).toBeInTheDocument();
+
+    act(() => deliver(painting({ phase: 'stopped', text: 'Not recognised.', again: true })));
+    expect(screen.getByRole('img', { name: /tongue out/ })).toBeInTheDocument();
+
+    // The same stop painted again does not make it last longer.
+    await act(() => vi.advanceTimersByTimeAsync(TONGUE_MS / 2));
+    act(() => deliver(painting({ phase: 'stopped', text: 'Not recognised.', again: true })));
+    await act(() => vi.advanceTimersByTimeAsync(TONGUE_MS / 2 + 10));
+    expect(screen.getByRole('img', { name: 'Uni Pilot, glum' })).toBeInTheDocument();
+
+    // Another try that fails again: tongue out again.
+    act(() => deliver(painting()));
+    act(() => deliver(painting({ phase: 'stopped', text: 'Not recognised.', again: true })));
+    expect(screen.getByRole('img', { name: /tongue out/ })).toBeInTheDocument();
   });
 
   it('offers to bring Uni Pilot back while the camera is paused', async () => {
