@@ -201,7 +201,7 @@ export function DocumentExplorer({
     const timer = window.setTimeout(() => {
       documentRequest<SearchHit[]>({ action: 'search', query: searchQuery })
         .then((hits) => {
-          if (active) setSearch({ query: searchQuery, hits });
+          if (active) setSearch({ query: searchQuery, hits: Array.isArray(hits) ? hits : [] });
         })
         .catch(() => {
           if (active) setSearch({ query: searchQuery, hits: [] });
