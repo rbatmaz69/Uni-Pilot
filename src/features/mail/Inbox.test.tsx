@@ -1,7 +1,8 @@
 /**
  * The Inbox across the shell: the university account found by its address,
  * messages sorted by sender and course, a message read in the pane and marked
- * read in Mail, a reply handed to Mail as a draft, triage and the board — and
+ * read in Mail, a reply handed to Mail as a draft, a new message sent once the
+ * student confirmed it, triage and the board — and
  * what the page says when Mail cannot help. Rust and Mail are a stand-in
  * answering like `apple_mail.rs` does.
  */
@@ -91,6 +92,7 @@ function answerLikeRust(refuse: Record<string, string> = {}, accounts = ACCOUNTS
     if (command === 'mail_previews') return Promise.resolve({});
     if (command === 'mail_message') return Promise.resolve(BODY);
     if (command === 'mail_reply') return Promise.resolve(true);
+    if (command === 'mail_send') return Promise.resolve(true);
     return Promise.resolve(undefined);
   });
 }
@@ -403,6 +405,85 @@ describe('the inbox', () => {
       },
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('sends a new message through Mail once the student confirms it', async () => {
+    pretendDesktop();
+    const user = userEvent.setup();
+    renderApp('/inbox');
+
+    await user.click(await screen.findByRole('button', { name: 'New message' }));
+    const dialog = screen.getByRole('dialog', { name: 'New message' });
+    expect(screen.getByRole('button', { name: 'Send…' })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
+    await user.type(within(dialog).getByLabelText('Subject'), 'Frage zu Blatt 4');
+    await user.type(within(dialog).getByLabelText('Message'), 'Guten Tag,');
+    await user.click(screen.getByRole('button', { name: 'Send…' }));
+
+    expect(dialog).toHaveTextContent(
+      'Send to prof@hs-heilbronn.de now? Apple Mail sends it from student@stud.hs-heilbronn.de right away.',
+    );
+    expect(within(dialog).getByLabelText('Message')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send now' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(within(dialog).getByLabelText('Message')).toBeEnabled();
+    expect(invoke).not.toHaveBeenCalledWith('mail_send', expect.anything());
+
+    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    await user.click(screen.getByRole('button', { name: 'Send now' }));
+
+    expect(invoke).toHaveBeenCalledWith('mail_send', {
+      draft: {
+        from: 'student@stud.hs-heilbronn.de',
+        to: ['prof@hs-heilbronn.de'],
+        subject: 'Frage zu Blatt 4',
+        body: 'Guten Tag,',
+      },
+    });
+    expect(invoke).not.toHaveBeenCalledWith('mail_compose', expect.anything());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('says so when Mail did not send the message, and leaves it there as a draft', async () => {
+    pretendDesktop();
+    const listed = invoke.getMockImplementation()!;
+    invoke.mockImplementation((command, args) =>
+      command === 'mail_send' ? Promise.resolve(false) : listed(command, args),
+    );
+    const user = userEvent.setup();
+    renderApp('/inbox');
+
+    await user.click(await screen.findByRole('button', { name: 'New message' }));
+    const dialog = screen.getByRole('dialog', { name: 'New message' });
+    await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
+    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    expect(dialog).toHaveTextContent('It has no subject.');
+    await user.click(screen.getByRole('button', { name: 'Send now' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Apple Mail did not send it. It is open in Mail as a draft',
+    );
+    expect(screen.queryByRole('button', { name: /Send/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('warns that a message may have gone out when Mail stopped answering', async () => {
+    pretendDesktop();
+    answerLikeRust({ mail_send: 'failed' });
+    const user = userEvent.setup();
+    renderApp('/inbox');
+
+    await user.click(await screen.findByRole('button', { name: 'New message' }));
+    const dialog = screen.getByRole('dialog', { name: 'New message' });
+    await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
+    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    await user.click(screen.getByRole('button', { name: 'Send now' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'It may have gone out anyway: look in Sent in Mail before sending it again.',
+    );
+    expect(within(dialog).getByLabelText('To')).toBeEnabled();
   });
 
   it('asks which account to read when none has a university address', async () => {

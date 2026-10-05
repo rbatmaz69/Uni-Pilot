@@ -455,6 +455,9 @@ describe('asking about an assignment', () => {
       'Beispielsysteme 1 - WS25 – Abgabe der Projektaufgabe',
     );
     await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
+    // Mail named no university account, so there is no address to send from.
+    expect(dialog).toHaveTextContent('Sending from here needs your university account');
+    expect(screen.getByRole('button', { name: 'Send…' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Open draft in Mail' }));
 
     expect(invoke).toHaveBeenCalledWith('mail_compose', {

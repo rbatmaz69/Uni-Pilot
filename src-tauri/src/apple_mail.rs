@@ -16,8 +16,10 @@
 //!   student opened — read on this Mac, held in memory, never stored or sent
 //!   anywhere. Listing marks nothing read; `mail_mark_read` does, when the
 //!   student opened a message or asked.
-//! - **Drafts only.** Compose and reply open a window in Mail; the student
-//!   sends. Nothing here sends a message, and the script has no way to.
+//! - **Sent only when the student confirmed it.** Compose and reply open a
+//!   window in Mail; the student sends there. `mail_send` sends a new message
+//!   the student wrote and confirmed in Uni Pilot, from the university address
+//!   and to someone — never a reply, whose text Mail may not have taken.
 //!
 //! On Windows and Linux every command answers `unsupported`.
 
@@ -140,7 +142,8 @@ pub struct MessageRef {
     pub mail_id: Option<u64>,
 }
 
-/// A new message for Mail to open, never to send.
+/// A new message for Mail: opened as a draft, or sent once the student
+/// confirmed it.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Draft {
@@ -323,6 +326,32 @@ fn check_draft(draft: &Draft) -> Result<(), MailError> {
     Ok(())
 }
 
+/// Checks a message before Mail sends it. A draft may go without recipient or
+/// sender, for the student to fill in in Mail; a sent message may not. Without
+/// a sender, Mail would send from its default account — perhaps a private one.
+fn check_send(draft: &Draft) -> Result<(), MailError> {
+    check_draft(draft)?;
+    if draft.to.is_empty() {
+        return Err(MailError::Invalid("Add who the message is for.".into()));
+    }
+    if draft.from.is_none() {
+        return Err(MailError::Invalid(
+            "Uni Pilot sends only from your university address.".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// The draft as the script takes it.
+fn draft_input(draft: &Draft) -> Value {
+    serde_json::json!({
+        "from": draft.from,
+        "to": draft.to.iter().map(|address| address.trim()).collect::<Vec<_>>(),
+        "subject": draft.subject,
+        "body": draft.body,
+    })
+}
+
 /// `message://%3c…%3e`, which opens that message in Mail.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn message_url(id: &str) -> String {
@@ -446,20 +475,24 @@ pub async fn mail_reply(
 #[tauri::command]
 pub async fn mail_compose(draft: Draft) -> Result<(), MailError> {
     check_draft(&draft)?;
-    let input = serde_json::json!({
-        "from": draft.from,
-        "to": draft.to.iter().map(|address| address.trim()).collect::<Vec<_>>(),
-        "subject": draft.subject,
-        "body": draft.body,
-    });
-    ask("compose", input).await.map(|_| ())
+    ask("compose", draft_input(&draft)).await.map(|_| ())
+}
+
+/// Sends a new message through Mail, which is signed in for it — only after
+/// the student confirmed it in Uni Pilot. Answers whether Mail took it; when it
+/// did not, Mail shows it as a draft instead.
+#[tauri::command]
+pub async fn mail_send(draft: Draft) -> Result<bool, MailError> {
+    check_send(&draft)?;
+    let answer = ask("send", draft_input(&draft)).await?;
+    Ok(answer.get("sent").and_then(Value::as_bool).unwrap_or(false))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        check_draft, message_input, message_url, read_answer, Draft, MailBody, MailError,
-        MailMessage, MailPreview, MessageRef,
+        check_draft, check_send, message_input, message_url, read_answer, Draft, MailBody,
+        MailError, MailMessage, MailPreview, MessageRef,
     };
 
     fn draft(to: &[&str]) -> Draft {
@@ -631,5 +664,17 @@ mod tests {
             ..draft(&[])
         };
         assert!(check_draft(&crowded).is_err());
+    }
+
+    #[test]
+    fn sends_only_from_an_address_to_someone() {
+        assert_eq!(check_send(&draft(&["prof@hs-heilbronn.de"])), Ok(()));
+        assert!(check_send(&draft(&[])).is_err());
+        let from_anywhere = Draft {
+            from: None,
+            ..draft(&["prof@hs-heilbronn.de"])
+        };
+        assert!(check_send(&from_anywhere).is_err());
+        assert!(check_send(&draft(&["not an address"])).is_err());
     }
 }

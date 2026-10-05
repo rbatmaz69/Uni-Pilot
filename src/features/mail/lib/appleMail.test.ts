@@ -9,6 +9,7 @@ import {
   readMessage,
   readPreviews,
   replyInMail,
+  sendWithMail,
   toMailFailure,
 } from './appleMail';
 
@@ -35,12 +36,14 @@ describe('what the page asks Rust for', () => {
     await markRead('stud.hs-heilbronn.de', message, true);
     await replyInMail('stud.hs-heilbronn.de', message, 'Danke!');
     await replyInMail('stud.hs-heilbronn.de', message, '   ');
-    await composeInMail({
+    const draft = {
       from: 'student@stud.hs-heilbronn.de',
       to: ['prof@hs-heilbronn.de'],
       subject: 'Frage',
       body: 'Guten Tag,',
-    });
+    };
+    await composeInMail(draft);
+    await sendWithMail(draft);
     expect(invoke.mock.calls).toEqual([
       ['mail_accounts', {}],
       ['mail_inbox', { account: 'stud.hs-heilbronn.de' }],
@@ -56,17 +59,8 @@ describe('what the page asks Rust for', () => {
       ['mail_mark_read', { account: 'stud.hs-heilbronn.de', message, read: true }],
       ['mail_reply', { account: 'stud.hs-heilbronn.de', message, text: 'Danke!' }],
       ['mail_reply', { account: 'stud.hs-heilbronn.de', message, text: null }],
-      [
-        'mail_compose',
-        {
-          draft: {
-            from: 'student@stud.hs-heilbronn.de',
-            to: ['prof@hs-heilbronn.de'],
-            subject: 'Frage',
-            body: 'Guten Tag,',
-          },
-        },
-      ],
+      ['mail_compose', { draft }],
+      ['mail_send', { draft }],
     ]);
   });
 });
