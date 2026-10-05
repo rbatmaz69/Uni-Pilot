@@ -2,12 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Send } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import { isDesktopRuntime } from '@/lib/icsFetch';
-import {
-  composeInMail,
-  sendWithMail,
-  type MailDraft,
-  type MailFailure,
-} from '@/features/mail/lib/appleMail';
+import { composeInMail, type MailDraft, type MailFailure } from '@/features/mail/lib/appleMail';
 import { universityAddress, universityDomain } from '@/features/mail/lib/mail';
 import { useMailStore } from '@/features/mail/store/mailStore';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -49,6 +44,8 @@ export function ComposeDialog({ onClose, initial }: ComposeDialogProps) {
   );
   const knowsAccounts = useMailStore((state) => state.accounts !== null);
   const findAccount = useMailStore((state) => state.findAccount);
+  // Through the store, so fetching ahead waits while Mail sends.
+  const sendThroughMail = useMailStore((state) => state.send);
   const from = account ? universityAddress(account, domain) : null;
 
   // Written away from the Inbox, Mail's accounts may not be known yet.
@@ -96,7 +93,7 @@ export function ComposeDialog({ onClose, initial }: ComposeDialogProps) {
     setBusy(true);
     setProblem(null);
     try {
-      if (await sendWithMail(draft())) {
+      if (await sendThroughMail(draft())) {
         onClose();
         return;
       }

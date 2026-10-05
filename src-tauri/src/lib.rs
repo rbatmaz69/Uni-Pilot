@@ -7,6 +7,7 @@ mod ilias_sign_out;
 mod ilias_sync;
 mod ilias_view;
 mod ilias_window;
+mod mail_cache;
 mod notch;
 mod reminders;
 mod vault;
@@ -63,7 +64,10 @@ pub fn run() {
             apple_mail::mail_mark_read,
             apple_mail::mail_reply,
             apple_mail::mail_compose,
-            apple_mail::mail_send
+            apple_mail::mail_send,
+            mail_cache::mail_cache_read,
+            mail_cache::mail_cache_write,
+            mail_cache::mail_cache_clear
         ])
         .manage(ilias_view::Mode::default())
         .manage(ilias_browser::Downloads::default())

@@ -44,8 +44,8 @@ const REFRESH_GAP_MS = 60_000;
 
 /**
  * The university inbox, through Apple Mail: sorted by who wrote and which
- * course it is about, readable here, answered in Mail. Uni Pilot never sends —
- * replies and new messages open in Mail as drafts.
+ * course it is about, readable here, answered in Mail. Replies open in Mail as
+ * drafts; a new message is sent through Mail once the student confirms it.
  */
 export function InboxExperience() {
   const domain = universityDomain(useIliasStore((state) => state.connection?.baseUrl));

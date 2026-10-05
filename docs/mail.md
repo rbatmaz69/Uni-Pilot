@@ -12,7 +12,8 @@ Microsoft 365 ⇄ Apple Mail (signed in, has the mail) ⇄ Apple Events, this Ma
 
 - `src-tauri/src/apple_mail.js` is what Mail is asked, through `osascript -l JavaScript`. Input travels as a JSON argument, never as script text.
 - `src-tauri/src/apple_mail.rs` runs it, checks what goes in and reads what comes out.
-- `src/features/mail/` is the page: `lib/mail.ts` sorts (university, fellow students, ILIAS, other; the course a message is about, from ILIAS's course list), `store/mailStore.ts` keeps the state, `components/` draws list, board and reading pane.
+- `src-tauri/src/mail_cache.rs` keeps the newest mail on this Mac, encrypted (see below).
+- `src/features/mail/` is the page: `lib/mail.ts` sorts (university, fellow students, ILIAS, other; the course a message is about, from ILIAS's course list), `lib/mailCache.ts` decides what is kept, `store/mailStore.ts` keeps the state, `components/` draws list, board and reading pane.
 
 ### Keeping Mail quick
 
@@ -23,12 +24,16 @@ Every property the script reads is an Apple Event — a round trip to Mail — a
 - **Mail is asked again only when the list is over a minute old** — on opening the Inbox as on coming back to the window. Mail's accounts are asked for once a session.
 - **Previews, including up to three attachment file names, come five at a time** and wait while a message is being opened; each message is asked about once a session, also when it has no text.
 - **A message's text is fetched once.** Clicking it again while it loads waits for the same answer; clicking it later shows it at once.
+- **The newest texts are fetched ahead.** After the previews, the texts of the newest 25 messages are fetched one at a time, so clicking one opens it at once. Fetching ahead marks nothing read, and waits whenever the student opens or sends a message.
+- **Sending goes first.** While a message is on its way to Mail, previews and texts fetched ahead wait.
+- **The last list is shown at start.** The list and the newest texts are kept on this Mac (below); the Inbox shows them at once and asks Mail for what is new behind them.
 
 The first time, macOS asks whether Uni Pilot may control Mail (System Settings → Privacy & Security → Automation). In `npm run tauri:dev` the question names **Terminal**, which started the app; in an installed build it names Uni Pilot, with the reason from `src-tauri/Info.plist`.
 
 ## The rules
 
-- **Read what the Inbox shows, nothing more.** The newest 50 messages with a one-line preview and up to three attachment names each, and the full text of the message the student opens. On this Mac, in memory only — no message is stored or passed on. Kept on disk: the chosen account, list or board, and the triage (Needs reply / Waiting / Done) by Message-ID.
+- **Read what the Inbox shows, nothing more.** The newest 50 messages with a one-line preview and up to three attachment names each, and the full text of the newest 25 and of any message the student opens. Nothing is passed on. Kept on disk: the chosen account, list or board, the triage (Needs reply / Waiting / Done) by Message-ID, and the copy below.
+- **The newest mail is kept on this Mac, encrypted.** The list of the newest 50 (with previews) and the text of the newest 25 — about a week of university mail — in one file in Uni Pilot's data folder, encrypted with AES-256-GCM. The key is in the Keychain: Mail's own folder (`~/Library/Mail`) is shielded from other apps by macOS, Uni Pilot's is not, so the file is of no use without the key. macOS asks once whether Uni Pilot may use the key, and again after an update (an ad-hoc signed build is a new app to the Keychain); refused, nothing is kept. Rust holds the copy to these limits whatever the page sends. It is deleted after 30 days without the Inbox, when the student switches account, and when **Settings → Keep the newest mail on this Mac** is turned off — which also stops fetching texts ahead.
 - **Listing marks nothing read.** Opening a message in the pane marks it read in Mail, as Mail would; **Mark as unread** undoes it.
 - **Uni Pilot sends only what the student confirmed.** New message and "Email about this" on a course's assignment offer two ways: **Open draft in Mail**, to finish and send it there, or **Send…**, which asks once more — who gets it, from which address — before **Send now** has Mail send it. Mail signs in for it, as it does for reading; Uni Pilot still never talks to Microsoft.
   - Sending needs the university address as sender and at least one recipient; Rust refuses a message without either, so it never goes out from Mail's default (perhaps private) account.

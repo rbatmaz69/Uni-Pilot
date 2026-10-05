@@ -120,7 +120,8 @@ const loadCore = () => import('@tauri-apps/api/core');
  */
 let core: ReturnType<typeof loadCore> | undefined;
 
-async function call<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+/** Asks Rust; a refusal comes back as a `MailFailure`. Shared with `mailCache.ts`. */
+export async function call<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
   core ??= loadCore();
   const { invoke } = await core;
   try {
