@@ -414,11 +414,11 @@ describe('the inbox', () => {
 
     await user.click(await screen.findByRole('button', { name: 'New message' }));
     const dialog = screen.getByRole('dialog', { name: 'New message' });
-    expect(screen.getByRole('button', { name: 'Send…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send email' })).toBeDisabled();
     await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
     await user.type(within(dialog).getByLabelText('Subject'), 'Frage zu Blatt 4');
     await user.type(within(dialog).getByLabelText('Message'), 'Guten Tag,');
-    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    await user.click(screen.getByRole('button', { name: 'Send email' }));
 
     expect(dialog).toHaveTextContent(
       'Send to prof@hs-heilbronn.de now? Apple Mail sends it from student@stud.hs-heilbronn.de right away.',
@@ -429,7 +429,7 @@ describe('the inbox', () => {
     expect(within(dialog).getByLabelText('Message')).toBeEnabled();
     expect(invoke).not.toHaveBeenCalledWith('mail_send', expect.anything());
 
-    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    await user.click(screen.getByRole('button', { name: 'Send email' }));
     await user.click(screen.getByRole('button', { name: 'Send now' }));
 
     expect(invoke).toHaveBeenCalledWith('mail_send', {
@@ -456,7 +456,7 @@ describe('the inbox', () => {
     await user.click(await screen.findByRole('button', { name: 'New message' }));
     const dialog = screen.getByRole('dialog', { name: 'New message' });
     await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
-    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    await user.click(screen.getByRole('button', { name: 'Send email' }));
     expect(dialog).toHaveTextContent('It has no subject.');
     await user.click(screen.getByRole('button', { name: 'Send now' }));
 
@@ -477,7 +477,7 @@ describe('the inbox', () => {
     await user.click(await screen.findByRole('button', { name: 'New message' }));
     const dialog = screen.getByRole('dialog', { name: 'New message' });
     await user.type(within(dialog).getByLabelText('To'), 'prof@hs-heilbronn.de');
-    await user.click(screen.getByRole('button', { name: 'Send…' }));
+    await user.click(screen.getByRole('button', { name: 'Send email' }));
     await user.click(screen.getByRole('button', { name: 'Send now' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
