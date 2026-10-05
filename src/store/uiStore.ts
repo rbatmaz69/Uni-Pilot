@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { alternateTheme, type ThemeName } from '@/lib/theme';
 
-export type ThemeName = 'light' | 'dark';
+export type { ThemeName } from '@/lib/theme';
 
 interface UiState {
   sidebarCollapsed: boolean;
@@ -33,7 +34,7 @@ export const useUiStore = create<UiState>()(
         set((state) => ({ studentEventsCollapsed: !state.studentEventsCollapsed })),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setTheme: (theme) => set({ theme }),
-      toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+      toggleTheme: () => set((state) => ({ theme: alternateTheme(state.theme) })),
       setImmersive: (immersive) => set({ immersive }),
     }),
     {

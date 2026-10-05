@@ -27,6 +27,18 @@ Bei Formatierungsfehlern: `npm run format`. Bei Lint-Fehlern: `npm run lint:fix`
   (`bg-surface`, `text-muted`, `border-line`, `rounded-xl` …).
 - **Komponenten brauchen Accessible Names.** Icon-Buttons bekommen `aria-label`, Landmarks werden
   benannt. Die Tests greifen über Rollen und Namen zu, nicht über `data-testid`.
+- **Notizen sind Markdown-Dateien.** Der Editor-Schema-Aufbau steht in
+  `src/features/documents/lib/markdown.ts` (`noteExtensions`). Eine neue Tiptap-Extension
+  ohne Markdown-Spec wird beim Speichern stillschweigend verworfen — jede Erweiterung bringt
+  einen Roundtrip-Test in `markdown.test.ts` mit.
+- **Eigene Block-Tokenizer melden ihren Start über `lineStart()`** aus
+  `src/features/documents/lib/markdownTokens.ts`: marked übergibt `start` den Text ab dem
+  zweiten Zeichen, `^` mit `m`-Flag träfe sonst escapte Syntax wie `\$$`. Zeichen, die neue
+  Syntax öffnen könnten (z. B. `$` für Formeln), escapt `escapeMarkdownText` in `markdown.ts`.
+- **Editor-Erweiterungen ohne Schema gehören nicht in `noteExtensions`.** Reine Dekorationen und
+  Plugins (Fokusmodus, Suche im Dokument, `/`-Menü) hängt `StudyEditor` an. Sie dürfen den
+  Dokumentinhalt nie verändern. Seitenstil (Schrift, Breite, Hintergrund) ist App-Einstellung im
+  `noteStyleStore` und wird nie in die Datei geschrieben.
 - **TypeScript bleibt bei 5.9.** TypeScript 7 (nativer Compiler) exportiert die klassische
   Compiler-API nicht mehr, `typescript-eslint` verlangt aber `<6.1.0`. Erst hochziehen, wenn
   typescript-eslint TS 7 unterstützt.
@@ -49,6 +61,9 @@ src/components/   ui/ (Button, IconButton, Tooltip, PageHeader)
 src/features/     Ein Ordner pro fachlichem Feature, siehe Regel oben, z.B.:
                   calendar/  {components,store,lib}/ + index.ts
                   dashboard/ {components,lib}/ + index.ts
+                  documents/ {components,lib}/ + index.ts
+                  courses/   {components,store,lib}/ + index.ts — ILIAS-Kurse; Kursdateien
+                             landen in Documents (siehe docs/integrations/ilias-course-files.md)
                   reminders/ {components,store,lib}/
                   integrations/ {components,store,lib}/ — ILIAS in der App (siehe
                                 docs/ilias-window.md); SOAP-Connector noch Prototyp

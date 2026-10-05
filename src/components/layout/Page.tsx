@@ -10,6 +10,11 @@ interface PageProps {
   children?: ReactNode;
   hideHeader?: boolean;
   /**
+   * The page's own toolbar says what it is, and the header bar names it too:
+   * title and subtitle stay for screen readers and take no room.
+   */
+  quietTitle?: boolean;
+  /**
    * The page is exactly as tall as the window and scrolls inside itself.
    *
    * Opt-in, because it works by dropping the automatic minimum height a flex
@@ -23,11 +28,24 @@ interface PageProps {
  * Shared page frame. Title and subtitle come from the navigation config so the
  * sidebar, header and page can never drift apart.
  */
-export function Page({ item, children, hideHeader = false, fill = false }: PageProps) {
+export function Page({
+  item,
+  children,
+  hideHeader = false,
+  quietTitle = false,
+  fill = false,
+}: PageProps) {
+  const visibleHeader = !hideHeader && !quietTitle;
   return (
-    <div className={cn('flex flex-1 flex-col', !hideHeader && 'gap-7', fill && 'min-h-0')}>
-      {!hideHeader ? (
+    <div className={cn('flex flex-1 flex-col', visibleHeader && 'gap-7', fill && 'min-h-0')}>
+      {visibleHeader ? (
         <PageHeader title={item.label} subtitle={item.subtitle} icon={item.icon} tone={item.tone} />
+      ) : null}
+      {quietTitle && !hideHeader ? (
+        <div className="sr-only">
+          <h1>{item.label}</h1>
+          <p>{item.subtitle}</p>
+        </div>
       ) : null}
       {children ?? <PagePlaceholder>{item.placeholder}</PagePlaceholder>}
     </div>

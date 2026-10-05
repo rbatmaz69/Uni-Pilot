@@ -338,6 +338,11 @@ Offen ist außerdem, ob WebDAV bei OIDC-Anmeldung überhaupt funktioniert — We
 HTTP-Basic, und ein OIDC-Konto hat kein Basic-taugliches Passwort. 🔴 **Das ist der lohnendste
 nächste Messpunkt**, weil es Dateizugriff ohne SOAP bedeuten würde.
 
+> **Nachtrag 25.09.2026:** Zwei Punkte dieses Abschnitts sind überholt. Die Messung
+> `/webdav.php/hhn/` fragte einen Client ab, den es nicht gibt (richtig: `iliashhn`), und ILIAS 9
+> akzeptiert für WebDAV unter Umständen die bestehende Sitzung statt eines Passworts. Siehe
+> [`ilias-sync-research.md` §5.6](ilias-sync-research.md#56-webdav-revisited).
+
 ### 4.8 Import/Export
 
 ILIAS kann Kurse und Lernmodule als XML/ZIP exportieren (`components/ILIAS/Export`). 📘 Das ist ein
@@ -1051,6 +1056,11 @@ Tauri hat offene Fehlermeldungen zur Positionierung solcher Ansichten.
 
 Der entscheidende Punkt ist nicht die Fragilität, sondern die Authentifizierung: Scraping bei
 OIDC-SSO bedeutet zwingend Passwortspeicherung. Das ist der Grund, warum es ausscheidet.
+
+> **Nachtrag 25.09.2026:** Dieser Grund gilt nicht mehr. Seit es die eingebettete ILIAS-Ansicht
+> gibt, meldet sich die Studentin oder der Student dort selbst an, und Rust kann die bestehende
+> Sitzung nutzen, ohne je ein Passwort zu sehen. Die Neubewertung steht in
+> [`ilias-sync-research.md`](ilias-sync-research.md).
 
 ---
 

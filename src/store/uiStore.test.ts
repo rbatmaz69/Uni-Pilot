@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { useUiStore } from './uiStore';
+import type { ThemeName } from '@/lib/theme';
 
 const state = () => useUiStore.getState();
 
@@ -30,5 +31,33 @@ describe('uiStore', () => {
 
     const stored: unknown = JSON.parse(localStorage.getItem('uni-pilot.ui') ?? '{}');
     expect(stored).toMatchObject({ state: { sidebarCollapsed: true } });
+  });
+
+  it.each(['flexoki-light', 'flexoki-dark'] as const)(
+    'restores the saved %s theme after rehydration',
+    async (theme) => {
+      state().setTheme(theme);
+      const saved = localStorage.getItem('uni-pilot.ui')!;
+      expect(JSON.parse(saved)).toMatchObject({ state: { theme } });
+
+      useUiStore.setState({ theme: 'light' });
+      localStorage.setItem('uni-pilot.ui', saved);
+      await useUiStore.persist.rehydrate();
+
+      expect(state().theme).toBe(theme);
+    },
+  );
+
+  it.each<[ThemeName, ThemeName]>([
+    ['light', 'dark'],
+    ['dark', 'light'],
+    ['flexoki-light', 'flexoki-dark'],
+    ['flexoki-dark', 'flexoki-light'],
+  ])('toggles %s to %s without changing the palette', (from, to) => {
+    state().setTheme(from);
+    state().toggleTheme();
+    expect(state().theme).toBe(to);
+    state().toggleTheme();
+    expect(state().theme).toBe(from);
   });
 });

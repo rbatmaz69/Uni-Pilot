@@ -9,15 +9,26 @@ import {
   resetIliasBrowserListening,
   useIliasBrowserStore,
 } from '@/features/integrations/store/iliasBrowserStore';
+import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
+import {
+  resetCourseFilesListening,
+  useCourseFilesStore,
+} from '@/features/courses/store/courseFilesStore';
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useUiStore } from '@/store/uiStore';
+import { useFocusStore } from '@/features/focus/store/focusStore';
 
 // Tests provide their own calendar fixtures, including on the first run.
 beforeEach(() => useEventStore.setState({ events: [] }));
 
+/** jsdom ships no media playback at all, so autoplaying video would only log errors. */
+HTMLMediaElement.prototype.play = () => Promise.resolve();
+HTMLMediaElement.prototype.load = () => {};
+
 afterEach(() => {
   cleanup();
+  useFocusStore.setState(useFocusStore.getInitialState(), true);
   localStorage.clear();
   useEventStore.setState({ events: [] });
   useReminderStore.setState({
@@ -37,4 +48,25 @@ afterEach(() => {
   useTaskStore.setState({ tasks: [] });
   useIliasBrowserStore.setState({ history: NO_HISTORY, downloads: [] });
   resetIliasBrowserListening();
+  useCourseFilesStore.setState({
+    installation: null,
+    folders: null,
+    syncing: {},
+    reports: {},
+    failures: {},
+    saving: {},
+  });
+  resetCourseFilesListening();
+  useNoteStyleStore.setState({
+    style: 'standard',
+    layout: 'pages',
+    zoom: 1,
+    font: 'inter',
+    textSize: 'm',
+    lineSpacing: 'normal',
+    paper: 'dotted',
+    sound: true,
+    boldColor: 'default',
+    bookmarks: {},
+  });
 });

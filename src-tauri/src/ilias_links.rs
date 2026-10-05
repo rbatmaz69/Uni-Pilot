@@ -57,7 +57,7 @@ fn classify(home: &Url, link: &Url) -> Destination {
 
 /// Whether a response is a page to show rather than a file to save. Anything
 /// but a plain success is shown too, so ILIAS can say what went wrong itself.
-fn is_page(status: u16, content_type: Option<&str>, disposition: Option<&str>) -> bool {
+pub(crate) fn is_page(status: u16, content_type: Option<&str>, disposition: Option<&str>) -> bool {
     if !(200..300).contains(&status) {
         return true;
     }
@@ -97,7 +97,7 @@ fn percent_decode(value: &str) -> String {
 
 /// The file name in a `Content-Disposition` header. `filename*` (RFC 6266,
 /// UTF-8, percent-encoded) wins over plain `filename`, as in browsers.
-fn file_name_from_disposition(value: &str) -> Option<String> {
+pub(crate) fn file_name_from_disposition(value: &str) -> Option<String> {
     let mut plain = None;
     for part in value.split(';').skip(1) {
         let Some((key, raw)) = part.split_once('=') else {
@@ -126,7 +126,7 @@ fn file_name_from_disposition(value: &str) -> Option<String> {
 }
 
 /// The last path segment, for a file that came without a name.
-fn file_name_from_url(url: &Url) -> String {
+pub(crate) fn file_name_from_url(url: &Url) -> String {
     url.path_segments()
         .and_then(|mut segments| segments.next_back())
         .map(percent_decode)
@@ -202,7 +202,7 @@ async fn fetch_or_show<R: Runtime>(
         .and_then(file_name_from_disposition)
         .unwrap_or_else(|| file_name_from_url(response.url()));
     let key = link.as_str();
-    let path = begin_download(app, key, &suggested).ok_or("There is no Downloads folder.")?;
+    let (path, _) = begin_download(app, key, &suggested).ok_or("There is no Downloads folder.")?;
     let saved = save(&mut response, &path).await;
     if saved.is_err() {
         // A half-written file would look like the real thing.
@@ -212,7 +212,7 @@ async fn fetch_or_show<R: Runtime>(
     saved
 }
 
-async fn save(response: &mut reqwest::Response, path: &Path) -> Result<(), String> {
+pub(crate) async fn save(response: &mut reqwest::Response, path: &Path) -> Result<(), String> {
     let mut file = std::fs::File::create(path).map_err(|error| error.to_string())?;
     while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
         file.write_all(&chunk).map_err(|error| error.to_string())?;

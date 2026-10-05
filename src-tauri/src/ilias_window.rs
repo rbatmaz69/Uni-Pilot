@@ -124,6 +124,24 @@ pub(crate) fn resolve_target(
     Ok(url)
 }
 
+/// A page of the configured installation with the given query, checked the
+/// same way as `resolve_target`. For the sync, which names pages itself
+/// rather than taking links from outside.
+pub(crate) fn installation_page(
+    base_url: &str,
+    client_id: &str,
+    page: &str,
+    pairs: &[(&str, &str)],
+) -> Result<Url, String> {
+    let base = parse_base(base_url)?;
+    if !is_client_id(client_id) {
+        return Err("That ILIAS client name contains characters it should not.".into());
+    }
+    let mut all = pairs.to_vec();
+    all.push(("client_id", client_id));
+    Ok(with_query(&base, page, &all))
+}
+
 fn parse_base(base_url: &str) -> Result<Url, String> {
     let url = Url::parse(base_url.trim())
         .map_err(|_| "The ILIAS address is not a web address.".to_string())?;
