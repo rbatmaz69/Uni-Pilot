@@ -1,6 +1,6 @@
 # University mail in Uni Pilot
 
-Open **Inbox** in the sidebar. On a Mac with the university account set up in Apple Mail, Uni Pilot shows that inbox: sorted by who wrote and which course it is about, readable in place, answered in Mail.
+Open **Inbox** in the sidebar. On a Mac with the university account set up in Apple Mail, Uni Pilot shows that inbox: sorted by who wrote and which course it is about, readable in place, answered in Mail. New messages can be sent from Uni Pilot itself, through Mail.
 
 ## How it works
 
@@ -30,7 +30,11 @@ The first time, macOS asks whether Uni Pilot may control Mail (System Settings �
 
 - **Read what the Inbox shows, nothing more.** The newest 50 messages with a one-line preview and up to three attachment names each, and the full text of the message the student opens. On this Mac, in memory only — no message is stored or passed on. Kept on disk: the chosen account, list or board, and the triage (Needs reply / Waiting / Done) by Message-ID.
 - **Listing marks nothing read.** Opening a message in the pane marks it read in Mail, as Mail would; **Mark as unread** undoes it.
-- **Uni Pilot never sends.** Reply, New message and "Email about this" on a course's assignment open a draft in Mail. The student reads it there and presses Send there. The script has no send; `appleMailScript.test.ts` fails if it ever calls one.
+- **Uni Pilot sends only what the student confirmed.** New message and "Email about this" on a course's assignment offer two ways: **Open draft in Mail**, to finish and send it there, or **Send…**, which asks once more — who gets it, from which address — before **Send now** has Mail send it. Mail signs in for it, as it does for reading; Uni Pilot still never talks to Microsoft.
+  - Sending needs the university address as sender and at least one recipient; Rust refuses a message without either, so it never goes out from Mail's default (perhaps private) account.
+  - A reply always opens as a draft in Mail: Mail may not take the typed text into its reply window, and a reply without it should not go out.
+  - Offline, Mail keeps the message in its Outbox and sends it later. If Mail does not take it at all, it opens as a draft instead. If Mail stops answering mid-send, the page says the message may have gone out, and to look in Sent before sending again.
+  - Only the script's `send` command calls Mail's `send`; `appleMailScript.test.ts` fails if any other command does.
 - **Links in a message are not links.** The text is shown as text; a link followed inside Uni Pilot's window would navigate the app itself away. Open the message in Mail to follow one.
 - **Mail is not started unasked.** If it is closed, the page offers to open it.
 

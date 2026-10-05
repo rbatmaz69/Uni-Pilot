@@ -73,6 +73,11 @@ interface MailState {
    * account with an address at `domain` — the university's.
    */
   refresh: (domain: string | null) => Promise<void>;
+  /**
+   * Finds the account to send from, as `refresh` would, without reading its
+   * inbox — for a message written away from the Inbox.
+   */
+  findAccount: (domain: string | null) => Promise<void>;
   /** Fills in previews for listed messages, a few at a time, after the list is up. */
   loadPreviews: () => Promise<void>;
   chooseAccount: (name: string | null) => void;
@@ -183,6 +188,14 @@ export const useMailStore = create<MailState>()(
             set({ failure: toMailFailure(cause) });
           } finally {
             set({ loading: false });
+          }
+        },
+
+        findAccount: async (domain) => {
+          try {
+            await accountToRead(domain);
+          } catch {
+            // Without it the message can still go to Mail as a draft.
           }
         },
 

@@ -11,8 +11,10 @@
 //   messages, a one-line preview for some of them, and the whole text of the
 //   one message the student opened. Listing marks nothing read; only
 //   `markRead` does, and only when the student opened or asked.
-// - Write drafts only. `compose` and `reply` open a window in Mail; the
-//   student sends from there. No command here ever calls `send`.
+// - Write drafts, and send only when told to. `compose` and `reply` open a
+//   window in Mail; the student sends from there. `send` is the one command
+//   that calls Mail's `send`: a new message the student wrote and confirmed
+//   in Uni Pilot — never a reply, whose text Mail may not have taken.
 //
 // Every property read is an Apple Event, a round trip to Mail, and Mail
 // answers them one at a time — a click on a message waits behind whatever was
@@ -211,6 +213,21 @@ function oneByOne(box, limit) {
   return listed;
 }
 
+/** A new message from what the student wrote; `visible` opens its window. */
+function newMessage(Mail, input, visible) {
+  const message = Mail.OutgoingMessage({
+    subject: input.subject,
+    content: input.body,
+    visible,
+  });
+  Mail.outgoingMessages.push(message);
+  if (input.from) message.sender = input.from;
+  for (const address of input.to) {
+    message.toRecipients.push(Mail.ToRecipient({ address }));
+  }
+  return message;
+}
+
 function handle(Mail, command, input) {
   // Asking Mail anything would start it. Uni Pilot does not start Mail on its
   // own; the page offers to.
@@ -316,18 +333,22 @@ function handle(Mail, command, input) {
     }
 
     case 'compose': {
-      const message = Mail.OutgoingMessage({
-        subject: input.subject,
-        content: input.body,
-        visible: true,
-      });
-      Mail.outgoingMessages.push(message);
-      if (input.from) message.sender = input.from;
-      for (const address of input.to) {
-        message.toRecipients.push(Mail.ToRecipient({ address }));
-      }
+      newMessage(Mail, input, true);
       Mail.activate();
       return { ok: true };
+    }
+
+    case 'send': {
+      // Built without a window, so Mail stays where the student left it.
+      const message = newMessage(Mail, input, false);
+      if (safely(() => message.send(), false) === true) return { ok: true, sent: true };
+      // Mail did not take it. Show it as a draft, so nothing typed is lost.
+      safely(() => {
+        message.visible = true;
+        return true;
+      }, false);
+      Mail.activate();
+      return { ok: true, sent: false };
     }
 
     default:

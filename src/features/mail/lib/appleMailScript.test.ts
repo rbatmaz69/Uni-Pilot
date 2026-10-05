@@ -2,7 +2,7 @@
  * The script Uni Pilot asks Apple Mail with (`src-tauri/src/apple_mail.js`),
  * run against a stand-in for Mail. CI has no Mail; these tests hold the
  * script to its rules instead: read what the Inbox shows, mark read only when
- * asked, and open drafts — never send.
+ * asked, and open drafts — sending only through `send`, never anywhere else.
  */
 
 import { runInNewContext } from 'node:vm';
@@ -45,13 +45,19 @@ interface Outgoing {
   visible: boolean;
   sender?: string;
   toRecipients: { address: string }[];
-  send: () => never;
+  sent: boolean;
+  send: () => boolean;
 }
 
 interface FakeOptions {
   running?: boolean;
   /** Whether Mail filters by date — when not, the script has to list the slow way. */
   filtersByDate?: boolean;
+  /**
+   * What Mail answers when the script sends. Left out, sending fails the test:
+   * only a test of `send` expects it.
+   */
+  sendAnswer?: boolean;
 }
 
 /** JXA element arrays can be called for their items and still have a length. */
@@ -197,13 +203,21 @@ function fakeMail(accounts: FakeAccount[], options: FakeOptions = {}) {
       return draft;
     },
     outgoingMessages,
-    OutgoingMessage: (properties: { subject: string; content: string; visible: boolean }) => ({
-      ...properties,
-      toRecipients: [] as { address: string }[],
-      send: (): never => {
-        throw new Error('The script sent a message. It must only ever open a draft.');
-      },
-    }),
+    OutgoingMessage: (properties: { subject: string; content: string; visible: boolean }) => {
+      const message: Outgoing = {
+        ...properties,
+        toRecipients: [],
+        sent: false,
+        send: () => {
+          if (options.sendAnswer === undefined) {
+            throw new Error('The script sent a message. Only `send` may, when asked to.');
+          }
+          message.sent = options.sendAnswer;
+          return options.sendAnswer;
+        },
+      };
+      return message;
+    },
     ToRecipient: (properties: { address: string }) => properties,
   };
   return { mail, events, outgoingMessages, replies };
@@ -495,6 +509,7 @@ describe('writing through Apple Mail', () => {
       visible: true,
       sender: 'student@stud.hs-heilbronn.de',
       toRecipients: [{ address: 'prof@hs-heilbronn.de' }],
+      sent: false,
     });
   });
 
@@ -503,5 +518,38 @@ describe('writing through Apple Mail', () => {
     const sly = `"); Application('Mail').outgoingMessages[0].send(); ("`;
     ask(mail, 'compose', { from: null, to: [], subject: sly, body: sly });
     expect(outgoingMessages[0]?.subject).toBe(sly);
+    expect(outgoingMessages[0]?.sent).toBe(false);
+  });
+
+  it('sends a confirmed message from the university address, without a window', () => {
+    const { mail, outgoingMessages } = fakeMail([hhn()], { sendAnswer: true });
+    const answer = ask(mail, 'send', {
+      from: 'student@stud.hs-heilbronn.de',
+      to: ['prof@hs-heilbronn.de'],
+      subject: 'Datenbanken 1 – Blatt 4',
+      body: 'Guten Tag,',
+    });
+    expect(answer).toEqual({ ok: true, sent: true });
+    expect(outgoingMessages).toHaveLength(1);
+    expect(outgoingMessages[0]).toMatchObject({
+      subject: 'Datenbanken 1 – Blatt 4',
+      content: 'Guten Tag,',
+      visible: false,
+      sender: 'student@stud.hs-heilbronn.de',
+      toRecipients: [{ address: 'prof@hs-heilbronn.de' }],
+      sent: true,
+    });
+  });
+
+  it('shows the message as a draft when Mail does not send it', () => {
+    const { mail, outgoingMessages } = fakeMail([hhn()], { sendAnswer: false });
+    const answer = ask(mail, 'send', {
+      from: 'student@stud.hs-heilbronn.de',
+      to: ['prof@hs-heilbronn.de'],
+      subject: 'Frage',
+      body: 'Guten Tag,',
+    });
+    expect(answer).toEqual({ ok: true, sent: false });
+    expect(outgoingMessages[0]).toMatchObject({ visible: true, sent: false });
   });
 });

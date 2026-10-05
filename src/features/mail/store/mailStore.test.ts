@@ -154,6 +154,21 @@ describe('the mail store', () => {
     expect(calls('mail_inbox')).toHaveLength(2);
   });
 
+  it('finds the account to send from without reading its inbox', async () => {
+    answer(() => Promise.resolve({}));
+    await useMailStore.getState().findAccount('hs-heilbronn.de');
+
+    expect(useMailStore.getState().account).toBe('HHN');
+    expect(calls('mail_inbox')).toHaveLength(0);
+  });
+
+  it('finds no account quietly when Mail cannot say', async () => {
+    invoke.mockRejectedValue({ kind: 'notRunning' });
+    await useMailStore.getState().findAccount('hs-heilbronn.de');
+
+    expect(useMailStore.getState()).toMatchObject({ account: null, accounts: null, failure: null });
+  });
+
   it('asks for the accounts again when the chosen one is gone from Mail', async () => {
     useMailStore.setState({ account: 'Old', accounts: [{ name: 'Old', addresses: [] }] });
     answer(() => Promise.resolve({}));

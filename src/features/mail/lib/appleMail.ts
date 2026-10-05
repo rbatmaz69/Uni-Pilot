@@ -5,8 +5,8 @@
  * which is signed in to Microsoft 365 already. The page asks Rust; Rust asks
  * Mail; nothing talks to Microsoft. What comes back is the overview with a
  * one-line preview, and the text of the message the student opens — held in
- * memory, never stored. What goes the other way is a draft for Mail to open.
- * Sending is always the student's click, in Mail.
+ * memory, never stored. What goes the other way is a draft for Mail to open,
+ * or a new message the student confirmed sending here — Mail sends it.
  */
 
 export interface MailAccount {
@@ -187,4 +187,12 @@ export function replyInMail(account: string, message: MessageRef, text?: string)
 /** Opens a filled-in message in Mail. The student sends it. */
 export function composeInMail(draft: MailDraft): Promise<void> {
   return call('mail_compose', { draft });
+}
+
+/**
+ * Has Mail send a new message the student confirmed. Answers whether Mail took
+ * it; when it did not, Mail shows it as a draft instead.
+ */
+export function sendWithMail(draft: MailDraft): Promise<boolean> {
+  return call('mail_send', { draft });
 }
