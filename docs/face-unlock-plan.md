@@ -23,7 +23,7 @@ for them — no password, no authenticator code.
 1. **The team agrees to change a rule.** `docs/ilias-window.md` says: _"Uni Pilot never injects
    script into ILIAS … nothing that … fills in the login form"_ and _"Not stored anywhere by
    Uni Pilot: no password, no token, no session id."_ This feature stores the password and the
-   authenticator secret. Refik owns the earlier ILIAS work and has to sign off. The webview
+   authenticator secret. Refik owns the earlier ILIAS work and signed off on 05.10.2026. The webview
    still gets no script: Rust signs in over HTTP (§4.3), so the first sentence of the rule can stay.
 2. **HHN's rules.** Check whether HHN allows keeping the authenticator secret in an app. If not,
    the feature can still ship for the password alone (student types the code) — see §11 Q4.
@@ -598,7 +598,7 @@ Linux and camera-less setups nothing new, but makes the Phase 3 button shippable
 
 | #   | Question                                                                                                                                                             | Who            | Blocks  |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------- |
-| Q1  | Team sign-off on storing the password and authenticator secret                                                                                                       | Ermir + Refik  | merge   |
+| Q1  | ~~Team sign-off on storing the password and authenticator secret~~ Given: Refik signed off (05.10.2026)                                                              | Ermir + Refik  | —       |
 | Q2  | HHN's code page and any page in between                                                                                                                              | Ermir (Safari) | Phase 2 |
 | Q3  | How long does HHN's Keycloak session last (idle / max)?                                                                                                              | measure        | —       |
 | Q4  | May students keep the authenticator secret in an app (HHN rules)?                                                                                                    | HHN IT         | ship    |
