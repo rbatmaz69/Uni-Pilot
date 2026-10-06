@@ -8,7 +8,7 @@ import {
   type DocumentEntry,
   type DocumentPreviewData,
 } from '../lib/files';
-import { loadNotePreview, loadPreview } from '../lib/previewCache';
+import { loadNotePreview, loadThumbnail } from '../lib/previewCache';
 import { DocumentThumbnail } from './DocumentThumbnail';
 import { NoteVisualPreview } from './NoteVisualPreview';
 
@@ -45,7 +45,7 @@ export const FolderArtwork = memo(function FolderArtwork({
                 !/\.pdf$/i.test(child.name) &&
                 child.size <= 12 * 1024 * 1024
               )
-                return { entry: child, media: await loadPreview(child) };
+                return { entry: child, media: await loadThumbnail(child) };
             } catch {
               // An unavailable preview must never prevent opening the folder.
             }

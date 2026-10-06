@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +6,7 @@ import { IliasOverview } from '@/features/documents/components/IliasOverview';
 import { documentRequest, type IliasCourse, type IliasFile } from '@/features/documents/lib/files';
 import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
+import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import type { IliasCourse as ListedCourse } from '@/features/integrations/lib/iliasSync';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
@@ -57,27 +58,48 @@ const listed = (refId: string, title: string, online = true): ListedCourse => ({
   properties: [],
 });
 
+const HHN: IliasConnection = {
+  name: 'Hochschule Heilbronn',
+  baseUrl: 'https://ilias.hs-heilbronn.de',
+  clientId: 'iliashhn',
+  version: '9.23',
+  signIn: 'both',
+  soap: 'blocked',
+  checkedAt: '2026-09-25T10:00:00.000Z',
+};
+const { loadCourses } = useCourseStore.getState();
+const { load } = useCourseFilesStore.getState();
+
 beforeEach(() => {
   Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
   vi.mocked(documentRequest).mockResolvedValue({ root: '/workspace', entries: [] });
   useIliasStore.setState({ connection: null });
   useCourseStore.setState({ courses: null, loading: {}, failure: null });
-  useCourseFilesStore.setState({ folders: null, syncing: {}, failures: {} });
+  useCourseFilesStore.setState({ folders: null, syncing: {}, failures: {}, waiting: [] });
 });
 
 afterEach(() => {
   Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+  useCourseStore.setState({ loadCourses });
+  useCourseFilesStore.setState({ load });
 });
 
 function renderOverview(courses: IliasCourse[] | null = kept) {
   const onOpen = vi.fn();
   const onAddCourse = vi.fn();
+  const onAddAllCourses = vi.fn();
   render(
     <MemoryRouter>
-      <IliasOverview courses={courses} course={null} onOpen={onOpen} onAddCourse={onAddCourse} />
+      <IliasOverview
+        courses={courses}
+        course={null}
+        onOpen={onOpen}
+        onAddCourse={onAddCourse}
+        onAddAllCourses={onAddAllCourses}
+      />
     </MemoryRouter>,
   );
-  return { user: userEvent.setup(), onOpen, onAddCourse };
+  return { user: userEvent.setup(), onOpen, onAddCourse, onAddAllCourses };
 }
 
 describe('ILIAS overview', () => {
@@ -120,6 +142,37 @@ describe('ILIAS overview', () => {
         'Arbeitssicherheit 2024 WS',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('adds every course at once, and shows which wait their turn', async () => {
+    useIliasStore.setState({ connection: HHN });
+    // Reading ILIAS is the stores' business; here the list is already read.
+    useCourseStore.setState({ loadCourses: vi.fn(() => Promise.resolve()) });
+    useCourseFilesStore.setState({ load: vi.fn(() => Promise.resolve()) });
+    const courses = [
+      listed('7', '262009 Datenbanken 1 - WS26'),
+      listed('9', '262147 Informationssicherheit'),
+      listed('11', 'Betriebssysteme'),
+      listed('10', 'Arbeitssicherheit 2024 WS', false),
+    ];
+    useCourseStore.setState({
+      courses: { items: courses, loadedAt: '2026-09-28T10:00:00.000Z' },
+    });
+    const { user, onAddAllCourses } = renderOverview();
+
+    // The two online courses not in Documents yet; the offline one is not offered.
+    await user.click(screen.getByRole('button', { name: 'Add all 2 courses' }));
+    expect(onAddAllCourses).toHaveBeenCalledTimes(1);
+
+    act(() => useCourseFilesStore.setState({ syncing: { '9': null }, waiting: [courses[2]!] }));
+    const row = screen.getByRole('list', { name: 'Your courses' });
+    const card = (name: string) => screen.getByRole('link', { name }).closest('li')!;
+    expect(within(card('Informationssicherheit')).getByRole('status')).toHaveTextContent(
+      'Adding to Documents…',
+    );
+    expect(within(card('Betriebssysteme')).getByRole('status')).toHaveTextContent('Waiting…');
+    expect(within(row).queryByRole('button', { name: 'Add to Documents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1 waiting to be added…' })).toBeDisabled();
   });
 
   it('shows how far a course being added has come', () => {

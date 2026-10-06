@@ -9,6 +9,7 @@ mod ilias_view;
 mod ilias_window;
 mod mail_cache;
 mod notch;
+mod preview_cache;
 mod reminders;
 mod vault;
 use tauri::Manager;
@@ -21,6 +22,8 @@ pub fn run() {
             reminders::reminder_request,
             documents::document_request,
             documents::document_upload,
+            preview_cache::preview_cache_read,
+            preview_cache::preview_cache_write,
             ilias_window::open_ilias,
             ilias_view::enter_ilias_mode,
             ilias_view::leave_ilias_mode,

@@ -1,8 +1,11 @@
 import {
   documentRequest,
+  keepThumbnail,
+  readKeptThumbnail,
   type DocumentEntry,
   type DocumentPreviewData,
 } from '@/features/documents/lib/files';
+import { renderThumbnail } from '@/features/documents/lib/thumbnail';
 import { slicePreviewText } from './previewText';
 
 // Base64 characters kept in memory before the least recently used are dropped.
@@ -60,17 +63,33 @@ function createCache<T>(weigh: (value: T) => number) {
 }
 
 const previews = createCache<DocumentPreviewData>((data) => data.base64.length);
+const thumbnails = createCache<DocumentPreviewData>((data) => data.base64.length);
 const excerpts = createCache<string>((text) => text.length);
 const notePreviews = createCache<string>((text) => text.length);
 
 // A changed file has a new modification time or size, and so a new key.
 const version = (entry: DocumentEntry) => `${entry.path}\n${entry.modified}\n${entry.size}`;
 
-/** Preview bytes for a file, read again only after the file changes. */
-export function loadPreview(entry: DocumentEntry) {
-  return previews.get(version(entry), () =>
-    documentRequest<DocumentPreviewData>({ action: 'preview', path: entry.path }),
-  );
+/**
+ * What a card shows for a PDF or picture: its first page or the picture
+ * scaled down, drawn once and then kept on disk. Later, also after a restart,
+ * the card appears without reading the file, which macOS may first have to
+ * fetch from iCloud. When the webview cannot draw it, the file's own bytes.
+ */
+export function loadThumbnail(entry: DocumentEntry) {
+  return thumbnails.get(version(entry), async () => {
+    const kept = await readKeptThumbnail(entry).catch(() => null);
+    if (kept) return kept;
+    const source = await documentRequest<DocumentPreviewData>({
+      action: 'preview',
+      path: entry.path,
+    });
+    const image = await renderThumbnail(source).catch(() => null);
+    if (!image) return source;
+    // Only a nicety: the card shows the image whether or not it was kept.
+    keepThumbnail(entry, image.base64).catch(() => undefined);
+    return image;
+  });
 }
 
 /** Pasted images get unique names and are never rewritten, so the path is enough. */
@@ -99,6 +118,7 @@ export function loadNotePreview(entry: DocumentEntry) {
 
 export function clearPreviewCache() {
   previews.clear();
+  thumbnails.clear();
   excerpts.clear();
   notePreviews.clear();
 }

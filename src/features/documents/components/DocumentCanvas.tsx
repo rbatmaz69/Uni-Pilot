@@ -33,7 +33,7 @@ import {
 } from '@/features/documents/lib/files';
 import { IliasBadge } from '@/features/integrations';
 import { folderTone } from '@/features/documents/lib/folderTone';
-import { loadNotePreview, loadPreview } from '@/features/documents/lib/previewCache';
+import { loadNotePreview, loadThumbnail } from '@/features/documents/lib/previewCache';
 import {
   packFolder,
   outsideFolder,
@@ -805,7 +805,7 @@ export function DocumentCanvas({
           try {
             return {
               path: entry.path,
-              data: editable(entry) ? await loadNotePreview(entry) : await loadPreview(entry),
+              data: editable(entry) ? await loadNotePreview(entry) : await loadThumbnail(entry),
             };
           } catch {
             return null;

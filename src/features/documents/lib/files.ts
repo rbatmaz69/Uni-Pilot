@@ -112,6 +112,21 @@ export function uploadDocument<T = void>(upload: DocumentUpload, bytes: Uint8Arr
   });
 }
 
+/** A file as the explorer lists it; names its kept card image (src-tauri/src/preview_cache.rs). */
+type FileVersion = Pick<DocumentEntry, 'path' | 'modified' | 'size'>;
+
+const versionOf = ({ path, modified, size }: FileVersion) => ({ path, modified, size });
+
+/** The card image kept for this version of a file, or null when there is none yet. */
+export function readKeptThumbnail(entry: FileVersion): Promise<DocumentPreviewData | null> {
+  return invoke<DocumentPreviewData | null>('preview_cache_read', { version: versionOf(entry) });
+}
+
+/** Keeps a card image for this version of a file, outside iCloud, across restarts. */
+export function keepThumbnail(entry: FileVersion, base64: string): Promise<void> {
+  return invoke('preview_cache_write', { version: versionOf(entry), base64 });
+}
+
 export function editable(entry: DocumentEntry) {
   return !entry.folder && /\.(md|markdown|txt)$/i.test(entry.name);
 }
