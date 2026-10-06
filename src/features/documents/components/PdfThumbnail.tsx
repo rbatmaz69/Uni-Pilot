@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { getDocument, GlobalWorkerOptions, type RenderTask } from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import type { RenderTask } from 'pdfjs-dist';
 import type { PreviewSize } from '@/features/documents/lib/folderLayout';
+import { openPdf } from '@/features/documents/lib/pdf';
 import { pdfCoverScale } from '@/features/documents/lib/pdfCover';
-
-GlobalWorkerOptions.workerSrc = workerUrl;
 
 export function PdfThumbnail({
   base64,
@@ -21,14 +19,7 @@ export function PdfThumbnail({
   useEffect(() => {
     let active = true;
     let renderTask: RenderTask | undefined;
-    const assets = new URL(`${import.meta.env.BASE_URL}pdfjs/`, window.location.href).href;
-    const task = getDocument({
-      data: Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)),
-      cMapUrl: `${assets}cmaps/`,
-      cMapPacked: true,
-      standardFontDataUrl: `${assets}standard_fonts/`,
-      wasmUrl: `${assets}wasm/`,
-    });
+    const task = openPdf(base64);
 
     task.promise
       .then(async (pdf) => {

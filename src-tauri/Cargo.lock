@@ -5793,6 +5793,7 @@ dependencies = [
  "security-framework 3.7.0",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-http",

@@ -453,7 +453,7 @@ it('defers preview work until the flight ends and keeps slots fixed when image d
     { name: 'Diagram.png', path: 'Biology/Diagram.png', folder: false, size: 100, modified: 1 },
   ];
   const preview = vi
-    .spyOn(previewCache, 'loadPreview')
+    .spyOn(previewCache, 'loadThumbnail')
     .mockResolvedValue({ mime: 'image/png', base64: 'test' });
   try {
     render(
