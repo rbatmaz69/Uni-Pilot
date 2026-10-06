@@ -62,6 +62,10 @@ objc2-app-kit = { version = "0.3", default-features = false, features = ["std", 
 # The Keychain's own error codes, to tell "you clicked Deny" from a broken
 # Keychain (src/vault.rs). The version keyring uses; only named here.
 security-framework = "3"
+# Keeping a course's ILIAS folder out of iCloud Drive: an extended attribute
+# and Finder's hidden flag (src/ilias_sync/mirror/icloud.rs). Already in the
+# tree; only named here.
+libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

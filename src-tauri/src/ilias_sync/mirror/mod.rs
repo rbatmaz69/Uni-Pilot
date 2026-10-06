@@ -17,6 +17,8 @@
 //! - Files larger than `MAX_BYTES` are listed, not downloaded; one click in
 //!   Courses fetches them.
 //! - Folders the student switched off are not read at all.
+//! - The `ILIAS` folder stays on this computer: out of iCloud Drive, so macOS
+//!   never swaps its files for placeholders (`icloud.rs`).
 //!
 //! Downloading a file counts as reading it in ILIAS, as a click there would.
 //! That is why the sync runs only for courses the student chose, and never
@@ -27,6 +29,7 @@
 //! seconds, and ILIAS sees one polite visitor. Progress goes to the page as
 //! `ilias-mirror-progress` events.
 
+mod icloud;
 mod manifest;
 
 use std::collections::{HashSet, VecDeque};
@@ -274,6 +277,7 @@ pub(crate) fn courses(root: &Path) -> Vec<CourseFiles> {
     manifest::find_all(root)
         .into_iter()
         .map(|(folder, manifest)| {
+            icloud::keep_on_this_computer(&folder);
             let base = relative(root, &folder);
             let files: Vec<CourseFile> = manifest
                 .files
@@ -371,6 +375,7 @@ fn locate_or_create(
         .into_iter()
         .find(|(_, manifest)| manifest.belongs_to(installation, &course.ref_id))
     {
+        icloud::keep_on_this_computer(&found.0);
         return Ok(found);
     }
 
@@ -389,6 +394,7 @@ fn locate_or_create(
     let folder_name = manifest::free_name(&course_dir, manifest::FOLDER, &[]);
     let folder = course_dir.join(&folder_name);
     fs::create_dir(&folder).map_err(|error| error.to_string())?;
+    icloud::keep_on_this_computer(&folder);
     let manifest = Manifest::new(installation, &course.ref_id, &course.title);
     manifest::write(&folder, &manifest)?;
     Ok((folder, manifest))
@@ -532,6 +538,7 @@ fn place_file(
 
         let target = resolve(root, &relative(root, &ilias_folder.join(&path)))?;
         fs::rename(partial, &target).map_err(|error| error.to_string())?;
+        icloud::show(&target);
         let meta = fs::metadata(&target).map_err(|error| error.to_string())?;
         manifest.files.insert(
             job.listed.ref_id.clone(),
@@ -647,7 +654,10 @@ pub async fn ilias_mirror_list(
         Ok(manifest::find_all(root)
             .into_iter()
             .filter(|(_, manifest)| manifest.installation == installation)
-            .map(|(folder, manifest)| summary(root, &folder, &manifest))
+            .map(|(folder, manifest)| {
+                icloud::keep_on_this_computer(&folder);
+                summary(root, &folder, &manifest)
+            })
             .collect())
     })
     .await
