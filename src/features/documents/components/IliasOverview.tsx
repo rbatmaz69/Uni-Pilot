@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { EyeOff, File, FileText, GraduationCap, Plus, School } from 'lucide-react';
+import { Download, EyeOff, File, FileText, GraduationCap, Plus, School } from 'lucide-react';
 import { FolderArtwork } from './FolderArtwork';
 import { NewBadge } from './NewBadge';
 import { CourseView } from '@/features/courses/components/CourseView';
@@ -40,6 +40,7 @@ interface IliasOverviewProps {
   course: IliasCourseView | null;
   onOpen: (entry: DocumentEntry) => void;
   onAddCourse: (courseId: string) => void;
+  onAddAllCourses: () => void;
 }
 
 /**
@@ -48,7 +49,13 @@ interface IliasOverviewProps {
  * exercises and whether its files sync. Lists, not a canvas: ILIAS files
  * arrive, the student does not arrange them.
  */
-export function IliasOverview({ courses, course, onOpen, onAddCourse }: IliasOverviewProps) {
+export function IliasOverview({
+  courses,
+  course,
+  onOpen,
+  onAddCourse,
+  onAddAllCourses,
+}: IliasOverviewProps) {
   const connection = useIliasStore((state) => state.connection);
   const desktop = canEmbedIlias();
 
@@ -72,6 +79,7 @@ export function IliasOverview({ courses, course, onOpen, onAddCourse }: IliasOve
           synced={courses}
           onOpen={onOpen}
           onAddCourse={onAddCourse}
+          onAddAllCourses={onAddAllCourses}
         />
       )}
     </section>
@@ -83,17 +91,20 @@ function Overview({
   synced,
   onOpen,
   onAddCourse,
+  onAddAllCourses,
 }: {
   connection: IliasConnection | null;
   synced: IliasCourse[] | null;
   onOpen: (entry: DocumentEntry) => void;
   onAddCourse: (courseId: string) => void;
+  onAddAllCourses: () => void;
 }) {
   const listed = useCourseStore((state) => state.courses);
   const loading = useCourseStore((state) => state.loading.courses === true);
   const loadCourses = useCourseStore((state) => state.loadCourses);
   const loadFolders = useCourseFilesStore((state) => state.load);
   const folders = useCourseFilesStore((state) => state.folders);
+  const waiting = useCourseFilesStore((state) => state.waiting.length);
   const [all, setAll] = useState(false);
 
   useEffect(() => {
@@ -106,6 +117,7 @@ function Overview({
   const cards = courseCards(listed?.items ?? [], kept);
   const offline = offlineCourses(listed?.items ?? [], kept);
   const files = newestFiles(kept);
+  const remote = cards.filter((card) => !card.synced).length;
   const shown = all ? files : files.slice(0, NEWEST);
   const refresh = () => {
     if (connection) void loadCourses(connection);
@@ -158,11 +170,20 @@ function Overview({
               <CourseFolder key={card.refId} card={card} onAdd={onAddCourse} />
             ))}
           </ul>
-          {cards.some((card) => !card.synced) ? (
-            <p className="ilias-overview-hint">
-              Drag a course onto Documents in the dock, or choose Add to Documents. Downloading
-              counts as opening the files in ILIAS.
-            </p>
+          {remote > 0 ? (
+            <div className="ilias-overview-add-all">
+              {connection && remote > 1 ? (
+                <button type="button" disabled={waiting > 0} onClick={onAddAllCourses}>
+                  <Download size={14} aria-hidden />
+                  {waiting > 0 ? `${waiting} waiting to be added…` : `Add all ${remote} courses`}
+                </button>
+              ) : null}
+              <p className="ilias-overview-hint">
+                Drag a course onto Documents in the dock, or choose Add to Documents. Its files are
+                then kept on this Mac, also offline. Downloading counts as opening the files in
+                ILIAS.
+              </p>
+            </div>
           ) : null}
         </>
       )}
@@ -247,6 +268,9 @@ function CourseFolder({ card, onAdd }: { card: CourseCard; onAdd: (courseId: str
     card.refId in state.syncing ? (state.syncing[card.refId] ?? null) : undefined,
   );
   const failure = useCourseFilesStore((state) => state.failures[card.refId]);
+  const waiting = useCourseFilesStore((state) =>
+    state.waiting.some((course) => course.refId === card.refId),
+  );
   const synced = card.synced;
   const unseen = synced?.unseen ?? 0;
   const status = synced
@@ -291,6 +315,10 @@ function CourseFolder({ card, onAdd }: { card: CourseCard; onAdd: (courseId: str
           {progress?.total
             ? `Adding · ${progress.done} of ${progress.total}`
             : 'Adding to Documents…'}
+        </p>
+      ) : waiting ? (
+        <p className="ilias-course-progress" role="status">
+          Waiting…
         </p>
       ) : (
         <button type="button" className="ilias-course-add" onClick={() => onAdd(card.refId)}>

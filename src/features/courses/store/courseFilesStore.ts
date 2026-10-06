@@ -9,7 +9,8 @@
  * Syncing downloads files, which ILIAS counts as reading them. So a course
  * syncs only after the student switched it on, and on its own only while
  * `auto` is on — at most every `AUTO_SYNC_MS`, when the course list was read
- * anyway (`CourseSync`).
+ * anyway (`CourseSync`). `syncAll` switches on every course at once, on the
+ * student's click, and works through them one after another.
  */
 
 import { create } from 'zustand';
@@ -57,10 +58,14 @@ interface CourseFilesState {
   failures: Record<string, CourseFailure>;
   /** Files asked for by a click, by file ref_id. */
   saving: Record<string, FileSaving>;
+  /** Courses waiting their turn behind `syncAll`, in order. */
+  waiting: IliasCourse[];
 
   load: (connection: IliasConnection) => Promise<void>;
   /** Syncs a course now; the first time, this creates its folder and switches on `auto`. */
   sync: (connection: IliasConnection, course: IliasCourse) => Promise<void>;
+  /** Brings every online course not in Documents yet into it, one after another. */
+  syncAll: (connection: IliasConnection, courses: IliasCourse[]) => Promise<void>;
   /** Syncs every `auto` course that is due, one after another. */
   syncDue: (connection: IliasConnection, courses: IliasCourse[], now?: Date) => Promise<void>;
   saveFile: (
@@ -87,13 +92,14 @@ function without<T>(record: Record<string, T>, key: string): Record<string, T> {
 }
 
 let due: Promise<void> | null = null;
+let all: Promise<void> | null = null;
 
 export const useCourseFilesStore = create<CourseFilesState>()((set, get) => {
   /** Resets what was read when the installation changes. */
   function forInstallation(connection: IliasConnection) {
     const installation = hostOf(connection);
     if (get().installation !== installation) {
-      set({ installation, folders: null, reports: {}, failures: {}, saving: {} });
+      set({ installation, folders: null, reports: {}, failures: {}, saving: {}, waiting: [] });
     }
   }
 
@@ -146,6 +152,7 @@ export const useCourseFilesStore = create<CourseFilesState>()((set, get) => {
     reports: {},
     failures: {},
     saving: {},
+    waiting: [],
 
     load: async (connection) => {
       forInstallation(connection);
@@ -162,6 +169,39 @@ export const useCourseFilesStore = create<CourseFilesState>()((set, get) => {
     sync: async (connection, course) => {
       forInstallation(connection);
       await run(connection, course, !get().folders?.[course.refId]);
+    },
+
+    syncAll: async (connection, courses) => {
+      forInstallation(connection);
+      // Which courses are kept decides which are new; never guess it.
+      if (!get().folders) await get().load(connection);
+      const { folders, syncing, waiting } = get();
+      const fresh = courses.filter(
+        (course) =>
+          course.online &&
+          !folders?.[course.refId] &&
+          !(course.refId in syncing) &&
+          !waiting.some((item) => item.refId === course.refId),
+      );
+      if (fresh.length) set((state) => ({ waiting: [...state.waiting, ...fresh] }));
+      all ??= (async () => {
+        try {
+          for (let next = get().waiting[0]; next; next = get().waiting[0]) {
+            set((state) => ({ waiting: state.waiting.slice(1) }));
+            // An ended sign-in fails every course after it, too.
+            if (useCourseStore.getState().failure?.kind === 'session-expired') {
+              set({ waiting: [] });
+              return;
+            }
+            // Added on its own while it waited.
+            if (get().folders?.[next.refId]) continue;
+            await run(connection, next, true);
+          }
+        } finally {
+          all = null;
+        }
+      })();
+      return all;
     },
 
     syncDue: (connection, courses, now = new Date()) => {
@@ -255,4 +295,5 @@ export function listenToCourseFiles(): Promise<void> {
 export function resetCourseFilesListening(): void {
   listening = null;
   due = null;
+  all = null;
 }

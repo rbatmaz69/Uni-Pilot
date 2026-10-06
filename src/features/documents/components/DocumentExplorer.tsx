@@ -59,7 +59,7 @@ import {
   looksSynced,
   type IliasCourseView,
 } from '@/features/documents/lib/iliasSpace';
-import { addCourseToDocuments } from '@/features/documents/lib/addCourse';
+import { addAllCoursesToDocuments, addCourseToDocuments } from '@/features/documents/lib/addCourse';
 import { iliasSpaceLink } from '@/features/courses/lib/courses';
 import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
 import { ILIAS_SPACE, type Space } from '@/features/documents/lib/spaces';
@@ -640,6 +640,7 @@ export function DocumentExplorer({
               course={iliasCourse}
               onOpen={activate}
               onAddCourse={(courseId) => void addCourseToDocuments(courseId)}
+              onAddAllCourses={() => void addAllCoursesToDocuments()}
             />
           )}
           {canvas && (

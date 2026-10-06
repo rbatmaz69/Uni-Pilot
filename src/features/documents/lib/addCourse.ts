@@ -13,3 +13,15 @@ export async function addCourseToDocuments(courseId: string): Promise<void> {
   if (!connection || !course) return;
   await useCourseFilesStore.getState().sync(connection, course);
 }
+
+/**
+ * Brings every course ILIAS lists as online into Documents, one after
+ * another, on the student's one click. Courses already there stay as they
+ * are.
+ */
+export async function addAllCoursesToDocuments(): Promise<void> {
+  const connection = useIliasStore.getState().connection;
+  const courses = useCourseStore.getState().courses?.items;
+  if (!connection || !courses) return;
+  await useCourseFilesStore.getState().syncAll(connection, courses);
+}

@@ -82,6 +82,7 @@ beforeEach(() => {
     reports: {},
     failures: {},
     saving: {},
+    waiting: [],
   });
 });
 
@@ -130,6 +131,76 @@ describe('the course files store', () => {
     expect(useCourseFilesStore.getState().folders?.['100100']?.syncedAt).toBe(
       '2026-10-01T08:00:00Z',
     );
+  });
+
+  it('adds every online course not in Documents yet, one after another', async () => {
+    const course = (refId: string, title: string, online = true): IliasCourse => ({
+      ...COURSE,
+      refId,
+      title,
+      online,
+    });
+    let running = 0;
+    let most = 0;
+    invoke.mockImplementation(async (command, args) => {
+      if (command === 'ilias_mirror_list') return [folder()];
+      const refId = String(
+        (args.course as { refId?: string } | undefined)?.refId ?? args.courseRefId,
+      );
+      const kept = folder({ courseRefId: refId, root: `Courses/${refId}/ILIAS` });
+      if (command === 'ilias_mirror_configure') return { ...kept, auto: true };
+      running += 1;
+      most = Math.max(most, running);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+      return report(kept);
+    });
+    const done = useCourseFilesStore
+      .getState()
+      .syncAll(HHN, [
+        COURSE,
+        course('200', 'Analysis'),
+        course('300', 'Betriebssysteme'),
+        course('400', 'Arbeitssicherheit', false),
+      ]);
+    // A second click while they run adds nothing twice.
+    const again = useCourseFilesStore.getState().syncAll(HHN, [course('300', 'Betriebssysteme')]);
+    await Promise.all([done, again]);
+
+    // The course already kept and the offline one are left alone.
+    expect(calls('ilias_mirror_course').map(([, args]) => args.course)).toEqual([
+      expect.objectContaining({ refId: '200' }),
+      expect.objectContaining({ refId: '300' }),
+    ]);
+    expect(most).toBe(1);
+    // Each is kept in sync from now on, like a course added on its own.
+    expect(calls('ilias_mirror_configure').map(([, args]) => args)).toEqual([
+      expect.objectContaining({ courseRefId: '200', auto: true }),
+      expect.objectContaining({ courseRefId: '300', auto: true }),
+    ]);
+    const state = useCourseFilesStore.getState();
+    expect(Object.keys(state.folders ?? {}).sort()).toEqual(['100100', '200', '300']);
+    expect(state.waiting).toEqual([]);
+    expect(state.syncing).toEqual({});
+  });
+
+  it('stops adding courses once the sign-in has ended', async () => {
+    // Rust rejects with the error's shape, not an Error.
+    const signedOut = vi.fn<() => Promise<unknown>>().mockRejectedValue({ kind: 'signedOut' });
+    invoke.mockImplementation((command) =>
+      command === 'ilias_sync_reauth'
+        ? Promise.resolve(false)
+        : command === 'ilias_mirror_list'
+          ? Promise.resolve([])
+          : signedOut(),
+    );
+    await useCourseFilesStore.getState().syncAll(HHN, [
+      { ...COURSE, refId: '200' },
+      { ...COURSE, refId: '300' },
+    ]);
+    expect(calls('ilias_mirror_course')).toHaveLength(1);
+    expect(useCourseStore.getState().failure?.kind).toBe('session-expired');
+    expect(useCourseFilesStore.getState().waiting).toEqual([]);
   });
 
   it('tells the page when the sign-in has ended', async () => {
