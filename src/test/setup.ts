@@ -27,6 +27,9 @@ beforeEach(() => useEventStore.setState({ events: [] }));
 HTMLMediaElement.prototype.play = () => Promise.resolve();
 HTMLMediaElement.prototype.load = () => {};
 
+// Tests provide their own calendar fixtures, including on the first run.
+beforeEach(() => useEventStore.setState({ events: [] }));
+
 afterEach(() => {
   cleanup();
   useFocusStore.setState(useFocusStore.getInitialState(), true);
