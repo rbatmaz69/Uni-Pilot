@@ -613,6 +613,10 @@
 }
 
 [data-theme='dark'] {
+  --focus-sky: #182d39;
+  --focus-horizon: #45636a;
+  --focus-image-shade: #09111a99;
+  --focus-cat-shade: #040b10f5;
   --app-background: oklch(0.18 0.012 255);
   --surface: oklch(0.22 0.012 255);
   --surface-secondary: oklch(0.26 0.014 255);

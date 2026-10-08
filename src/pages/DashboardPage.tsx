@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ActivityFeedWidget,
   AddAssignmentModal,
@@ -8,7 +9,6 @@ import {
   CoursesGrid,
   DashboardHero,
   DeadlinesCard,
-  FocusSessionModal,
   MensaWidget,
   PublicTransitWidget,
   QuickAiModal,
@@ -24,9 +24,9 @@ import { NAV_ITEMS } from '@/lib/navigation';
  * made-up data. Widgets come back one at a time, each backed by real data.
  */
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>(INITIAL_ASSIGNMENTS);
   const [events, setEvents] = useState<AgendaEvent[]>(TODAY_AGENDA);
-  const [focusModalOpen, setFocusModalOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [addAssignmentOpen, setAddAssignmentOpen] = useState(false);
   const [eventDate, setEventDate] = useState(() => localDateKey(new Date()));
@@ -59,7 +59,9 @@ export function DashboardPage() {
       <div className="flex flex-col gap-7">
         {/* Hero Section */}
         <DashboardHero
-          onStartFocus={() => setFocusModalOpen(true)}
+          onStartFocus={() => {
+            void navigate(NAV_ITEMS.focus.path);
+          }}
           onAskAi={() => setAiModalOpen(true)}
         />
 
@@ -92,7 +94,6 @@ export function DashboardPage() {
         </div>
 
         {/* Interactive Modals */}
-        <FocusSessionModal isOpen={focusModalOpen} onClose={() => setFocusModalOpen(false)} />
         <QuickAiModal isOpen={aiModalOpen} onClose={() => setAiModalOpen(false)} />
         <AddAssignmentModal
           isOpen={addAssignmentOpen}
