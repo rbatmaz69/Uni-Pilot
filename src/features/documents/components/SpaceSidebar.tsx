@@ -278,7 +278,7 @@ export function SpaceSidebar({
     );
   }
 
-  const search = query.trim();
+  const search = ilias ? '' : query.trim();
   const hits = !search ? [] : results?.query === search ? results.hits : null;
   const missing = !ilias ? failed[folder] : undefined;
 
@@ -331,20 +331,22 @@ export function SpaceSidebar({
       data-tone={added ? spaceTones(spaces.map((space) => space.name)).get(added.name) : undefined}
       aria-label="Document spaces"
     >
-      <div className="document-tree-search">
-        <Search size={16} aria-hidden />
-        <input
-          aria-label="Search all documents"
-          placeholder="Search files"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        {query && (
-          <button type="button" aria-label="Clear search" onClick={() => setQuery('')}>
-            <X size={14} />
-          </button>
-        )}
-      </div>
+      {!ilias && (
+        <div className="document-tree-search">
+          <Search size={16} aria-hidden />
+          <input
+            aria-label="Search all documents"
+            placeholder="Search files"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {query && (
+            <button type="button" aria-label="Clear search" onClick={() => setQuery('')}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
       <div className="document-tree-scroll scroll-area">
         {search ? (
           <>

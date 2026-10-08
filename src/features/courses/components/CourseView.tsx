@@ -1,3 +1,4 @@
+import { studyEditorLink } from '@/features/documents/lib/studyImport';
 import { useEffect, useState } from 'react';
 import {
   Box,
@@ -53,6 +54,7 @@ interface CourseViewProps {
   /** The folders opened below the course, outermost first. */
   trail: string[];
   exerciseId: string | null;
+  onFileSelect: (item: IliasContentItem, course: IliasCourse | undefined, trail: Step[]) => void;
 }
 
 /** ILIAS's own heading for a container without item groups; saying it adds nothing. */
@@ -71,7 +73,13 @@ function address(courseId: string, trail: string[], exerciseId?: string): string
   return iliasSpaceLink(courseId, trail, exerciseId);
 }
 
-export function CourseView({ connection, courseId, trail, exerciseId }: CourseViewProps) {
+export function CourseView({
+  connection,
+  courseId,
+  trail,
+  exerciseId,
+  onFileSelect,
+}: CourseViewProps) {
   const course = useCourseStore((state) =>
     state.courses?.items.find((item) => item.refId === courseId),
   );
@@ -180,6 +188,7 @@ export function CourseView({ connection, courseId, trail, exerciseId }: CourseVi
           trail={crumbs.map(({ refId, title }) => ({ refId, title }))}
           container={container}
           containerId={containerId}
+          onFileSelect={onFileSelect}
           open={(item) => {
             if (itemKind(item.providerType) === 'folder') {
               return address(courseId, [...trail, item.refId]);
@@ -225,9 +234,18 @@ interface ContentsProps {
   containerId: string;
   /** Where a click on an item goes inside Uni Pilot, or null to open it in ILIAS. */
   open: (item: IliasContentItem) => string | null;
+  onFileSelect: (item: IliasContentItem, course: IliasCourse | undefined, trail: Step[]) => void;
 }
 
-function Contents({ connection, course, trail, container, containerId, open }: ContentsProps) {
+function Contents({
+  connection,
+  course,
+  trail,
+  container,
+  containerId,
+  open,
+  onFileSelect,
+}: ContentsProps) {
   const loaded = useCourseStore((state) => state.contents[containerId]);
   const loading = useCourseStore((state) => state.loading[`contents:${containerId}`] === true);
   const loadContents = useCourseStore((state) => state.loadContents);
@@ -292,6 +310,7 @@ function Contents({ connection, course, trail, container, containerId, open }: C
                   trail={trail}
                   item={item}
                   to={open(item)}
+                  onFileSelect={onFileSelect}
                 />
               ))}
             </ul>
@@ -308,9 +327,10 @@ interface ItemRowProps {
   trail: Step[];
   item: IliasContentItem;
   to: string | null;
+  onFileSelect: (item: IliasContentItem, course: IliasCourse | undefined, trail: Step[]) => void;
 }
 
-function ItemRow({ connection, course, trail, item, to }: ItemRowProps) {
+function ItemRow({ connection, course, trail, item, to, onFileSelect }: ItemRowProps) {
   const kind = itemKind(item.providerType);
   const Icon = ICONS[kind];
   const facts = item.file
@@ -367,7 +387,18 @@ function ItemRow({ connection, course, trail, item, to }: ItemRowProps) {
   }
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      {body}
+      {kind === 'file' ? (
+        <button
+          type="button"
+          aria-label={`Show details for ${item.title}`}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          onClick={() => onFileSelect(item, course, trail)}
+        >
+          {body}
+        </button>
+      ) : (
+        body
+      )}
       {kind === 'file' ? (
         <FileActions connection={connection} course={course} trail={trail} item={item} />
       ) : (
@@ -465,6 +496,14 @@ function FileActions({
           >
             Open
           </Button>
+          {/\.(pdf|png|jpe?g|gif|webp|bmp|avif|md|markdown|txt)$/i.test(local.path) ? (
+            <Link
+              to={studyEditorLink(local.path)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-secondary transition-colors hover:bg-surface-hover hover:text-primary"
+            >
+              Aufschreiben
+            </Link>
+          ) : null}
           <Link
             to={documentsLink(folderOf(local.path))}
             aria-label={`Show ${item.title} in Documents`}

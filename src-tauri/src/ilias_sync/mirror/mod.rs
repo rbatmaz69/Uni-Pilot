@@ -256,6 +256,8 @@ pub(crate) struct CourseFiles {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CourseFile {
+    /// ILIAS file ref_id, for its original page and share link.
+    ref_id: String,
     name: String,
     /// Workspace-relative, as the explorer opens it.
     path: String,
@@ -281,11 +283,12 @@ pub(crate) fn courses(root: &Path) -> Vec<CourseFiles> {
             let base = relative(root, &folder);
             let files: Vec<CourseFile> = manifest
                 .files
-                .values()
-                .filter(|file| file.state != FileState::Removed)
-                .filter_map(|file| {
+                .iter()
+                .filter(|(_, file)| file.state != FileState::Removed)
+                .filter_map(|(ref_id, file)| {
                     let meta = fs::symlink_metadata(folder.join(&file.path)).ok()?;
                     meta.is_file().then(|| CourseFile {
+                        ref_id: ref_id.clone(),
                         name: file
                             .path
                             .rsplit('/')

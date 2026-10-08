@@ -34,6 +34,46 @@ function paragraph(text: string): JSONContent {
 }
 
 describe('note Markdown round trip', () => {
+  it('keeps colored text and highlights with links, bold text, Unicode and table pipes', () => {
+    const current = notes();
+    current.commands.setContent(
+      '<p>Before <span data-note-color="blue"><strong>Größe &amp; β | 2</strong></span> <mark data-note-highlight="pink"><a href="https://uni.example">Übung</a></mark> after</p>',
+    );
+    const before = current.getJSON();
+    const markdown = current.getMarkdown();
+    current.commands.setContent(markdown, { contentType: 'markdown' });
+    expect(current.getJSON()).toEqual(before);
+    expect(current.getMarkdown()).toBe(markdown);
+    expect(findContentLoss(markdown, current.getMarkdown())).toEqual([]);
+  });
+
+  it('keeps text highlight geometry in a PDF note after save and reopening', () => {
+    const ink = JSON.stringify([
+      {
+        id: 'selected-text',
+        type: 'highlight',
+        color: 'yellow',
+        rects: [
+          { x: 12, y: 30, width: 90, height: 14 },
+          { x: 12, y: 47, width: 48, height: 14 },
+        ],
+      },
+    ]);
+    const current = notes();
+    current.commands.setContent({
+      type: 'doc',
+      content: [
+        {
+          type: 'pdfPage',
+          attrs: { src: 'attachments/original.pdf', page: 1, width: 595, height: 842, ink },
+        },
+      ],
+    });
+    const before = current.getJSON();
+    const markdown = current.getMarkdown();
+    current.commands.setContent(markdown, { contentType: 'markdown' });
+    expect(current.getJSON()).toEqual(before);
+  });
   it.each([
     ['nested lists', '- one\n  - nested a\n  - nested b\n- two\n'],
     ['task lists', '- [ ] read chapter 3\n- [x] submit sheet\n'],
@@ -745,4 +785,110 @@ describe('visual components inside notes', () => {
       ).toBe(false);
     }
   });
+});
+
+it('roundtrips PDF annotations, Unicode and rich note pages in one Markdown file', () => {
+  const current = notes();
+  const ink = [
+    {
+      id: 'text',
+      type: 'text',
+      color: 'blue',
+      x: 12,
+      y: 18,
+      width: 260,
+      fontSize: 16,
+      text: 'Übung 😀\n\\LaTeX ::: und $x$',
+    },
+    {
+      id: 'pen',
+      type: 'pen',
+      color: 'red',
+      width: 2,
+      points: [
+        { x: 10.5, y: 5 },
+        { x: 84, y: 34 },
+      ],
+    },
+  ];
+  current.commands.setContent({
+    type: 'doc',
+    content: [
+      {
+        type: 'pdfPage',
+        attrs: {
+          src: 'attachments/Übung (1).pdf',
+          page: 3,
+          width: 842,
+          height: 595,
+          ink: JSON.stringify(ink),
+        },
+      },
+      {
+        type: 'studyPage',
+        content: [
+          paragraph('Meine Lösung').content![0]!,
+          { type: 'blockMath', attrs: { latex: 'x^2 = 4' } },
+          createNoteVisual('sticky-blue'),
+          { type: 'image', attrs: { src: 'attachments/diagram.png', alt: 'Diagramm' } },
+        ],
+      },
+    ],
+  });
+  const original = current.getJSON();
+  const markdown = composeNote('', current.getMarkdown());
+  expect(markdown).toContain('[Original](<attachments/%C3%9Cbung%20(1).pdf>)');
+  expect(markdown).toContain('::::studyPage');
+  expect(findContentLoss(markdown, save(markdown))).toEqual([]);
+  expect(save(markdown)).toBe(markdown);
+  expect(current.getJSON()).toEqual(original);
+});
+
+it('preserves empty inserted note pages through repeated saves', () => {
+  const input = ':::studyPage\n\n:::\n';
+  expect(save(input)).toBe(input);
+  expect(save(save(input))).toBe(input);
+  expect(notes().getJSON().content?.[0]?.content).toEqual([{ type: 'paragraph' }]);
+});
+
+it('keeps literal study page fences as text', () => {
+  for (const text of [':::pdfPage', ':::studyPage']) {
+    notes().commands.setContent(paragraph(text));
+    const serialized = notes().getMarkdown();
+    notes().commands.setContent(serialized, { contentType: 'markdown' });
+    expect(notes().getText()).toBe(text);
+    expect(notes().getJSON().content?.[0]?.type).toBe('paragraph');
+  }
+});
+
+it('keeps handwriting together with rich text on an inserted note page', () => {
+  const current = notes();
+  current.commands.setContent({
+    type: 'doc',
+    content: [
+      {
+        type: 'studyPage',
+        attrs: {
+          ink: JSON.stringify([
+            {
+              id: 'note-pen',
+              type: 'pen',
+              color: 'green',
+              width: 2,
+              points: [
+                { x: 50, y: 60 },
+                { x: 80, y: 90 },
+              ],
+            },
+          ]),
+        },
+        content: [paragraph('Meine Lösung mit Handschrift').content![0]!],
+      },
+    ],
+  });
+  const before = current.getJSON();
+  const markdown = composeNote('', current.getMarkdown());
+  expect(markdown).toContain(':::studyPage {"annotations"');
+  expect(save(markdown)).toBe(markdown);
+  expect(current.getJSON()).toEqual(before);
 });

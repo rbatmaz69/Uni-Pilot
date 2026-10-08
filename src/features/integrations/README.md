@@ -20,7 +20,7 @@ own university, which changes what a connector should even attempt.
 | `lib/ilias/parse*.ts`       | Pure mappers: ILIAS XML or RSS in, read models out.                                                                                                                            |
 | `lib/ilias/fixtures/`       | Recorded and derived payloads the tests run against.                                                                                                                           |
 | `lib/iliasSync.ts`          | Courses, folders, exercises read by Rust with the student's session (`src-tauri/src/ilias_sync/`); course files kept in Documents (`docs/integrations/ilias-course-files.md`). |
-| `components/IliasBadge.tsx` | The ILIAS mark on synced folders and files. A placeholder until the official logo is cleared.                                                                                  |
+| `components/IliasBadge.tsx` | The ILIAS mark on synced folders and files, using the logo supplied in `public/ilias-logo.jpg`.                                                                                |
 
 ## What is deliberately missing
 

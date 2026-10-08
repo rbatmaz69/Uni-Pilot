@@ -1,3 +1,4 @@
+import { blockInsertionRange } from './selectionActions';
 import { InputRule, type Editor, type JSONContent } from '@tiptap/core';
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics';
 import { NodeSelection } from '@tiptap/pm/state';
@@ -188,11 +189,7 @@ export function editSelectedFormula(editor: Editor, type: 'inlineMath' | 'blockM
 export function insertFormula(editor: Editor, display: boolean) {
   if (!editor.isEditable) return false;
   if (!display) return editor.chain().focus().insertContent({ type: 'inlineMath' }).run();
-  const { $from } = editor.state.selection;
-  const empty =
-    $from.depth === 1 && $from.parent.type.name === 'paragraph' && !$from.parent.content.size;
-  const end = $from.depth ? $from.after(1) : editor.state.doc.content.size;
-  const from = empty ? $from.before(1) : end;
+  const { from, to: end } = blockInsertionRange(editor);
   const formula: JSONContent = { type: 'blockMath', attrs: { latex: '' } };
   return editor
     .chain()

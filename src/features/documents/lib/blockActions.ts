@@ -12,7 +12,7 @@ export interface BlockTarget {
 
 const ITEMS = new Set(['listItem', 'taskItem']);
 // Cards and layouts bring their own grip and options.
-const OWN_HANDLE = new Set(['noteCard', 'noteLayout']);
+const OWN_HANDLE = new Set(['noteCard', 'noteLayout', 'pdfPage', 'studyPage']);
 // Blocks whose text can be turned into another kind of block.
 const TEXT_BLOCKS = new Set([
   'paragraph',

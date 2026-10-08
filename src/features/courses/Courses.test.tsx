@@ -280,6 +280,12 @@ describe('inside a course', () => {
     expect(within(item).getByText('Version 3')).toBeInTheDocument();
     expect(within(item).getByText('BACKUP · 49.9 KB · 15 Sep 2025, 08:41')).toBeInTheDocument();
     expect(within(item).getByRole('button', { name: 'Open in ILIAS' })).toBeInTheDocument();
+    await user.click(within(item).getByRole('button', { name: 'Show details for Beispiel_DB' }));
+    const details = screen.getByLabelText('File details: Beispiel_DB');
+    expect(within(details).getByText('Download to preview this file')).toBeInTheDocument();
+    expect(
+      within(details).getByRole('button', { name: 'Download to Documents' }),
+    ).toBeInTheDocument();
 
     const trail = screen.getByRole('navigation', { name: 'Where you are in the course' });
     expect(within(trail).getByText('Material')).toHaveAttribute('aria-current', 'page');
@@ -296,7 +302,12 @@ describe('inside a course', () => {
     const user = userEvent.setup();
     renderApp('/courses?course=100100&trail=100120');
 
-    await user.click(await screen.findByRole('button', { name: 'Download Beispiel_DB' }));
+    await user.click(await screen.findByRole('button', { name: 'Show details for Beispiel_DB' }));
+    await user.click(
+      within(screen.getByLabelText('File details: Beispiel_DB')).getByRole('button', {
+        name: 'Download to Documents',
+      }),
+    );
     expect(await screen.findByText('On this computer')).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith('ilias_mirror_file', {
       baseUrl: 'https://ilias.hs-heilbronn.de',

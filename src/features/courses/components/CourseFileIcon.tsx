@@ -10,7 +10,15 @@ const FILE_STYLES: Record<CourseFileKind, { color: string; fold: string; label: 
 };
 
 /** A compact, recognisable file badge for the type ILIAS reports. */
-export function CourseFileIcon({ title, suffix }: { title: string; suffix: string | null }) {
+export function CourseFileIcon({
+  title,
+  suffix,
+  size = 'md',
+}: {
+  title: string;
+  suffix: string | null;
+  size?: 'sm' | 'md';
+}) {
   const kind = fileKind(suffix, title);
   const { color, fold, label } = FILE_STYLES[kind];
 
@@ -18,7 +26,7 @@ export function CourseFileIcon({ title, suffix }: { title: string; suffix: strin
     <svg
       aria-hidden="true"
       data-file-kind={kind}
-      className="h-11 w-9 shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.12)]"
+      className={`${size === 'sm' ? 'h-6 w-5' : 'h-11 w-9'} shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.12)]`}
       viewBox="0 0 36 44"
       fill="none"
     >

@@ -1,5 +1,6 @@
+import { NotePdfPage, NoteStudyPage } from '@/features/documents/lib/studyPages';
 import { generateHTML, type AnyExtension, type JSONContent } from '@tiptap/core';
-import Highlight from '@tiptap/extension-highlight';
+import { NoteHighlight, NoteTextColor } from '@/features/documents/lib/noteColors';
 import Image from '@tiptap/extension-image';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import Paragraph from '@tiptap/extension-paragraph';
@@ -131,8 +132,8 @@ function characterAfter(node: JSONContent, parentNode?: JSONContent): string {
 function escapeLineStart(line: string, first: boolean): string {
   const indent = /^ {0,3}/.exec(line)?.[0] ?? '';
   const rest = line.slice(indent.length);
-  if (/^:{3,}note(?:Card|Layout)(?:[ \t]|$)/.test(rest))
-    return `${indent}${rest.replace(/:(?=note(?:Card|Layout))/, '\\:')}`;
+  if (/^:{3,}(?:note(?:Card|Layout)|pdfPage|studyPage)(?:[ \t]|$)/.test(rest))
+    return `${indent}${rest.replace(/:(?=(?:note(?:Card|Layout)|pdfPage|studyPage))/, '\\:')}`;
   // Text writes `\[`, so this is a footnote reference that starts the line; a
   // colon after it would turn the paragraph into the footnote's definition.
   const reference = /^\[\^[^\]\s^]+\]:/.exec(rest);
@@ -351,6 +352,8 @@ interface NoteExtensionOptions {
   /** Replaces the plain image node, e.g. with one that resolves attachments. */
   image?: AnyExtension;
   placeholder?: string;
+  pdfPage?: AnyExtension;
+  studyPage?: AnyExtension;
   card?: AnyExtension;
   layout?: AnyExtension;
   codeBlock?: AnyExtension;
@@ -372,13 +375,16 @@ export function noteExtensions({
   codeBlock,
   inlineMath,
   blockMath,
+  pdfPage,
+  studyPage,
 }: NoteExtensionOptions = {}): AnyExtension[] {
   return [
     StarterKit.configure({ paragraph: false, underline: false, codeBlock: false }),
     codeBlock ?? NoteCodeBlock,
     SafeParagraph,
     PortableUnderline,
-    Highlight,
+    NoteHighlight,
+    NoteTextColor,
     TaskList,
     TaskItem.configure({ nested: true }),
     TableKit.configure({ table: false, tableCell: false, tableHeader: false }),
@@ -386,6 +392,8 @@ export function noteExtensions({
     StyledTableCell,
     StyledTableHeader,
     image ?? Image.configure({ allowBase64: true }),
+    pdfPage ?? NotePdfPage,
+    studyPage ?? NoteStudyPage,
     card ?? NoteCard,
     layout ?? NoteLayout,
     inlineMath ?? NoteInlineMath,

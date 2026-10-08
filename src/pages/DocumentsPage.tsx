@@ -18,8 +18,8 @@ function idParam(value: string | null): string | null {
 export function DocumentsPage() {
   const [params] = useSearchParams();
   const location = useLocation();
-  const path = workspacePath(params.get('path'));
   const file = workspacePath(params.get('file')) || null;
+  const path = workspacePath(params.get('path')) || file?.split('/').slice(0, -1).join('/') || '';
   const courseId = idParam(params.get('course'));
   const course: IliasCourseView | null = courseId
     ? {

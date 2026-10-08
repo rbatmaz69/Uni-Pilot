@@ -187,7 +187,7 @@ async function imageOutput(
   }
 }
 
-async function imagesPdf(
+export async function imagesPdf(
   images: Array<{ bytes: Uint8Array; extension: string }>,
 ): Promise<Uint8Array> {
   const { PDFDocument } = await import('pdf-lib');
@@ -306,7 +306,11 @@ async function pdfPageImage(bytes: Uint8Array, pageNumber: string): Promise<[Uin
   }
 }
 
-async function notePdf(content: string): Promise<Uint8Array> {
+async function notePdf(content: string, notePath: string): Promise<Uint8Array> {
+  if (/^:{3,}(?:pdfPage|studyPage)\r?$/m.test(content)) {
+    const { exportStudyMarkdown } = await import('@/features/documents/lib/studyExport');
+    return exportStudyMarkdown(content, notePath);
+  }
   const { PDFDocument } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
   const canvas = document.createElement('canvas');
@@ -525,7 +529,7 @@ export async function runDocumentTool(
     case 'note-pdf':
       outputs.push({
         name: `${stem} (note text).pdf`,
-        bytes: await notePdf(new TextDecoder().decode(bytes)),
+        bytes: await notePdf(new TextDecoder().decode(bytes), entry.path),
       });
       break;
   }

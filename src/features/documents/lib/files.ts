@@ -20,6 +20,8 @@ export interface IliasFolderInfo {
 
 /** A file the ILIAS sync keeps, as the ILIAS space lists it. */
 export interface IliasFile {
+  /** The source file's reference in ILIAS, when known. */
+  refId?: string;
   name: string;
   path: string;
   size: number;

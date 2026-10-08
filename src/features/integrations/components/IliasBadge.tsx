@@ -1,14 +1,6 @@
-import { School } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/**
- * Placeholder mark for anything the ILIAS course sync manages (a folder, a
- * downloaded file, an ILIAS sync banner). It draws a generic pill with the
- * same `School` icon navigation uses for ILIAS — the single place this mark
- * is drawn, so an official ILIAS logo can later be swapped in by editing
- * only this file. Check ILIAS e.V.'s logo usage terms before using their
- * mark.
- */
+/** The official ILIAS mark for synced files, folders and course labels. */
 interface IliasBadgeProps {
   size?: 'sm' | 'md';
   showLabel?: boolean;
@@ -17,13 +9,13 @@ interface IliasBadgeProps {
 }
 
 const SIZES = {
-  sm: { pill: 'gap-1 px-1.5 py-0.5 text-[10px]', icon: 11 },
-  md: { pill: 'gap-1.5 px-2 py-1 text-xs', icon: 13 },
+  sm: { pill: 'gap-1 px-1.5 py-0.5 text-[10px]', image: 'size-4 rounded-[3px]' },
+  md: { pill: 'gap-1.5 px-2 py-1 text-xs', image: 'size-[18px] rounded-[4px]' },
 };
 
 export function IliasBadge({ size = 'md', showLabel = true, className, title }: IliasBadgeProps) {
   const label = title ?? 'Synced from ILIAS';
-  const { pill, icon } = SIZES[size];
+  const { pill, image } = SIZES[size];
   return (
     <span
       role="img"
@@ -35,7 +27,12 @@ export function IliasBadge({ size = 'md', showLabel = true, className, title }: 
         className,
       )}
     >
-      <School aria-hidden size={icon} />
+      <img
+        src="/ilias-logo.jpg"
+        alt=""
+        aria-hidden="true"
+        className={cn('shrink-0 object-cover', image)}
+      />
       {showLabel && <span>ILIAS</span>}
     </span>
   );

@@ -105,7 +105,7 @@ export function activeBlockType(editor: Editor): BlockType {
 
 /** Turns the selected blocks into `type`, first lifting them out of any list or quote. */
 export function turnInto(editor: Editor, type: BlockType, range?: Range) {
-  let chain = editor.chain().focus();
+  let chain = editor.chain().focus(undefined, { scrollIntoView: false });
   if (range) chain = chain.deleteRange(range);
   type.apply(chain.clearNodes()).run();
 }

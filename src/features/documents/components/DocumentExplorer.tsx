@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { studyDocument, openStudyDocument } from '@/features/documents/lib/studyImport';
 import {
   ArrowLeft,
   PanelsTopLeft,
@@ -104,10 +105,10 @@ interface DocumentExplorerProps {
    * rather than lie on the canvas.
    */
   initialPath?: string;
-  /** A course to open in the ILIAS space. */
-  initialCourse?: IliasCourseView | null;
   /** A file to open over `initialPath`, e.g. a note kept under Favorites. */
   initialFile?: string | null;
+  /** A course to open in the ILIAS space. */
+  initialCourse?: IliasCourseView | null;
   /**
    * Changes with every link followed to Documents. The open explorer then goes
    * to `initialPath`, `initialCourse` and `initialFile`, keeping its view and tabs.
@@ -134,7 +135,7 @@ export function DocumentExplorer({
   const [sort, setSort] = useState('name');
   const [view, setView] = useState<'list' | 'grid' | 'canvas'>('canvas');
   const [iliasCourse, setIliasCourse] = useState<IliasCourseView | null>(initialCourse);
-  const followed = useRef(request);
+  const followed = useRef<string | null | undefined>(initialFile ? null : request);
   const [canvasParents, setCanvasParents] = useState<Record<string, DocumentEntry[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -431,12 +432,43 @@ export function DocumentExplorer({
       () => undefined,
     );
   }
+  async function openEditor(item: DocumentEntry) {
+    const opened = editable(item)
+      ? { entry: item, content: await documentRequest<string>({ action: 'read', path: item.path }) }
+      : await openStudyDocument(item);
+    rememberTab({
+      path: opened.entry.path,
+      name: opened.entry.name,
+      folder: false,
+      entry: opened.entry,
+    });
+    setNote(opened);
+  }
   function activate(item: DocumentEntry) {
     if (item.folder) {
       navigate(item.path);
       return;
     }
     markSeen(item);
+    if (studyDocument(item) && /\.pdf$/i.test(item.name)) {
+      void run(async () => {
+        let opened;
+        try {
+          opened = await openStudyDocument(item);
+        } catch {
+          setPreview(item);
+          return;
+        }
+        rememberTab({
+          path: opened.entry.path,
+          name: opened.entry.name,
+          folder: false,
+          entry: opened.entry,
+        });
+        setNote(opened);
+      });
+      return;
+    }
     if (previewable(item)) {
       setPreview(item);
       return;
@@ -449,6 +481,28 @@ export function DocumentExplorer({
       } else await documentRequest({ action: 'open', path: item.path });
     });
   }
+  // A link followed while Documents is open: go where it points.
+  useEffect(() => {
+    if (request === followed.current) return;
+    followed.current = request;
+    const target = initialPath;
+    const course = initialCourse;
+    leaveThen(() => {
+      setIliasCourse(course);
+      navigate(target);
+      if (initialFile)
+        void run(async () => {
+          const folder = initialFile.split('/').slice(0, -1).join('/');
+          const files = await documentRequest<DirectoryListing>({ action: 'list', path: folder });
+          const item = files.entries.find((file) => file.path === initialFile && !file.folder);
+          if (!item) throw new Error('Die verlinkte Datei wurde nicht gefunden.');
+          markSeen(item);
+          if (editable(item) || studyDocument(item)) await openEditor(item);
+          else activate(item);
+        });
+    });
+  });
+
   function openHit(hit: SearchHit) {
     setMenu(null);
     if (hit.folder) navigate(hit.path);
@@ -636,9 +690,20 @@ export function DocumentExplorer({
         <div className={cn('document-content', note && 'has-open-note', inIlias && 'is-ilias')}>
           {inIlias && (
             <IliasOverview
+              key={
+                iliasCourse
+                  ? `${iliasCourse.courseId}:${iliasCourse.trail.join('/')}:${iliasCourse.exerciseId ?? ''}`
+                  : 'all-courses'
+              }
               courses={iliasCourses}
               course={iliasCourse}
-              onOpen={activate}
+              onOpen={markSeen}
+              onEdit={(item) =>
+                leaveThen(() => {
+                  markSeen(item);
+                  void run(() => openEditor(item));
+                })
+              }
               onAddCourse={(courseId) => void addCourseToDocuments(courseId)}
               onAddAllCourses={() => void addAllCoursesToDocuments()}
             />
@@ -1244,7 +1309,23 @@ export function DocumentExplorer({
               </button>
             </footer>
           )}
-          {preview && <DocumentPreview entry={preview} onClose={() => setPreview(null)} />}
+          {preview && (
+            <DocumentPreview
+              entry={preview}
+              onClose={() => setPreview(null)}
+              onEdit={async () => {
+                const opened = await openStudyDocument(preview);
+                rememberTab({
+                  path: opened.entry.path,
+                  name: opened.entry.name,
+                  folder: false,
+                  entry: opened.entry,
+                });
+                setPreview(null);
+                setNote(opened);
+              }}
+            />
+          )}
           <Modal
             open={!!dialog}
             onClose={() => {

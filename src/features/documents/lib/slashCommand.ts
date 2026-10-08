@@ -1,4 +1,5 @@
 import { Extension, type Editor, type Range } from '@tiptap/core';
+import type { Node } from '@tiptap/pm/model';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { type SuggestionKeyDownProps } from '@tiptap/suggestion';
 import {
@@ -61,6 +62,19 @@ export function registerImagePicker(editor: Editor, pick: () => void) {
  * space, so "and/or" and URLs never trigger it. The typed `/query` stays
  * ordinary text until a command replaces it, so dismissing the menu keeps it.
  */
+export function allowsSlashMenu(doc: Node, position: number): boolean {
+  const at = doc.resolve(position);
+  if (at.parent.type.spec.code) return false;
+  let pages = false;
+  doc.forEach((node) => {
+    if (['pdfPage', 'studyPage'].includes(node.type.name)) pages = true;
+  });
+  if (!pages) return true;
+  for (let depth = at.depth; depth > 0; depth--)
+    if (at.node(depth).type.name === 'studyPage') return true;
+  return false;
+}
+
 export const SlashCommandExtension = Extension.create<SlashCommandOptions, SlashCommandStorage>({
   name: 'slashCommand',
   addOptions() {
@@ -78,7 +92,7 @@ export const SlashCommandExtension = Extension.create<SlashCommandOptions, Slash
         char: '/',
         allowedPrefixes: [' '],
         // Code keeps its slashes: `//` comments, paths, `a / b`.
-        allow: ({ state, range }) => !state.doc.resolve(range.from).parent.type.spec.code,
+        allow: ({ state, range }) => allowsSlashMenu(state.doc, range.from),
         items: ({ query }) => filterSlashCommands(query),
         command: ({ editor, range, props }) =>
           runSlashCommand(editor, range, props, () => storage.pickImage()),

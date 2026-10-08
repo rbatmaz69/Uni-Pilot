@@ -82,7 +82,7 @@ pub enum Request {
 pub enum Upload {
     /// Copies a file into a folder under its own name. Never overwrites.
     Import { path: String, name: String },
-    /// Stores an image pasted into a note in the `attachments` folder beside it.
+    /// Stores an image or a PDF source snapshot attached to a note in the `attachments` folder beside it.
     Attachment { note: String, name: String },
 }
 
@@ -811,8 +811,10 @@ fn perform_upload(root: &Path, upload: Upload, bytes: &[u8]) -> Result<serde_jso
             if !note.is_file() || !is_text(&note) {
                 return Err("Images can only be added to a Markdown or text note.".into());
             }
-            if !IMAGE_EXTENSIONS.contains(&extension(Path::new(&name)).as_str()) {
-                return Err("Only images can be pasted into a note.".into());
+            if extension(Path::new(&name)) != "pdf"
+                && !IMAGE_EXTENSIONS.contains(&extension(Path::new(&name)).as_str())
+            {
+                return Err("Only images and PDFs can be attached to a note.".into());
             }
             let folder = note
                 .parent()
@@ -878,6 +880,60 @@ pub async fn document_request(
     request: Request,
 ) -> Result<serde_json::Value, String> {
     with_workspace(app, move |root| perform(root, request)).await
+}
+
+/// Copies a workspace file to Downloads without replacing a previous copy.
+#[tauri::command]
+pub async fn download_document(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let downloads = app.path().download_dir().map_err(error)?;
+    with_workspace(app, move |root| copy_to_downloads(root, &downloads, &path)).await
+}
+
+fn copy_to_downloads(root: &Path, downloads: &Path, path: &str) -> Result<String, String> {
+    let source = resolve(root, path)?;
+    if !source.is_file() {
+        return Err("Choose a file to download.".into());
+    }
+    let name = source
+        .file_name()
+        .ok_or("Missing file name")?
+        .to_string_lossy();
+    let stem = source
+        .file_stem()
+        .ok_or("Missing file name")?
+        .to_string_lossy();
+    let extension = source.extension().map(|value| value.to_string_lossy());
+    for attempt in 1..1000 {
+        let candidate = if attempt == 1 {
+            name.to_string()
+        } else if let Some(extension) = &extension {
+            format!("{stem}-{attempt}.{extension}")
+        } else {
+            format!("{stem}-{attempt}")
+        };
+        let target = downloads.join(&candidate);
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+        {
+            Ok(mut output) => {
+                let result = (|| -> io::Result<()> {
+                    let mut input = fs::File::open(&source)?;
+                    io::copy(&mut input, &mut output)?;
+                    output.sync_all()
+                })();
+                if let Err(cause) = result {
+                    let _ = fs::remove_file(&target);
+                    return Err(error(cause));
+                }
+                return Ok(candidate);
+            }
+            Err(cause) if cause.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(cause) => return Err(error(cause)),
+        }
+    }
+    Err("Could not find a free file name in Downloads.".into())
 }
 
 /// Receives file bytes as a raw IPC body rather than a JSON array of numbers,
@@ -965,6 +1021,26 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn download_keeps_existing_file_and_uses_a_free_name() {
+        let workspace = Workspace::new();
+        let downloads = workspace.0.join("downloads");
+        fs::create_dir(&downloads).unwrap();
+        workspace.write("Blatt.pdf", "new copy");
+        fs::write(downloads.join("Blatt.pdf"), "old copy").unwrap();
+
+        let name = copy_to_downloads(&workspace.0, &downloads, "Blatt.pdf").unwrap();
+        assert_eq!(name, "Blatt-2.pdf");
+        assert_eq!(
+            fs::read_to_string(downloads.join("Blatt.pdf")).unwrap(),
+            "old copy"
+        );
+        assert_eq!(
+            fs::read_to_string(downloads.join(name)).unwrap(),
+            "new copy"
+        );
     }
 
     #[test]
@@ -1299,6 +1375,50 @@ mod tests {
                 b"x",
             )
             .is_err());
+    }
+
+    #[test]
+    fn pdf_snapshots_are_unique_and_follow_a_moved_markdown_note() {
+        let workspace = Workspace::new();
+        fs::create_dir(workspace.0.join("Lectures")).unwrap();
+        fs::create_dir(workspace.0.join("Notes")).unwrap();
+        workspace.write("Lectures/Slides.md", "");
+        let first = workspace
+            .upload(
+                Upload::Attachment {
+                    note: "Lectures/Slides.md".into(),
+                    name: "original.pdf".into(),
+                },
+                b"%PDF-original",
+            )
+            .unwrap();
+        let second = workspace
+            .upload(
+                Upload::Attachment {
+                    note: "Lectures/Slides.md".into(),
+                    name: "original.pdf".into(),
+                },
+                b"%PDF-new",
+            )
+            .unwrap();
+        assert_eq!(first["src"], "attachments/original.pdf");
+        assert_eq!(second["src"], "attachments/original-2.pdf");
+        workspace.write(
+            "Lectures/Slides.md",
+            ":::pdfPage\n[Original](<attachments/original.pdf>)\n{}\n:::\n",
+        );
+        workspace
+            .run(Request::Move {
+                path: "Lectures/Slides.md".into(),
+                destination: "Notes".into(),
+                name: "Slides.md".into(),
+            })
+            .unwrap();
+        assert_eq!(
+            fs::read(workspace.0.join("Notes/attachments/original.pdf")).unwrap(),
+            b"%PDF-original"
+        );
+        assert!(workspace.exists("Lectures/attachments/original.pdf"));
     }
 
     #[cfg(unix)]

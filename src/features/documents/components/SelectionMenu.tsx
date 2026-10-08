@@ -1,9 +1,22 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import type { Editor } from '@tiptap/core';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { useEditorState } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import {
+  Table2,
+  RemoveFormatting,
+  Quote,
+  ListCollapse,
+  Minus,
   Bold,
   Check,
   ChevronDown,
@@ -20,6 +33,13 @@ import { normaliseHref } from '@/features/documents/lib/links';
 import { usePlatformModifier } from '@/hooks/usePlatform';
 import { cn } from '@/lib/utils';
 import { TableTools } from './TableTools';
+import { TableSizePicker } from './TableSizePicker';
+import { NOTE_COLORS } from '@/features/documents/lib/noteColors';
+import {
+  insertAfterSelection,
+  insertSelectionTable,
+  wrapSelection,
+} from '@/features/documents/lib/selectionActions';
 
 interface Tool {
   label: string;
@@ -27,7 +47,10 @@ interface Tool {
   keys?: string;
   icon: ReactNode;
   active?: boolean;
-  run: () => void;
+  run: (event: MouseEvent<HTMLButtonElement>) => void;
+  popup?: 'menu' | 'dialog';
+  expanded?: boolean;
+  controls?: string;
 }
 
 function shortcutHint(keys: string, isMac: boolean) {
@@ -95,13 +118,17 @@ interface SelectionMenuProps {
  */
 export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
   const { isMac } = usePlatformModifier();
-  const [mode, setMode] = useState<'tools' | 'turn' | 'link' | 'table'>('tools');
+  const [mode, setMode] = useState<'tools' | 'turn' | 'link' | 'table' | 'insertTable' | 'color'>(
+    'tools',
+  );
+  const colorPaletteId = useId();
   const [href, setHref] = useState('');
   const [focused, setFocused] = useState(0);
-  const [tablePopover, setTablePopover] = useState<{ side: 'above' | 'below'; height: number }>({
-    side: 'below',
-    height: 620,
-  });
+  const [tablePopover, setTablePopover] = useState<{
+    side: 'above' | 'below';
+    height: number;
+    left: number;
+  }>({ side: 'below', height: 620, left: 0 });
   const toolbar = useRef<HTMLDivElement>(null);
   const state = useEditorState({
     editor,
@@ -112,6 +139,8 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
       underline: current.isActive('underline'),
       strike: current.isActive('strike'),
       highlight: current.isActive('highlight'),
+      color: String(current.getAttributes('textColor').color ?? ''),
+      highlightColor: String(current.getAttributes('highlight').color ?? 'yellow'),
       code: current.isActive('code'),
       link: current.isActive('link'),
       linkHref: String(current.getAttributes('link').href ?? ''),
@@ -121,11 +150,16 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
         current.state.selection instanceof TextSelection && !current.state.selection.empty,
     }),
   });
-  const chain = () => editor.chain().focus();
+  const chain = () => editor.chain().focus(undefined, { scrollIntoView: false });
   const block = BLOCK_TYPES.find((type) => type.id === state.block) ?? BLOCK_TYPES[0];
   const tableContext = state.inTable && !state.textSelected;
 
   const marks: Tool[] = [
+    {
+      label: 'Insert table',
+      icon: <Table2 size={ICON} />,
+      run: (event) => openPanel('insertTable', event.currentTarget),
+    },
     {
       label: 'Bold',
       keys: 'Mod-B',
@@ -155,13 +189,6 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
       run: () => chain().toggleStrike().run(),
     },
     {
-      label: 'Highlight',
-      keys: 'Mod-Shift-H',
-      icon: <Highlighter size={ICON} />,
-      active: state.highlight,
-      run: () => chain().toggleHighlight().run(),
-    },
-    {
       label: 'Inline code',
       keys: 'Mod-E',
       icon: <Code size={ICON} />,
@@ -177,6 +204,25 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
         setHref(state.linkHref);
         setMode('link');
       },
+    },
+    {
+      label: 'Text and background color',
+      icon: (
+        <span className="note-bubble-color-trigger-icon" aria-hidden="true">
+          <Highlighter size={ICON} />
+          <ChevronDown size={10} />
+        </span>
+      ),
+      active: Boolean(state.color) || state.highlight,
+      popup: 'menu',
+      expanded: mode === 'color',
+      controls: colorPaletteId,
+      run: (event) => openPanel('color', event.currentTarget),
+    },
+    {
+      label: 'Clear formatting',
+      icon: <RemoveFormatting size={ICON} />,
+      run: () => chain().unsetAllMarks().run(),
     },
   ];
   const tools: Tool[] = state.textSelected ? marks : [];
@@ -199,13 +245,23 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
   }, [editor]);
 
   useEffect(() => {
+    let previous = editor.state.selection;
     const closeStaleMode = () => {
       const selection = editor.state.selection;
+      if (!selection.eq(previous)) setMode('tools');
+      previous = selection;
       const textSelected = selection instanceof TextSelection && !selection.empty;
       const tableContext = editor.isActive('table') && !textSelected;
       setMode((current) => {
         if (current === 'table' && !tableContext) return 'tools';
-        if ((current === 'turn' || current === 'link') && !textSelected) return 'tools';
+        if (
+          (current === 'turn' ||
+            current === 'link' ||
+            current === 'color' ||
+            current === 'insertTable') &&
+          !textSelected
+        )
+          return 'tools';
         return current;
       });
     };
@@ -215,6 +271,20 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
     };
   }, [editor]);
 
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (editor.isDestroyed) return;
+      editor.commands.setMeta('bubbleMenu', 'updatePosition');
+      if (mode === 'insertTable')
+        toolbar.current?.querySelector<HTMLElement>('[role="gridcell"][tabindex="0"]')?.focus();
+      else if (mode === 'color')
+        toolbar.current
+          ?.querySelector<HTMLElement>('.note-color-popover [aria-checked="true"]')
+          ?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editor, mode]);
+
   function applyLink() {
     const target = normaliseHref(href);
     const link = chain().extendMarkRange('link');
@@ -222,36 +292,57 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
     setMode('tools');
   }
 
-  function toggleTableOptions() {
-    if (mode === 'table') {
+  function openPanel(next: 'table' | 'insertTable' | 'turn' | 'color', trigger: HTMLElement) {
+    if (mode === next) {
       setMode('tools');
       return;
     }
-    const bounds = toolbar.current?.getBoundingClientRect();
+    const bounds = trigger.closest('.note-bubble-bar')?.getBoundingClientRect();
+    const triggerBounds = trigger.getBoundingClientRect();
     const above = Math.max(0, (bounds?.top ?? 0) - 12);
     const below = Math.max(0, window.innerHeight - (bounds?.bottom ?? 0) - 12);
-    const side = below >= 400 || below >= above ? 'below' : 'above';
+    const side =
+      next === 'color'
+        ? below >= 360 || below >= above
+          ? 'below'
+          : 'above'
+        : below >= 400 || below >= above
+          ? 'below'
+          : 'above';
+    const left =
+      next === 'color'
+        ? Math.max(
+            0,
+            Math.min(
+              triggerBounds.left - (bounds?.left ?? 0),
+              window.innerWidth - (bounds?.left ?? 0) - 248,
+            ),
+          )
+        : 0;
     setTablePopover({
       side,
       height: Math.max(120, Math.min(620, side === 'below' ? below : above)),
+      left,
     });
-    setMode('table');
+    setMode(next);
   }
 
   function moveFocus(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
       event.preventDefault();
       setMode('tools');
-      editor.commands.focus();
+      editor.commands.focus(undefined, { scrollIntoView: false });
+      if (mode === 'tools') editor.commands.setMeta('bubbleMenu', 'hide');
       return;
     }
-    if (mode === 'link' || mode === 'table') return;
-    const selector = mode === 'turn' ? '[role="menuitemradio"]' : 'button[data-tool]';
+    if (mode === 'link' || mode === 'table' || mode === 'insertTable') return;
+    const verticalMenu = mode === 'turn' || mode === 'color';
+    const selector = verticalMenu ? '[role="menuitemradio"]' : 'button[data-tool]';
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
     const index = buttons.findIndex((button) => button === document.activeElement);
     if (index < 0) return;
-    const forward = mode === 'turn' ? 'ArrowDown' : 'ArrowRight';
-    const backward = mode === 'turn' ? 'ArrowUp' : 'ArrowLeft';
+    const forward = verticalMenu ? 'ArrowDown' : 'ArrowRight';
+    const backward = verticalMenu ? 'ArrowUp' : 'ArrowLeft';
     const target =
       event.key === forward
         ? buttons[(index + 1) % buttons.length]
@@ -270,12 +361,16 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
   return (
     <BubbleMenu
       editor={editor}
+      updateDelay={60}
       ref={toolbar}
       className="note-bubble"
       appendTo={() => document.body}
       options={{
         strategy: 'fixed',
-        placement: 'top',
+        placement: 'bottom-start',
+        flip: { padding: 10, boundary: scrollTarget ?? undefined },
+        shift: { padding: 10 },
+        hide: scrollTarget ? { boundary: scrollTarget } : false,
         offset: 10,
         scrollTarget: scrollTarget ?? window,
         onHide: () => setMode('tools'),
@@ -283,6 +378,8 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
       getReferencedVirtualElement={() => selectionAnchor(editor)}
       shouldShow={({ editor: current, element, view, state: editorState, from, to }) => {
         if (!current.isEditable) return false;
+        const anchor = document.getSelection()?.anchorNode;
+        if (anchor?.parentElement?.closest('.study-pdf-text')) return false;
         if (!view.hasFocus() && !element.contains(document.activeElement)) return false;
         const textSelected =
           editorState.selection instanceof TextSelection && !editorState.selection.empty;
@@ -353,7 +450,7 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
               aria-expanded={mode === 'table'}
               tabIndex={tabStop === 0 ? 0 : -1}
               onFocus={() => setFocused(0)}
-              onClick={toggleTableOptions}
+              onClick={(event) => openPanel('table', event.currentTarget)}
             >
               <span className="note-bubble-table-preview" aria-hidden>
                 <i />
@@ -381,7 +478,7 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
                 title={label}
                 tabIndex={tabStop === index + 1 ? 0 : -1}
                 onFocus={() => setFocused(index + 1)}
-                onClick={() => editor.chain().focus().updateAttributes('table', { tone: id }).run()}
+                onClick={() => chain().updateAttributes('table', { tone: id }).run()}
               />
             ))}
           </div>
@@ -399,8 +496,8 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
                   title="Turn into"
                   tabIndex={tabStop === 0 ? 0 : -1}
                   onFocus={() => setFocused(0)}
-                  onClick={() => {
-                    setMode(mode === 'turn' ? 'tools' : 'turn');
+                  onClick={(event) => {
+                    openPanel('turn', event.currentTarget);
                     requestAnimationFrame(() =>
                       toolbar.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus(),
                     );
@@ -421,6 +518,9 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
                   data-tool
                   aria-label={tool.label}
                   aria-pressed={tool.active}
+                  aria-haspopup={tool.popup}
+                  aria-expanded={tool.expanded}
+                  aria-controls={tool.controls}
                   aria-keyshortcuts={tool.keys ? ariaShortcut(tool.keys, isMac) : undefined}
                   title={
                     tool.keys ? `${tool.label} (${shortcutHint(tool.keys, isMac)})` : tool.label
@@ -437,7 +537,12 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
           </>
         )}
         {mode === 'turn' ? (
-          <div role="menu" aria-label="Turn into" className="note-bubble-menu">
+          <div
+            role="menu"
+            aria-label="Turn into"
+            className={cn('note-bubble-menu', tablePopover.side === 'above' && 'is-above')}
+            style={{ maxHeight: tablePopover.height }}
+          >
             {BLOCK_TYPES.map((type) => (
               <button
                 key={type.id}
@@ -454,6 +559,154 @@ export function SelectionMenu({ editor, scrollTarget }: SelectionMenuProps) {
                 <kbd>{type.hint}</kbd>
               </button>
             ))}
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={editor.isActive('details')}
+              tabIndex={-1}
+              onClick={() => {
+                wrapSelection(editor, 'toggle');
+                setMode('tools');
+              }}
+            >
+              <span>
+                <ListCollapse size={ICON} /> Toggle list
+              </span>
+            </button>
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={editor.isActive('noteCard')}
+              tabIndex={-1}
+              onClick={() => {
+                wrapSelection(editor, 'callout');
+                setMode('tools');
+              }}
+            >
+              <span>
+                <Quote size={ICON} /> Callout
+              </span>
+            </button>
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={false}
+              tabIndex={-1}
+              onClick={() => {
+                insertAfterSelection(editor, { type: 'horizontalRule' });
+                setMode('tools');
+              }}
+            >
+              <span>
+                <Minus size={ICON} /> Divider
+              </span>
+            </button>
+          </div>
+        ) : null}
+        {mode === 'color' && state.textSelected ? (
+          <div
+            id={colorPaletteId}
+            role="menu"
+            aria-label="Text and background colors"
+            className={cn('note-color-popover', tablePopover.side === 'above' && 'is-above')}
+            style={{ maxHeight: tablePopover.height, left: tablePopover.left }}
+          >
+            <section className="note-color-section" aria-label="Color">
+              <h3 className="note-color-section-title">Color</h3>
+              <button
+                type="button"
+                role="menuitemradio"
+                data-tool
+                aria-label="Default text color"
+                aria-checked={!state.color}
+                tabIndex={-1}
+                onClick={() => chain().unsetMark('textColor').run()}
+              >
+                <span className="note-color-chip is-default-text" aria-hidden="true">
+                  A
+                </span>
+                <span>Default Color</span>
+                {!state.color ? <Check size={ICON} aria-hidden="true" /> : null}
+              </button>
+              {NOTE_COLORS.map((color) => (
+                <button
+                  key={'text-' + color.id}
+                  type="button"
+                  role="menuitemradio"
+                  data-tool
+                  aria-label={color.label + ' text color'}
+                  aria-checked={state.color === color.id}
+                  tabIndex={-1}
+                  onClick={() => chain().setMark('textColor', { color: color.id }).run()}
+                >
+                  <span className="note-color-chip" style={{ color: color.ink }} aria-hidden="true">
+                    A
+                  </span>
+                  <span>{color.label}</span>
+                  {state.color === color.id ? <Check size={ICON} aria-hidden="true" /> : null}
+                </button>
+              ))}
+            </section>
+            <section className="note-color-section" aria-label="Background">
+              <h3 className="note-color-section-title">Background</h3>
+              <button
+                type="button"
+                role="menuitemradio"
+                data-tool
+                aria-label="Default background"
+                aria-checked={!state.highlight}
+                tabIndex={-1}
+                onClick={() => chain().unsetHighlight().run()}
+              >
+                <span className="note-color-chip is-default-background" aria-hidden="true">
+                  A
+                </span>
+                <span>Default Background</span>
+                {!state.highlight ? <Check size={ICON} aria-hidden="true" /> : null}
+              </button>
+              {NOTE_COLORS.map((color) => (
+                <button
+                  key={'background-' + color.id}
+                  type="button"
+                  role="menuitemradio"
+                  data-tool
+                  aria-label={color.label + ' background'}
+                  aria-checked={state.highlight && state.highlightColor === color.id}
+                  tabIndex={-1}
+                  onClick={() => chain().setHighlight({ color: color.id }).run()}
+                >
+                  <span
+                    className="note-color-chip"
+                    style={{ color: color.ink, backgroundColor: color.fill }}
+                    aria-hidden="true"
+                  >
+                    A
+                  </span>
+                  <span>{color.label}</span>
+                  {state.highlight && state.highlightColor === color.id ? (
+                    <Check size={ICON} aria-hidden="true" />
+                  ) : null}
+                </button>
+              ))}
+            </section>
+          </div>
+        ) : null}
+        {mode === 'insertTable' ? (
+          <div
+            role="dialog"
+            aria-label="Insert table"
+            className={cn(
+              'note-bubble-menu note-table-size-popover',
+              tablePopover.side === 'above' && 'is-above',
+            )}
+            style={{ maxHeight: tablePopover.height }}
+          >
+            <TableSizePicker
+              onInsert={(rows, cols) => {
+                insertSelectionTable(editor, rows, cols);
+                setMode('tools');
+              }}
+            />
           </div>
         ) : null}
         {mode === 'table' && tableContext ? (

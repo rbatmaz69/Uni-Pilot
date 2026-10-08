@@ -111,3 +111,25 @@ describe('moving, duplicating and deleting blocks', () => {
     expect(saved(current)).toBe('A\n\nB\n');
   });
 });
+
+it('keeps the Markdown block grip off PDF pages and inserted sheets with their own page insertion controls', () => {
+  const editor = new Editor({
+    extensions: noteExtensions(),
+    content: {
+      type: 'doc',
+      content: [
+        {
+          type: 'pdfPage',
+          attrs: { src: 'attachments/a.pdf', page: 1, width: 595, height: 842, ink: '[]' },
+        },
+        { type: 'studyPage', content: [{ type: 'paragraph' }] },
+      ],
+    },
+  });
+  try {
+    expect(blockAt(editor.state.doc, 0)).toBeNull();
+    expect(blockAt(editor.state.doc, 3)).toBeNull();
+  } finally {
+    editor.destroy();
+  }
+});

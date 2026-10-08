@@ -392,6 +392,39 @@ describe('Document explorer', () => {
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Lecture 3');
   });
 
+  it('starts imported sheets without a cover or inline title and keeps the ordinary note cover', async () => {
+    const previousCover = useNoteStyleStore.getState().cover;
+    useNoteStyleStore.setState({ cover: 'blue' });
+    const body =
+      ':::pdfPage\n[Original](<attachments/original.pdf>)\n{"page":1,"width":595,"height":842}\n:::\n';
+    const base = request.getMockImplementation()!;
+    let imported = true;
+    request.mockImplementation((action) =>
+      action.action === 'read' && imported ? Promise.resolve(body) : base(action),
+    );
+    const { user } = await openNotes();
+    const workspace = screen.getByRole('region', { name: 'Edit Notes.md' });
+    expect(workspace).toHaveClass('has-study-pages');
+    expect(within(workspace).getByRole('heading', { level: 1, name: 'Notes' })).toHaveClass(
+      'note-crumb',
+    );
+    expect(within(workspace).queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
+    expect(workspace.querySelector('.note-page-cover')).toBeNull();
+    expect(workspace.querySelector('.note-page-eyebrow')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Document content' })).toHaveValue(body);
+
+    imported = false;
+    await user.click(screen.getByRole('button', { name: 'Back to board' }));
+    await user.dblClick(await screen.findByRole('button', { name: 'Select Notes.md' }));
+    const ordinary = await screen.findByRole('region', { name: 'Edit Notes.md' });
+    expect(ordinary).not.toHaveClass('has-study-pages');
+    expect(ordinary.querySelector('.note-page-cover.is-blue')).toBeInTheDocument();
+    expect(within(ordinary).getByRole('textbox', { name: 'Title' })).toHaveValue('Notes');
+    expect(useNoteStyleStore.getState().cover).toBe('blue');
+    expect(saves()).toEqual([]);
+    useNoteStyleStore.setState({ cover: previousCover });
+  });
+
   it('explains a title that cannot be a file name and keeps the old one', async () => {
     const { user } = await openNotes();
     const title = screen.getByRole('textbox', { name: 'Title' });
@@ -1181,10 +1214,18 @@ describe('ILIAS space', () => {
     expect(screen.getByRole('tab', { name: 'ILIAS' })).toHaveAttribute('aria-selected', 'true');
     const overview = screen.getByRole('region', { name: 'ILIAS' });
     expect(screen.queryByRole('button', { name: 'Add to canvas' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Search all documents' })).not.toBeInTheDocument();
     expect(request).not.toHaveBeenCalledWith({ action: 'list', path: ':ilias' });
 
     await user.click(within(overview).getByRole('button', { name: 'Blatt 6.zip New' }));
     await waitFor(() => expect(request).toHaveBeenCalledWith({ action: 'seen', path: sheet }));
+    expect(screen.getByLabelText('File details: Blatt 6.zip')).toBeInTheDocument();
+    expect(request).not.toHaveBeenCalledWith({ action: 'open', path: sheet });
+    await user.click(
+      within(screen.getByLabelText('File details: Blatt 6.zip')).getByRole('button', {
+        name: 'Open file',
+      }),
+    );
     expect(request).toHaveBeenCalledWith({ action: 'open', path: sheet });
     expect(await within(dock).findByRole('button', { name: 'ILIAS' })).toBeInTheDocument();
 
@@ -1199,4 +1240,11 @@ describe('ILIAS space', () => {
     expect(await screen.findByRole('button', { name: 'Add to canvas' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Go to parent folder' })).not.toBeInTheDocument();
   });
+});
+
+it('follows a course file link into the existing editor', async () => {
+  render(<DocumentExplorer initialFile="Notes.md" request="linked-file" />);
+  expect(await screen.findByRole('textbox', { name: 'Document content' })).toHaveValue('# Lecture');
+  expect(request).toHaveBeenCalledWith({ action: 'read', path: 'Notes.md' });
+  expect(request).not.toHaveBeenCalledWith({ action: 'open', path: 'Notes.md' });
 });

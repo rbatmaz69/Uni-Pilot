@@ -7,6 +7,7 @@ import {
 } from '@tiptap/core';
 import type { DrawingPresetId } from './drawingPresets';
 import { lineStart } from './markdownTokens';
+import { blockInsertionRange } from './selectionActions';
 
 export const CARD_TONES = ['yellow', 'peach', 'mint', 'blue', 'paper'] as const;
 export const CARD_SHAPES = [
@@ -190,7 +191,11 @@ export const NoteCard = Node.create({
       'Mod-Enter': () => {
         if (!this.editor.isActive('noteCard')) return false;
         const { $from } = this.editor.state.selection;
-        const after = $from.after(1);
+        let depth = $from.depth;
+        while (depth > 0 && $from.node(depth).type.name !== 'noteCard') depth -= 1;
+        // A layout only accepts cards; leave it too, but stay inside any enclosing note sheet.
+        if (depth > 1 && $from.node(depth - 1).type.name === 'noteLayout') depth -= 1;
+        const after = $from.after(depth);
         return this.editor
           .chain()
           .insertContentAt(after, { type: 'paragraph' })
@@ -302,11 +307,7 @@ export function createNoteVisual(id: DrawingPresetId): JSONContent {
 /** Insert after the current top-level block; never overwrite selected note text. */
 export function insertNoteVisual(editor: Editor, id: DrawingPresetId) {
   if (!editor.isEditable) return false;
-  const { $from, to } = editor.state.selection;
-  const empty =
-    $from.depth === 1 && $from.parent.type.name === 'paragraph' && !$from.parent.content.size;
-  const end = $from.depth ? $from.after(1) : to;
-  const from = empty ? $from.before(1) : end;
+  const { from, to: end } = blockInsertionRange(editor);
   const visual = createNoteVisual(id);
   return editor
     .chain()

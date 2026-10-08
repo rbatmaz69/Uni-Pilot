@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, EyeOff, File, FileText, GraduationCap, Plus, School } from 'lucide-react';
+import { Download, EyeOff, GraduationCap, Plus, School } from 'lucide-react';
 import { FolderArtwork } from './FolderArtwork';
+import { IliasFileDetails, type IliasFileSelection } from './IliasFileDetails';
 import { NewBadge } from './NewBadge';
+import { CourseFileIcon } from '@/features/courses/components/CourseFileIcon';
 import { CourseView } from '@/features/courses/components/CourseView';
 import { EmptyState, FailureNotice, SyncBar } from '@/features/courses/components/CourseNotices';
-import { iliasSpaceLink, splitCourseTitle } from '@/features/courses/lib/courses';
+import {
+  containerFor,
+  iliasSpaceLink,
+  splitCourseTitle,
+  type CourseFileKind,
+} from '@/features/courses/lib/courses';
 import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
-import { useCourseStore } from '@/features/courses/store/courseStore';
-import { editable, type DocumentEntry, type IliasCourse } from '@/features/documents/lib/files';
+import { hostOf, useCourseStore } from '@/features/courses/store/courseStore';
+import { type DocumentEntry, type IliasCourse } from '@/features/documents/lib/files';
 import { folderTone } from '@/features/documents/lib/folderTone';
 import {
-  addedAt,
   COURSE_DRAG,
   courseCards,
   iliasEntry,
@@ -22,6 +28,7 @@ import {
   type CourseCard,
   type IliasCourseView,
 } from '@/features/documents/lib/iliasSpace';
+import { recentIliasFiles } from '@/features/documents/lib/recentIliasFiles';
 import { IliasBadge } from '@/features/integrations';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
 import { canEmbedIlias } from '@/features/integrations/lib/iliasView';
@@ -31,7 +38,19 @@ import { NAV_ITEMS } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 
 /** How many of the newest files show before "Show all". */
-const NEWEST = 40;
+const NEWEST = 15;
+const INDEX_FRESH_MS = 15 * 60 * 1000;
+
+type FileStatus = 'all' | 'documents' | 'ilias' | 'gone';
+type FileSort = 'newest' | 'oldest' | 'name';
+const FILE_KINDS: { value: CourseFileKind; label: string }[] = [
+  { value: 'pdf', label: 'PDFs' },
+  { value: 'document', label: 'Documents' },
+  { value: 'presentation', label: 'Presentations' },
+  { value: 'spreadsheet', label: 'Spreadsheets' },
+  { value: 'image', label: 'Images' },
+  { value: 'other', label: 'Other files' },
+];
 
 interface IliasOverviewProps {
   /** The courses Documents keeps; `null` while they are read. */
@@ -39,13 +58,14 @@ interface IliasOverviewProps {
   /** The course open in the space, or `null` for all of them. */
   course: IliasCourseView | null;
   onOpen: (entry: DocumentEntry) => void;
+  onEdit?: (entry: DocumentEntry) => void;
   onAddCourse: (courseId: string) => void;
   onAddAllCourses: () => void;
 }
 
 /**
  * The ILIAS space: every course side by side, and below them the newest files
- * of the ones Documents keeps. A course opens here as ILIAS has it — folders,
+ * across those courses. A course opens here as ILIAS has it — folders,
  * exercises and whether its files sync. Lists, not a canvas: ILIAS files
  * arrive, the student does not arrange them.
  */
@@ -53,35 +73,58 @@ export function IliasOverview({
   courses,
   course,
   onOpen,
+  onEdit,
   onAddCourse,
   onAddAllCourses,
 }: IliasOverviewProps) {
   const connection = useIliasStore((state) => state.connection);
   const desktop = canEmbedIlias();
+  const [selection, setSelection] = useState<IliasFileSelection | null>(null);
 
   return (
-    <section className="ilias-overview scroll-area" aria-label="ILIAS">
-      {!desktop ? (
-        <EmptyState icon={GraduationCap} title="Your courses come from the desktop app">
-          Uni Pilot reads your ILIAS courses with the sign-in of its ILIAS view, and only the
-          desktop app has one. Open Uni Pilot there to see them.
-        </EmptyState>
-      ) : course && connection ? (
-        <CourseView
-          connection={connection}
-          courseId={course.courseId}
-          trail={course.trail}
-          exerciseId={course.exerciseId}
+    <section className="ilias-overview" aria-label="ILIAS">
+      <div className="ilias-overview-main scroll-area">
+        {!desktop ? (
+          <EmptyState icon={GraduationCap} title="Your courses come from the desktop app">
+            Uni Pilot reads your ILIAS courses with the sign-in of its ILIAS view, and only the
+            desktop app has one. Open Uni Pilot there to see them.
+          </EmptyState>
+        ) : course && connection ? (
+          <CourseView
+            connection={connection}
+            courseId={course.courseId}
+            trail={course.trail}
+            exerciseId={course.exerciseId}
+            onFileSelect={(item, selectedCourse, trail) =>
+              setSelection({ kind: 'course', item, course: selectedCourse, trail })
+            }
+          />
+        ) : (
+          <Overview
+            connection={connection}
+            synced={courses}
+            onOpen={onOpen}
+            onSelect={setSelection}
+            onAddCourse={onAddCourse}
+            onAddAllCourses={onAddAllCourses}
+          />
+        )}
+      </div>
+      {selection ? (
+        <IliasFileDetails
+          key={selection.kind === 'saved' ? selection.file.path : selection.item.refId}
+          selection={selection}
+          onEdit={
+            onEdit
+              ? (entry) => {
+                  setSelection(null);
+                  onEdit(entry);
+                }
+              : undefined
+          }
+          onClose={() => setSelection(null)}
         />
-      ) : (
-        <Overview
-          connection={connection}
-          synced={courses}
-          onOpen={onOpen}
-          onAddCourse={onAddCourse}
-          onAddAllCourses={onAddAllCourses}
-        />
-      )}
+      ) : null}
     </section>
   );
 }
@@ -90,22 +133,33 @@ function Overview({
   connection,
   synced,
   onOpen,
+  onSelect,
   onAddCourse,
   onAddAllCourses,
 }: {
   connection: IliasConnection | null;
   synced: IliasCourse[] | null;
   onOpen: (entry: DocumentEntry) => void;
+  onSelect: (selection: IliasFileSelection) => void;
   onAddCourse: (courseId: string) => void;
   onAddAllCourses: () => void;
 }) {
   const listed = useCourseStore((state) => state.courses);
+  const installation = useCourseStore((state) => state.installation);
+  const contents = useCourseStore((state) => state.contents);
   const loading = useCourseStore((state) => state.loading.courses === true);
   const loadCourses = useCourseStore((state) => state.loadCourses);
+  const loadContents = useCourseStore((state) => state.loadContents);
   const loadFolders = useCourseFilesStore((state) => state.load);
   const folders = useCourseFilesStore((state) => state.folders);
   const waiting = useCourseFilesStore((state) => state.waiting.length);
   const [all, setAll] = useState(false);
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState<CourseFileKind | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<FileStatus>('all');
+  const [sort, setSort] = useState<FileSort>('newest');
+  const [indexing, setIndexing] = useState(false);
+  const [scanRevision, setScanRevision] = useState(0);
 
   useEffect(() => {
     if (!connection) return;
@@ -113,14 +167,83 @@ function Overview({
     void loadFolders(connection);
   }, [connection, loadCourses, loadFolders]);
 
+  // File metadata is read without downloading. Walk the course tree in the
+  // background, reusing recent cached listings and stopping after a sign-in
+  // failure. The cached tree remains useful while ILIAS is unavailable.
+  const onlineIds =
+    listed?.items
+      .filter((item) => item.online)
+      .map((item) => `${item.providerType}:${item.refId}`)
+      .join('|') ?? '';
+  useEffect(() => {
+    if (!connection || !onlineIds || installation !== hostOf(connection)) return;
+    let active = true;
+    let canRead = true;
+    const queue = onlineIds.split('|').map((part) => {
+      const [providerType, refId] = part.split(':');
+      return { providerType: providerType ?? 'crs', refId: refId ?? '' };
+    });
+    const seen = new Set<string>();
+    const worker = async () => {
+      while (active && queue.length > 0) {
+        const next = queue.shift();
+        if (!next?.refId || seen.has(next.refId)) continue;
+        seen.add(next.refId);
+        const previous = useCourseStore.getState().contents[next.refId];
+        const fresh =
+          scanRevision === 0 &&
+          previous &&
+          Date.now() - new Date(previous.loadedAt).getTime() < INDEX_FRESH_MS;
+        if (canRead && !fresh) {
+          await loadContents(connection, containerFor(next.providerType) ?? 'fold', next.refId);
+          if (useCourseStore.getState().failure?.kind === 'session-expired') canRead = false;
+        }
+        for (const item of useCourseStore.getState().contents[next.refId]?.items ?? []) {
+          if (containerFor(item.providerType))
+            queue.push({ providerType: item.providerType, refId: item.refId });
+        }
+      }
+    };
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setIndexing(true);
+      try {
+        await Promise.all([worker(), worker()]);
+      } finally {
+        if (active) setIndexing(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [connection, installation, loadContents, onlineIds, scanRevision]);
+
   const kept = keptCourses(synced ?? [], folders);
   const cards = courseCards(listed?.items ?? [], kept);
   const offline = offlineCourses(listed?.items ?? [], kept);
-  const files = newestFiles(kept);
+  const files = recentIliasFiles(listed?.items ?? [], contents, newestFiles(kept));
   const remote = cards.filter((card) => !card.synced).length;
-  const shown = all ? files : files.slice(0, NEWEST);
+  const courseOptions = Array.from(
+    new Map(files.map((file) => [file.courseId, file.courseTitle])).entries(),
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+  const filtered = files
+    .filter(
+      (file) =>
+        (courseFilter === 'all' || file.courseId === courseFilter) &&
+        (typeFilter === 'all' || file.kind === typeFilter) &&
+        (statusFilter === 'all' || file.status === statusFilter),
+    )
+    .sort((a, b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name, undefined, { numeric: true });
+      if (a.time === null) return b.time === null ? 0 : 1;
+      if (b.time === null) return -1;
+      const difference = b.time - a.time;
+      return sort === 'newest' ? difference : -difference;
+    });
+  const shown = all ? filtered : filtered.slice(0, NEWEST);
   const refresh = () => {
     if (connection) void loadCourses(connection);
+    if (!indexing) setScanRevision((revision) => revision + 1);
   };
 
   return (
@@ -188,11 +311,83 @@ function Overview({
         </>
       )}
 
-      <h3 className="ilias-overview-title">Newest files</h3>
+      <div className="ilias-files-heading">
+        <h3 className="ilias-overview-title">Newest files</h3>
+        <span>{indexing ? 'Reading courses…' : `${filtered.length} files`}</span>
+      </div>
+      <div className="ilias-files-filters" aria-label="Filter files">
+        <label>
+          <span>Course</span>
+          <select
+            value={courseFilter}
+            onChange={(event) => {
+              setCourseFilter(event.target.value);
+              setAll(false);
+            }}
+          >
+            <option value="all">All courses</option>
+            {courseOptions.map(([id, title]) => (
+              <option key={id} value={id}>
+                {splitCourseTitle(title).name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Type</span>
+          <select
+            value={typeFilter}
+            onChange={(event) => {
+              setTypeFilter(event.target.value as CourseFileKind | 'all');
+              setAll(false);
+            }}
+          >
+            <option value="all">All types</option>
+            {FILE_KINDS.map((kind) => (
+              <option key={kind.value} value={kind.value}>
+                {kind.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Location</span>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as FileStatus);
+              setAll(false);
+            }}
+          >
+            <option value="all">Everywhere</option>
+            <option value="documents">In Documents</option>
+            <option value="ilias">On ILIAS</option>
+            <option value="gone">No longer on ILIAS</option>
+          </select>
+        </label>
+        <label>
+          <span>Sort</span>
+          <select
+            value={sort}
+            onChange={(event) => {
+              setSort(event.target.value as FileSort);
+              setAll(false);
+            }}
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name">File name</option>
+          </select>
+        </label>
+      </div>
       {files.length === 0 ? (
         <p className="ilias-overview-hint">
-          Nothing has arrived yet. Files come here once a course is in Documents.
+          {indexing
+            ? 'Reading files from your ILIAS courses…'
+            : 'No files found in your courses yet.'}
         </p>
+      ) : filtered.length === 0 ? (
+        <p className="ilias-overview-hint">No files match these filters.</p>
       ) : (
         <table className="ilias-files">
           <caption className="sr-only">Newest files from all your courses</caption>
@@ -200,35 +395,61 @@ function Overview({
             <tr>
               <th scope="col">File</th>
               <th scope="col">Course</th>
-              <th scope="col">Added</th>
+              <th scope="col">Updated</th>
             </tr>
           </thead>
           <tbody>
-            {shown.map((file) => {
-              const entry = iliasEntry(file);
-              const Icon = editable(entry) ? FileText : File;
+            {shown.map((row) => {
+              const file = row.source === 'saved' ? row.file : null;
               return (
-                <tr key={file.path}>
+                <tr key={row.id}>
                   <td>
-                    <button type="button" onClick={() => onOpen(entry)}>
-                      <Icon size={16} strokeWidth={1.7} aria-hidden />
-                      <span>{file.name}</span>
-                      {file.unseen ? ' ' : null}
-                      <NewBadge count={file.unseen ? 1 : 0} file />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (row.source === 'saved') {
+                          onSelect({ kind: 'saved', file: row.file });
+                          onOpen(iliasEntry(row.file));
+                        } else {
+                          onSelect({
+                            kind: 'course',
+                            item: row.item,
+                            course: row.course,
+                            trail: row.trail,
+                          });
+                        }
+                      }}
+                    >
+                      <CourseFileIcon
+                        title={row.name}
+                        suffix={row.source === 'ilias' ? (row.item.file?.suffix ?? null) : null}
+                        size="sm"
+                      />
+                      <span>{row.name}</span>
+                      {file?.unseen ? ' ' : null}
+                      <NewBadge count={file?.unseen ? 1 : 0} file />
                     </button>
-                    {file.gone ? <span className="ilias-file-gone">No longer on ILIAS</span> : null}
+                    {row.status === 'gone' ? (
+                      <span className="ilias-file-gone">No longer on ILIAS</span>
+                    ) : row.status === 'ilias' ? (
+                      <span className="ilias-file-gone">On ILIAS</span>
+                    ) : null}
                   </td>
-                  <td>{splitCourseTitle(file.course.title).name}</td>
-                  <td>{formatShortDayLabel(new Date(addedAt(file)))}</td>
+                  <td>{splitCourseTitle(row.courseTitle).name}</td>
+                  <td>
+                    {row.time === null
+                      ? 'Date unavailable'
+                      : formatShortDayLabel(new Date(row.time))}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       )}
-      {files.length > NEWEST ? (
+      {filtered.length > NEWEST ? (
         <button type="button" className="ilias-overview-more" onClick={() => setAll(!all)}>
-          {all ? 'Show only the newest' : 'Show all files'}
+          {all ? 'Show first 15' : `Show all ${filtered.length} files`}
         </button>
       ) : null}
 

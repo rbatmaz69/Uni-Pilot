@@ -21,6 +21,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             reminders::reminder_request,
             documents::document_request,
+            documents::download_document,
             documents::document_upload,
             preview_cache::preview_cache_read,
             preview_cache::preview_cache_write,

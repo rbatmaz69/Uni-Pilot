@@ -1,6 +1,7 @@
 import type { Editor, JSONContent, MarkdownTokenizer } from '@tiptap/core';
 import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
 import { lineStart } from './markdownTokens';
+import { blockInsertionRange } from './selectionActions';
 
 /**
  * A toggle: a summary line that opens to show its content, e.g. a question
@@ -123,11 +124,7 @@ export function createToggle(summary = '', content: JSONContent[] = []): JSONCon
 /** Inserts an empty toggle after the current block and puts the cursor in its summary. */
 export function insertToggle(editor: Editor) {
   if (!editor.isEditable) return false;
-  const { $from } = editor.state.selection;
-  const empty =
-    $from.depth === 1 && $from.parent.type.name === 'paragraph' && !$from.parent.content.size;
-  const end = $from.depth ? $from.after(1) : editor.state.doc.content.size;
-  const from = empty ? $from.before(1) : end;
+  const { from, to: end } = blockInsertionRange(editor);
   return editor
     .chain()
     .focus()

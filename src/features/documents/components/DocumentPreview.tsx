@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { studyDocument } from '@/features/documents/lib/studyImport';
 import { Button, Modal } from '@/components/ui';
 import {
   documentRequest,
@@ -8,7 +9,15 @@ import {
 
 const PdfPreview = lazy(() => import('./PdfPreview'));
 
-export function DocumentPreview({ entry, onClose }: { entry: DocumentEntry; onClose: () => void }) {
+export function DocumentPreview({
+  entry,
+  onClose,
+  onEdit,
+}: {
+  entry: DocumentEntry;
+  onClose: () => void;
+  onEdit?: () => Promise<void>;
+}) {
   const [data, setData] = useState<DocumentPreviewData | null>(null);
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
@@ -36,6 +45,19 @@ export function DocumentPreview({ entry, onClose }: { entry: DocumentEntry; onCl
       className="max-w-5xl"
       footer={
         <>
+          {onEdit && studyDocument(entry) ? (
+            <Button
+              disabled={opening || !data}
+              onClick={() => {
+                setOpening(true);
+                void onEdit()
+                  .catch((cause: unknown) => setError(String(cause)))
+                  .finally(() => setOpening(false));
+              }}
+            >
+              Im Notizeditor öffnen
+            </Button>
+          ) : null}
           <Button
             disabled={opening}
             onClick={() => {

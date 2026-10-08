@@ -7,7 +7,10 @@ import { documentRequest, type IliasCourse, type IliasFile } from '@/features/do
 import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
-import type { IliasCourse as ListedCourse } from '@/features/integrations/lib/iliasSync';
+import type {
+  IliasContentItem,
+  IliasCourse as ListedCourse,
+} from '@/features/integrations/lib/iliasSync';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 
 vi.mock('@/features/documents/lib/files', async (original) => ({
@@ -57,6 +60,16 @@ const listed = (refId: string, title: string, online = true): ListedCourse => ({
   period: null,
   properties: [],
 });
+const remoteFile = (refId: string, title: string, updatedAt: string): IliasContentItem => ({
+  refId,
+  parentRefId: 'folder-1',
+  providerType: 'file',
+  title,
+  description: null,
+  block: null,
+  file: { suffix: 'pdf', size: 1024, version: 1, updatedAt },
+  properties: [],
+});
 
 const HHN: IliasConnection = {
   name: 'Hochschule Heilbronn',
@@ -74,7 +87,7 @@ beforeEach(() => {
   Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
   vi.mocked(documentRequest).mockResolvedValue({ root: '/workspace', entries: [] });
   useIliasStore.setState({ connection: null });
-  useCourseStore.setState({ courses: null, loading: {}, failure: null });
+  useCourseStore.setState({ courses: null, contents: {}, loading: {}, failure: null });
   useCourseFilesStore.setState({ folders: null, syncing: {}, failures: {}, waiting: [] });
 });
 
@@ -198,14 +211,80 @@ describe('ILIAS overview', () => {
           .map((cell) => cell.textContent?.trim()),
       ),
     ).toEqual([
-      ['Blatt 6.pdf', 'Datenbanken 1 - WS26', 'Thu, 8 Oct 2026'],
-      ['Skript.pdfNo longer on ILIAS', 'Analysis II - WS26', 'Thu, 1 Oct 2026'],
-      ['Kapitel 1.pdf', 'Datenbanken 1 - WS26', 'Thu, 24 Sep 2026'],
+      ['PDFBlatt 6.pdf', 'Datenbanken 1 - WS26', 'Thu, 8 Oct 2026'],
+      ['PDFSkript.pdfNo longer on ILIAS', 'Analysis II - WS26', 'Thu, 1 Oct 2026'],
+      ['PDFKapitel 1.pdf', 'Datenbanken 1 - WS26', 'Thu, 24 Sep 2026'],
     ]);
     await user.click(within(rows[0]!).getByRole('button', { name: 'Blatt 6.pdf New' }));
     expect(onOpen).toHaveBeenCalledWith(
       expect.objectContaining({ path: `${datenbanken}/Folien/Blatt 6.pdf`, unseen: 1 }),
     );
+    expect(screen.getByLabelText('File details: Blatt 6.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close file details' })).toBeInTheDocument();
+  });
+
+  it('includes nested ILIAS files and filters across courses, type, location and order', async () => {
+    useCourseStore.setState({
+      courses: {
+        items: [listed('7', '262009 Datenbanken 1 - WS26'), listed('8', 'Analysis II - WS26')],
+        loadedAt: '2026-09-28',
+      },
+      contents: {
+        '7': {
+          loadedAt: '2026-09-28',
+          items: [
+            {
+              ...remoteFile('folder-1', 'Übungen', '2026-10-09'),
+              providerType: 'fold',
+              file: null,
+            },
+          ],
+        },
+        'folder-1': {
+          loadedAt: '2026-09-28',
+          items: [remoteFile('remote-1', 'Newest.pdf', '2026-10-12')],
+        },
+      },
+    });
+    const { user } = renderOverview();
+    const table = screen.getByRole('table', { name: 'Newest files from all your courses' });
+    expect(within(table).getAllByRole('row')).toHaveLength(5);
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Newest.pdf');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Course' }), '8');
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+    expect(table).toHaveTextContent('Skript.pdf');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Course' }), 'all');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Location' }), 'ilias');
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+    await user.click(within(table).getByRole('button', { name: 'Newest.pdf' }));
+    expect(screen.getByLabelText('File details: Newest.pdf')).toHaveTextContent('On ILIAS');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Location' }), 'all');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Type' }), 'pdf');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'oldest');
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Kapitel 1.pdf');
+  });
+
+  it('shows 15 recent files by default and can reveal the rest', async () => {
+    const many: IliasCourse[] = [
+      {
+        ...kept[0]!,
+        files: Array.from({ length: 18 }, (_, index) =>
+          file(
+            datenbanken,
+            `Lecture ${index + 1}.pdf`,
+            `2026-10-${String(index + 1).padStart(2, '0')}T10:00`,
+          ),
+        ),
+      },
+    ];
+    const { user } = renderOverview(many);
+    const table = screen.getByRole('table', { name: 'Newest files from all your courses' });
+    expect(within(table).getAllByRole('row')).toHaveLength(16);
+    await user.click(screen.getByRole('button', { name: 'Show all 18 files' }));
+    expect(within(table).getAllByRole('row')).toHaveLength(19);
   });
 
   it('asks to connect ILIAS, still showing the courses already in Documents', () => {

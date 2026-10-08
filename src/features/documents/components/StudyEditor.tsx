@@ -1,3 +1,6 @@
+import { EditablePdfPage, EditableStudyPage } from '@/features/documents/components/StudyPage';
+import { StudyAnnotationToolbar } from '@/features/documents/components/StudyAnnotationToolbar';
+import { StudyDocumentControls } from '@/features/documents/components/StudyDocumentControls';
 import {
   useEffect,
   useEffectEvent,
@@ -170,7 +173,8 @@ export function StudyEditor({
   const initial = useMemo(() => splitFrontMatter(initialContent), [initialContent]);
   const [mode, setMode] = useState<Mode>('text');
   const settings = useNoteStyleStore();
-  const notebook = settings.style === 'notebook';
+  const study = /^:{3,}(?:pdfPage|studyPage)(?:[ \t]+[^\r\n]+)?\r?$/m.test(initial.body);
+  const notebook = settings.style === 'notebook' && !study;
   const [drawingOpened, setDrawingOpened] = useState(false);
   const [status, setStatus] = useState<AutosaveState>({ kind: 'saved' });
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -199,6 +203,8 @@ export function StudyEditor({
       ...noteExtensions({
         image: NoteImage.configure({ allowBase64: true, notePath: path }),
         placeholder: 'Write, or type / for blocks…',
+        pdfPage: EditablePdfPage.configure({ notePath: path }),
+        studyPage: EditableStudyPage,
         card: EditableNoteCard,
         layout: EditableNoteLayout,
         codeBlock: EditableNoteCodeBlock,
@@ -273,9 +279,11 @@ export function StudyEditor({
     // A notebook opens where its ribbon lies, or on the first page.
     const current = useNoteStyleStore.getState();
     source.commands.focus(
-      current.style === 'notebook' ? (current.bookmarks[path] ?? 'start') : 'start',
+      !study && current.style === 'notebook' ? (current.bookmarks[path] ?? 'start') : 'start',
+      // An atomic PDF selection must not scroll its caption behind the toolbar on opening.
+      { scrollIntoView: !study },
     );
-  }, [path, source]);
+  }, [path, source, study]);
 
   useEffect(() => {
     if (!plain && !source) return;
@@ -494,7 +502,7 @@ export function StudyEditor({
   const showSidebar = Boolean(source) && onPage && settings.sidebar;
   // A text file is one textarea, which cannot break across sheets.
   const layout =
-    settings.layout === 'pages' && /\.txt$/i.test(entry.name) ? 'card' : settings.layout;
+    study || (settings.layout === 'pages' && /\.txt$/i.test(entry.name)) ? 'card' : settings.layout;
   const paged = onPage && layout === 'pages';
   const sheets = usePageSheets(page, flow, paged);
   const { zoom, zoomTo } = usePageZoom(stage, paged);
@@ -532,7 +540,7 @@ export function StudyEditor({
 
   return (
     <section
-      className={cn('note-workspace', settings.focus && 'is-focus')}
+      className={cn('note-workspace', settings.focus && 'is-focus', study && 'has-study-pages')}
       aria-label={`Edit ${entry.name}`}
       data-font={settings.font}
       data-text-size={settings.textSize}
@@ -573,8 +581,8 @@ export function StudyEditor({
               {folder}
             </span>
           ))}
-          {/* The page carries the title as its heading; in the notebook and the drawing it lives here. */}
-          {onPage ? (
+          {/* Imported sheets keep their heading here so the first page starts below the tools. */}
+          {onPage && !study ? (
             <span className="note-crumb is-current" aria-current="page">
               {title}
             </span>
@@ -583,6 +591,15 @@ export function StudyEditor({
           )}
         </nav>
         {sheets ? <PageZoom stage={stage} layout={sheets} zoom={zoom} onZoom={zoomTo} /> : null}
+        {source && study ? (
+          <StudyDocumentControls
+            editor={source}
+            entry={entry}
+            readContent={currentText}
+            flush={flushAll}
+            report={setNotice}
+          />
+        ) : null}
         <SaveStatus
           state={status}
           savedLabel="Saved on your computer"
@@ -683,6 +700,7 @@ export function StudyEditor({
               onOpenCanvas={() => selectMode('drawing')}
             />
           ) : null}
+          {source && study ? <StudyAnnotationToolbar editor={source} report={setNotice} /> : null}
           <div className="note-shell">
             {showSidebar && source ? (
               <NoteSidebar editor={source} scrollRoot={stage} searchRequest={searchRequest} />
@@ -726,27 +744,31 @@ export function StudyEditor({
                       {/* Outside the text layer, whose clip hides the margins it sits in. */}
                       {source ? <BlockHandle editor={source} container={page} /> : null}
                       <div ref={setFlow} className="note-page-flow">
-                        {settings.cover !== 'none' ? (
-                          <div
-                            className={cn('note-page-cover', `is-${settings.cover}`)}
-                            aria-hidden="true"
-                          >
-                            <span />
-                            <span />
-                            <span />
-                          </div>
+                        {!study ? (
+                          <>
+                            {settings.cover !== 'none' ? (
+                              <div
+                                className={cn('note-page-cover', `is-${settings.cover}`)}
+                                aria-hidden="true"
+                              >
+                                <span />
+                                <span />
+                                <span />
+                              </div>
+                            ) : null}
+                            <div className="note-page-eyebrow">
+                              <NotebookPen size={14} aria-hidden />
+                              <span>{folders.at(-1) || 'Personal notes'}</span>
+                            </div>
+                            <NoteTitle
+                              title={title}
+                              fileName={entry.name}
+                              disabled={renaming}
+                              onRename={rename}
+                              onContinue={continueFromTitle}
+                            />
+                          </>
                         ) : null}
-                        <div className="note-page-eyebrow">
-                          <NotebookPen size={14} aria-hidden />
-                          <span>{folders.at(-1) || 'Personal notes'}</span>
-                        </div>
-                        <NoteTitle
-                          title={title}
-                          fileName={entry.name}
-                          disabled={renaming}
-                          onRename={rename}
-                          onContinue={continueFromTitle}
-                        />
                         {plain ? (
                           plainEditor
                         ) : source ? (
@@ -759,15 +781,17 @@ export function StudyEditor({
                   </div>
                 </div>
               )}
-              <EditorDock
-                editor={source}
-                disabled={readOnly || renaming}
-                onInsertImage={() => imageInput.current?.click()}
-                onOpenCanvas={() => selectMode('drawing')}
-                readStats={() => (source ? noteStats(source.state.doc) : plainStats(plainText))}
-                fileName={entry.name}
-                keepsProperties={Boolean(initial.frontMatter)}
-              />
+              {!study ? (
+                <EditorDock
+                  editor={source}
+                  disabled={readOnly || renaming}
+                  onInsertImage={() => imageInput.current?.click()}
+                  onOpenCanvas={() => selectMode('drawing')}
+                  readStats={() => (source ? noteStats(source.state.doc) : plainStats(plainText))}
+                  fileName={entry.name}
+                  keepsProperties={Boolean(initial.frontMatter)}
+                />
+              ) : null}
             </div>
           </div>
           {source ? (
