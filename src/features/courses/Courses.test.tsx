@@ -26,6 +26,7 @@ const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise
 vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tauri-apps/api/core')>()),
   invoke: (command: string, args: Record<string, unknown>) => invoke(command, args),
+  isTauri: () => false,
 }));
 
 vi.mock('@tauri-apps/api/event', () => ({
