@@ -341,7 +341,10 @@ function handle(Mail, command, input) {
     case 'send': {
       // Built without a window, so Mail stays where the student left it.
       const message = newMessage(Mail, input, false);
-      if (safely(() => message.send(), false) === true) return { ok: true, sent: true };
+      if (safely(() => {
+        message.send();
+        return true;
+      }, false)) return { ok: true, sent: true };
       // Mail did not take it. Show it as a draft, so nothing typed is lost.
       safely(() => {
         message.visible = true;
