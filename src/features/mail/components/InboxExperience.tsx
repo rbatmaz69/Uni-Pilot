@@ -2,41 +2,39 @@ import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from
 import {
   Columns3,
   Check,
-  ChevronDown,
   Inbox,
-  X,
   Mail,
-  MailPlus,
   MonitorSmartphone,
   RefreshCw,
   Rows3,
-  Search,
   ShieldQuestion,
+  SquarePen,
 } from 'lucide-react';
-import { Button, IconButton } from '@/components/ui';
+import { useSectionPanelShown } from '@/components/layout/sectionPanelHost';
+import { Button } from '@/components/ui';
 import { isDesktopRuntime } from '@/lib/icsFetch';
 import { cn } from '@/lib/utils';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { launchMail, type MailFailure, type MailMessage } from '@/features/mail/lib/appleMail';
 import {
-  CATEGORY_LABELS,
   categoryOf,
-  courseFor,
   courseRefs,
+  filterGroups,
   formatChecked,
   matchesFilter,
   matchesSearch,
   universityDomain,
-  type CourseRef,
-  type MailCategory,
   type MailFilter,
   type TriageState,
 } from '@/features/mail/lib/mail';
 import { useMailStore } from '@/features/mail/store/mailStore';
+import { AccountSwitcher } from '@/features/mail/components/AccountSwitcher';
 import { ComposeDialog } from '@/features/mail/components/ComposeDialog';
+import { MailPanel } from '@/features/mail/components/MailPanel';
 import '@/features/mail/mail.css';
-import { MessageList, TriageBoard } from '@/features/mail/components/MessageList';
+import { MailList } from '@/features/mail/components/MailList';
+import { TriageBoard } from '@/features/mail/components/MessageList';
 import { ReadingPane } from '@/features/mail/components/ReadingPane';
 
 /** Opening the page or coming back to the window asks Mail again only after this long. */
@@ -90,51 +88,6 @@ export function InboxExperience() {
   return <MailWorkspace domain={domain} />;
 }
 
-interface Chip {
-  id: MailFilter;
-  label: string;
-  count: number;
-}
-
-function chipsFor(
-  messages: readonly MailMessage[],
-  domain: string | null,
-  refs: readonly CourseRef[],
-  triage: Readonly<Record<string, TriageState>>,
-): Chip[] {
-  const count = (test: (message: MailMessage) => boolean) => messages.filter(test).length;
-  const chips: Chip[] = [
-    { id: 'all', label: 'All', count: messages.length },
-    { id: 'unread', label: 'Unread', count: count((message) => !message.read) },
-    {
-      id: 'reply',
-      label: 'Needs reply',
-      count: count((message) => triage[message.id] === 'reply'),
-    },
-  ];
-  for (const category of ['university', 'ilias', 'students'] as MailCategory[]) {
-    chips.push({
-      id: category,
-      label: CATEGORY_LABELS[category],
-      count: count((message) => categoryOf(message, domain) === category),
-    });
-  }
-  // The courses the inbox talks about most, by how often.
-  const byCourse = new Map<string, { ref: CourseRef; count: number }>();
-  for (const message of messages) {
-    const course = courseFor(message, refs);
-    if (!course) continue;
-    const known = byCourse.get(course.refId);
-    byCourse.set(course.refId, { ref: course, count: (known?.count ?? 0) + 1 });
-  }
-  for (const { ref, count: n } of [...byCourse.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4)) {
-    chips.push({ id: `course:${ref.refId}`, label: ref.key, count: n });
-  }
-  return chips.filter((chip) => chip.id === 'all' || chip.count > 0);
-}
-
 function summaryOf(
   messages: readonly MailMessage[] | null,
   domain: string | null,
@@ -153,13 +106,16 @@ function summaryOf(
 
 export function MailWorkspace({ domain }: { domain: string | null }) {
   const account = useMailStore((state) => state.account);
+  const accounts = useMailStore((state) => state.accounts);
+  // The panel is the list, with the account, Refresh and New message on top; hidden, the card
+  // offers all of that itself.
+  const panelShown = useSectionPanelShown();
   const messages = useMailStore((state) => state.messages);
   const checkedAt = useMailStore((state) => state.checkedAt);
   const loading = useMailStore((state) => state.loading);
   const selectedId = useMailStore((state) => state.selectedId);
   const triage = useMailStore((state) => state.triage);
   const view = useMailStore((state) => state.view);
-  const accounts = useMailStore((state) => state.accounts);
   const courses = useCourseStore((state) => state.courses?.items);
   const [filter, setFilter] = useState<MailFilter>('all');
   const [query, setQuery] = useState('');
@@ -167,7 +123,7 @@ export function MailWorkspace({ domain }: { domain: string | null }) {
 
   const refs = useMemo(() => courseRefs(courses ?? []), [courses]);
   const all = messages ?? [];
-  const chips = chipsFor(all, domain, refs, triage);
+  const groups = filterGroups(all, { domain, refs, triage });
   const shown = all.filter(
     (message) =>
       matchesFilter(message, filter, { domain, refs, triage }) && matchesSearch(message, query),
@@ -175,9 +131,50 @@ export function MailWorkspace({ domain }: { domain: string | null }) {
   const summary = summaryOf(messages, domain, triage);
   const { refresh, select, setView } = useMailStore.getState();
   const now = new Date();
+  // The inbox as a list: the panel when it is shown, the card's left column when not.
+  const list = {
+    messages: shown,
+    inbox: messages,
+    loading,
+    groups,
+    refs,
+    filter,
+    onFilter: setFilter,
+    query,
+    onQuery: setQuery,
+    selectedId,
+    onSelect: (id: string) => void select(id),
+  };
+  const board = (
+    <TriageBoard
+      messages={shown}
+      selectedId={selectedId}
+      triage={triage}
+      onSelect={(id) => void select(id)}
+    />
+  );
+
+  const chooseAccount = (name: string) => {
+    useMailStore.getState().chooseAccount(name);
+    // Another account's mail is a different inbox: nothing of the old one carries over.
+    setFilter('all');
+    setQuery('');
+    void refresh(domain);
+  };
 
   return (
-    <div className="mail-workspace" data-view={view} data-selected={Boolean(selectedId)}>
+    <div
+      className="mail-workspace"
+      data-view={view}
+      data-selected={Boolean(selectedId)}
+      data-list={panelShown ? 'panel' : 'card'}
+    >
+      <MailPanel
+        {...list}
+        onRefresh={() => void refresh(domain)}
+        onCompose={() => setComposing(true)}
+        onAccount={chooseAccount}
+      />
       <header className="mail-workspace-header">
         <div className="mail-heading">
           <span className="mail-heading-icon">
@@ -191,6 +188,41 @@ export function MailWorkspace({ domain }: { domain: string | null }) {
           </div>
         </div>
         <div className="mail-header-actions">
+          {panelShown ? null : (
+            <div className="mail-header-tools">
+              {accounts && accounts.length > 1 ? (
+                <AccountSwitcher
+                  accounts={accounts}
+                  account={account}
+                  onPick={chooseAccount}
+                  placement="card"
+                />
+              ) : null}
+              <button
+                type="button"
+                className="mail-tool mail-tool--icon"
+                aria-label="Refresh"
+                title="Refresh"
+                disabled={loading}
+                onClick={() => void refresh(domain)}
+              >
+                <RefreshCw
+                  size={15}
+                  strokeWidth={1.8}
+                  aria-hidden
+                  className={cn(loading && 'animate-spin')}
+                />
+              </button>
+              <button
+                type="button"
+                className="mail-tool mail-tool--primary"
+                onClick={() => setComposing(true)}
+              >
+                <SquarePen size={14} strokeWidth={1.8} aria-hidden />
+                New message
+              </button>
+            </div>
+          )}
           <div role="group" aria-label="View" className="mail-view-toggle">
             {(
               [
@@ -215,140 +247,40 @@ export function MailWorkspace({ domain }: { domain: string | null }) {
               </button>
             ))}
           </div>
-
-          <IconButton
-            label="Refresh"
-            size="sm"
-            disabled={loading}
-            onClick={() => void refresh(domain)}
-          >
-            <RefreshCw
-              size={15}
-              strokeWidth={1.8}
-              aria-hidden
-              className={cn(loading && 'animate-spin')}
-            />
-          </IconButton>
-          <Button
-            variant="primary"
-            size="sm"
-            className="mail-compose-button"
-            onClick={() => setComposing(true)}
-            leadingIcon={<MailPlus size={14} strokeWidth={1.8} aria-hidden />}
-          >
-            New message
-          </Button>
         </div>
       </header>
 
-      <div className={cn('mail-panes', view === 'board' && selectedId && 'mail-panes--board-open')}>
-        <div className={cn('mail-list-pane', selectedId && 'max-lg:hidden')}>
-          <div className="mail-list-controls">
-            <label className="mail-search">
-              <Search size={16} strokeWidth={1.7} aria-hidden />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search your mail…"
-                aria-label="Search mail"
-              />
-              {query && (
-                <button type="button" aria-label="Clear search" onClick={() => setQuery('')}>
-                  <X size={14} aria-hidden />
-                </button>
+      <div
+        className={cn(
+          'mail-panes',
+          panelShown && view === 'list' && 'mail-panes--reader',
+          view === 'board' && selectedId && 'mail-panes--board-open',
+        )}
+      >
+        {/* Beside the panel the card is the open message (or the board); without it the card
+            holds the list as well, on the left. */}
+        {!panelShown ? (
+          <MailList {...list} className={cn(selectedId && 'max-lg:hidden')}>
+            {view === 'board' ? board : undefined}
+          </MailList>
+        ) : view === 'board' ? (
+          <div className={cn('mail-list-pane', selectedId && 'max-lg:hidden')}>
+            <div className="mail-list-scroll scroll-area">
+              {shown.length > 0 ? (
+                board
+              ) : (
+                <p className="px-4 py-6 text-[13px] text-secondary">
+                  {all.length === 0 ? 'Your inbox is empty.' : 'Nothing here with this filter.'}
+                </p>
               )}
-            </label>
-            <div role="group" aria-label="Show" className="mail-filters">
-              {chips
-                .filter((chip) => ['all', 'unread', 'reply'].includes(chip.id))
-                .map((chip) => (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    aria-pressed={filter === chip.id}
-                    onClick={() => setFilter(chip.id)}
-                  >
-                    {chip.label}
-                    {chip.id !== 'all' && <span>{chip.count}</span>}
-                  </button>
-                ))}
-              <details
-                className="mail-filter-menu"
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.currentTarget.removeAttribute('open');
-                    event.currentTarget.querySelector('summary')?.focus();
-                  }
-                }}
-              >
-                <summary aria-label="Filter by sender or course" title="Filter by sender or course">
-                  <span>{!['all', 'unread', 'reply'].includes(filter) ? 'Filtered' : 'More'}</span>
-                  <ChevronDown size={12} aria-hidden />
-                </summary>
-                <div className="mail-filter-options">
-                  <p>Sender &amp; course</p>
-                  {chips
-                    .filter((chip) => !['all', 'unread', 'reply'].includes(chip.id))
-                    .map((chip) => (
-                      <button
-                        key={chip.id}
-                        type="button"
-                        aria-pressed={filter === chip.id}
-                        onClick={(event) => {
-                          setFilter(chip.id);
-                          const menu = event.currentTarget.closest('details');
-                          menu?.removeAttribute('open');
-                          menu?.querySelector('summary')?.focus();
-                        }}
-                      >
-                        {chip.label}
-                        <span>{chip.count}</span>
-                      </button>
-                    ))}
-                </div>
-              </details>
             </div>
-            {!['all', 'unread', 'reply'].includes(filter) && (
-              <button type="button" className="mail-active-filter" onClick={() => setFilter('all')}>
-                {chips.find((chip) => chip.id === filter)?.label ?? 'Course filter'}
-                <X size={12} aria-hidden />
-                <span className="sr-only">Clear filter</span>
-              </button>
-            )}
           </div>
-          <div className="mail-list-scroll scroll-area">
-            {!messages && loading ? (
-              <p className="px-4 py-6 text-[13px] text-secondary">Asking Apple Mail…</p>
-            ) : shown.length === 0 ? (
-              <p className="px-4 py-6 text-[13px] text-secondary">
-                {all.length === 0 ? 'Your inbox is empty.' : 'Nothing here with this filter.'}
-              </p>
-            ) : view === 'board' ? (
-              <TriageBoard
-                messages={shown}
-                selectedId={selectedId}
-                triage={triage}
-                onSelect={(id) => void select(id)}
-              />
-            ) : (
-              <MessageList
-                messages={shown}
-                selectedId={selectedId}
-                onSelect={(id) => void select(id)}
-              />
-            )}
-          </div>
-          <div className="mail-list-count">
-            {shown.length} {shown.length === 1 ? 'message' : 'messages'}
-            <span>Newest first</span>
-          </div>
-        </div>
+        ) : null}
         <div
           className={cn(
             'mail-reading-pane scroll-area',
-            !selectedId && 'max-lg:hidden',
-            view === 'board' && !selectedId && 'lg:hidden',
+            !panelShown && !selectedId && 'max-lg:hidden',
+            view === 'board' && !selectedId && 'hidden',
           )}
         >
           <ReadingPane key={selectedId ?? 'empty'} domain={domain} refs={refs} summary={summary} />
@@ -363,11 +295,6 @@ export function MailWorkspace({ domain }: { domain: string | null }) {
         <span className="mail-freshness">
           {loading ? 'Asking Mail…' : formatChecked(checkedAt, now)}
         </span>
-        {accounts && accounts.length > 1 && (
-          <button type="button" onClick={() => useMailStore.getState().chooseAccount(null)}>
-            Switch account
-          </button>
-        )}
       </footer>
 
       {composing ? <ComposeDialog onClose={() => setComposing(false)} /> : null}

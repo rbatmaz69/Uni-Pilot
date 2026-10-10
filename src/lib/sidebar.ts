@@ -22,10 +22,19 @@ function parseFavorite(value: unknown): SidebarFavorite | null {
  * lies in. Documents follows these like any other link to it.
  */
 export function favoriteHref(favorite: SidebarFavorite) {
-  const folder = favorite.folder ? favorite.path : favorite.path.split('/').slice(0, -1).join('/');
+  return documentsHref(favorite.path, !favorite.folder);
+}
+
+/**
+ * The address of a place in Documents: a folder, or with `file` a note over its
+ * folder. One spelling for every link, favorite and tab, so the same place is
+ * always the same address.
+ */
+export function documentsHref(path: string, file = false) {
+  const folder = file ? path.split('/').slice(0, -1).join('/') : path;
   const params = new URLSearchParams();
   if (folder) params.set('path', folder);
-  if (!favorite.folder) params.set('file', favorite.path);
+  if (file) params.set('file', path);
   const query = params.toString();
   return query ? `${NAV_ITEMS.documents.path}?${query}` : NAV_ITEMS.documents.path;
 }

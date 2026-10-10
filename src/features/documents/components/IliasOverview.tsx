@@ -521,7 +521,11 @@ function CourseFolder({ card, onAdd }: { card: CourseCard; onAdd: (courseId: str
         }}
       >
         <span className={cn('ilias-course-folder', `tone-${folderTone(card.name)}`)}>
-          <FolderArtwork entry={peek} enabled={!!synced} />
+          <FolderArtwork
+            entry={peek}
+            enabled={!!synced}
+            appearancePath={`:ilias-course/${card.refId}`}
+          />
         </span>
         <IliasBadge size="sm" showLabel={false} className="ilias-course-badge" />
         <NewBadge count={unseen} className="ilias-course-new" />

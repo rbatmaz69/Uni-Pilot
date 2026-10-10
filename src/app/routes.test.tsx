@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ROUTE, NAV_ITEMS } from '@/lib/navigation';
 import { renderApp } from '@/test/render';
@@ -24,7 +24,9 @@ describe('application routes', () => {
     (_label, item) => {
       renderApp(item.path);
 
-      const links = screen.getAllByRole('link', { current: 'page' });
+      // The icon rail only: a page's own sidebar marks its current section the same way.
+      const rail = screen.getByRole('complementary', { name: 'Main navigation' });
+      const links = within(rail).getAllByRole('link', { current: 'page' });
       expect(links).toHaveLength(1);
       expect(links[0]).toHaveAccessibleName(item.label);
       expect(links[0]).toHaveAttribute('href', item.path);

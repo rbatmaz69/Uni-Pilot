@@ -1464,6 +1464,29 @@ mod tests {
     }
 
     #[test]
+    fn embedded_pdf_attachments_survive_note_rename_and_move() {
+        let workspace = Workspace::new();
+        fs::create_dir_all(workspace.0.join("Lectures/attachments")).unwrap();
+        fs::create_dir(workspace.0.join("Notes")).unwrap();
+        workspace.write("Lectures/attachments/lecture (1).pdf", "%PDF-original");
+        workspace.write("Lectures/attachments/unrelated.pdf", "%PDF-unrelated");
+        let markdown = "Before\n\n:::notePdf\n[PDF](<attachments/lecture%20(1).pdf>)\n{\"name\":\"Lecture.pdf\",\"size\":13,\"view\":\"embed\"}\n:::\n\nAfter\n";
+        workspace.write("Lectures/Notes.md", markdown);
+        workspace.mv("Lectures/Notes.md", "Lectures", "Renamed.md");
+        workspace.mv("Lectures/Renamed.md", "Notes", "Renamed.md");
+        assert_eq!(
+            fs::read_to_string(workspace.0.join("Notes/Renamed.md")).unwrap(),
+            markdown
+        );
+        assert_eq!(
+            fs::read_to_string(workspace.0.join("Notes/attachments/lecture (1).pdf")).unwrap(),
+            "%PDF-original"
+        );
+        assert!(workspace.exists("Lectures/attachments/lecture (1).pdf"));
+        assert!(!workspace.exists("Notes/attachments/unrelated.pdf"));
+    }
+
+    #[test]
     fn finds_attachment_links_in_markdown() {
         assert_eq!(
             referenced_attachments(

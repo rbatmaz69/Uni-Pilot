@@ -1,8 +1,8 @@
-//! Signing out of ILIAS from the strip.
+//! Signing out of ILIAS from the ILIAS panel.
 //!
 //! ILIAS 9 signs out only through the link in its own user menu: `doLogout`
 //! is one of ilStartUpGUI's "unsafe GET commands", which ILIAS runs only with
-//! the `rtoken` that link carries. A bare `logout.php` — what the strip used to
+//! the `rtoken` that link carries. A bare `logout.php` — what the button used to
 //! open — is dropped without a word and ILIAS sends the student straight back
 //! to the dashboard: a flicker, and still signed in.
 //!

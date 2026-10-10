@@ -173,6 +173,74 @@ export function matchesFilter(
   return categoryOf(message, context.domain) === filter;
 }
 
+/** One way to narrow the inbox, with how many messages it keeps. */
+export interface FilterEntry {
+  id: MailFilter;
+  label: string;
+  count: number;
+}
+
+/** The inbox's ways to narrow, as the Mail panel lists them. */
+export interface FilterGroups {
+  /** All mail, unread and to answer — always there, even at zero. */
+  views: FilterEntry[];
+  /** The university, ILIAS and fellow students; only those with mail. */
+  senders: FilterEntry[];
+  /** The courses the inbox talks about most, most often first. */
+  courses: FilterEntry[];
+}
+
+/** How many courses the panel lists: the ones mail is about, not the whole timetable. */
+export const COURSE_FILTERS = 8;
+
+export const VIEW_LABELS = { all: 'All mail', unread: 'Unread', reply: 'To answer' } as const;
+
+export function filterGroups(
+  messages: readonly MailMessage[],
+  context: FilterContext,
+): FilterGroups {
+  const count = (test: (message: MailMessage) => boolean) => messages.filter(test).length;
+  const views: FilterEntry[] = [
+    { id: 'all', label: VIEW_LABELS.all, count: messages.length },
+    { id: 'unread', label: VIEW_LABELS.unread, count: count((message) => !message.read) },
+    {
+      id: 'reply',
+      label: VIEW_LABELS.reply,
+      count: count((message) => context.triage[message.id] === 'reply'),
+    },
+  ];
+  const senders = (['university', 'ilias', 'students'] as const)
+    .map((category) => ({
+      id: category,
+      label: CATEGORY_LABELS[category],
+      count: count((message) => categoryOf(message, context.domain) === category),
+    }))
+    .filter((entry) => entry.count > 0);
+
+  const byCourse = new Map<string, { ref: CourseRef; count: number }>();
+  for (const message of messages) {
+    const course = courseFor(message, context.refs);
+    if (!course) continue;
+    const known = byCourse.get(course.refId);
+    byCourse.set(course.refId, { ref: course, count: (known?.count ?? 0) + 1 });
+  }
+  const courses = [...byCourse.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, COURSE_FILTERS)
+    .map(({ ref, count: n }) => ({ id: `course:${ref.refId}` as const, label: ref.key, count: n }));
+
+  return { views, senders, courses };
+}
+
+/** What a filter is called, for the pill that says it is on. */
+export function filterLabel(filter: MailFilter, refs: readonly CourseRef[]): string {
+  if (filter === 'all' || filter === 'unread' || filter === 'reply') return VIEW_LABELS[filter];
+  if (filter.startsWith('course:')) {
+    return refs.find((ref) => ref.refId === filter.slice('course:'.length))?.key ?? 'Course';
+  }
+  return CATEGORY_LABELS[filter as MailCategory];
+}
+
 /** Sender, subject or preview containing every word typed. */
 export function matchesSearch(message: MailMessage, query: string): boolean {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);

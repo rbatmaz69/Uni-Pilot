@@ -13,7 +13,7 @@
   /* Native date pickers, select popups and scrollbars follow the theme too. */
   color-scheme: light;
 
-  --app-background: #deedf5;
+  --app-background: var(--frame-to);
   --surface: #ffffff;
   --surface-secondary: #f5f7fa;
   --surface-hover: #edf1f7;
@@ -24,7 +24,26 @@
   --sidebar-active: #d0e0e8;
   --sidebar-border: #cadde5;
   --sidebar-foreground: #18252e;
-  --sidebar-muted: #667b87;
+  --sidebar-muted: #586d79;
+
+  /* The window's layers, back to front, all one cool hue: the frame (the window itself,
+     a soft glass gradient the rail and title bars sit on), the panel (a section's own
+     sidebar), the card (--surface) and the canvas (the backdrop of boards and pages
+     inside the card). The hairline draws panel and card against the frame. */
+  --frame-from: #e6f6f9;
+  --frame-to: #e3eff9;
+  --frame-line: #d7e2e7;
+  --panel: #f3f9fd;
+  --canvas: #f0f5f9;
+  /* What a panel's rows are made of, for every theme: text one step softer than the
+     sidebar's, icons and headings muted, the rail's washes for hover and the open row.
+     Documents' sidebar and every SectionPanel read these. */
+  --panel-text: color-mix(in oklab, var(--sidebar-foreground) 80%, var(--sidebar-muted));
+  --panel-muted: var(--sidebar-muted);
+  --panel-hover: var(--sidebar-hover);
+  --panel-active: var(--sidebar-active);
+  /* A panel's width. It narrows with the window, which the 72px rail already takes from. */
+  --panel-width: clamp(188px, 19vw, 262px);
 
   --text-primary: #20272e;
   --text-secondary: #67717d;
@@ -76,6 +95,9 @@
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 24px;
+  /* The space around the window's card; on the side where a panel joins it there is none.
+     A hairline's worth more than nothing, so the card reads as one on the frame (Synara). */
+  --frame-gutter: 4px;
 
   --shadow-soft: 0 2px 8px #294d7410;
   --shadow-raised: 0 2px 4px oklch(0.3 0.02 70 / 0.06), 0 20px 44px -24px oklch(0.3 0.03 70 / 0.3);
@@ -83,8 +105,8 @@
 
   /* Note pages: the sheet, what lies behind it, and the tools floating over it. */
   --page: #ffffff;
-  --page-backdrop: #eef2f6;
-  --page-paper: #ebe4d8;
+  --page-backdrop: var(--canvas);
+  --page-paper: #e0e7ed;
   --page-grain-blend: multiply;
   --page-search-match: oklch(0.93 0.09 92);
   --page-search-current: oklch(0.85 0.15 85);
@@ -119,6 +141,17 @@
   --marker-qualification: var(--marker-qualification-light);
   --shadow-page: 0 1px 2px oklch(0.3 0.02 255 / 0.08), 0 28px 64px -34px oklch(0.3 0.03 255 / 0.38);
   --shadow-float: 0 1px 2px oklch(0.3 0.02 255 / 0.1), 0 14px 34px -12px oklch(0.3 0.03 255 / 0.32);
+}
+
+@media (max-width: 750px) {
+  :root {
+    --panel-width: 172px;
+  }
+}
+@media (max-width: 560px) {
+  :root {
+    --panel-width: 150px;
+  }
 }
 
 /* Image-derived colour stays dark enough for the same foreground in both themes. */
@@ -223,18 +256,24 @@
   --focus-horizon: #45636a;
   --focus-image-shade: #09111a99;
   --focus-cat-shade: #040b10f5;
-  --app-background: oklch(0.18 0.012 255);
+  --app-background: var(--frame-to);
   --surface: oklch(0.22 0.012 255);
   --surface-secondary: oklch(0.26 0.014 255);
   --surface-hover: oklch(0.3 0.015 255);
 
   --sidebar: oklch(0.14 0.01 255);
   --sidebar-elevated: oklch(0.18 0.012 255);
-  --sidebar-hover: oklch(0.22 0.014 255);
-  --sidebar-active: oklch(0.28 0.016 255);
+  --sidebar-hover: oklch(0.245 0.014 255);
+  --sidebar-active: oklch(0.3 0.016 255);
   --sidebar-border: oklch(0.25 0.012 255);
   --sidebar-foreground: oklch(0.92 0.008 255);
   --sidebar-muted: oklch(0.62 0.012 255);
+
+  --frame-from: oklch(0.175 0.026 242);
+  --frame-to: oklch(0.145 0.016 258);
+  --frame-line: oklch(0.275 0.014 255);
+  --panel: oklch(0.195 0.013 255);
+  --canvas: oklch(0.207 0.012 255);
 
   --text-primary: oklch(0.94 0.006 255);
   --text-secondary: oklch(0.74 0.012 255);
@@ -277,8 +316,8 @@
   --shadow-sidebar: 0 2px 8px oklch(0.05 0.01 255 / 0.5);
 
   --page: oklch(0.235 0.012 255);
-  --page-backdrop: oklch(0.155 0.01 255);
-  --page-paper: oklch(0.3 0.006 70);
+  --page-backdrop: var(--canvas);
+  --page-paper: oklch(0.235 0.012 255);
   --page-grain-blend: multiply;
   --page-search-match: oklch(0.42 0.08 88);
   --page-search-current: oklch(0.62 0.13 85);
@@ -308,6 +347,12 @@
   --sidebar-border: #dad8ce;
   --sidebar-foreground: #100f0f;
   --sidebar-muted: #6f6e69;
+
+  --frame-from: #f2f0e5;
+  --frame-to: #f2f0e5;
+  --frame-line: #dad8ce;
+  --panel: #f8f6ea;
+  --canvas: #f5f3e8;
 
   --text-primary: #100f0f;
   --text-secondary: #6f6e69;
@@ -350,7 +395,7 @@
   --shadow-sidebar: 0 2px 6px #100f0f0d, 0 24px 48px -26px #100f0f26;
 
   --page: #fffcf0;
-  --page-backdrop: #f2f0e5;
+  --page-backdrop: var(--canvas);
   --page-paper: #e6e4d9;
   --page-grain-blend: multiply;
   --page-search-match: #faeec6;
@@ -374,6 +419,12 @@
   --sidebar-border: #282726;
   --sidebar-foreground: #cecdc3;
   --sidebar-muted: #9f9d96;
+
+  --frame-from: #100f0f;
+  --frame-to: #100f0f;
+  --frame-line: #282726;
+  --panel: #151413;
+  --canvas: #191817;
 
   --text-primary: #cecdc3;
   --text-secondary: #b7b5ac;
@@ -416,8 +467,8 @@
   --shadow-sidebar: 0 2px 8px #100f0f80;
 
   --page: #1c1b1a;
-  --page-backdrop: #100f0f;
-  --page-paper: #282726;
+  --page-backdrop: var(--canvas);
+  --page-paper: #1b1a19;
   --page-grain-blend: multiply;
   --page-search-match: #503d02;
   --page-search-current: #8e6b01;
@@ -540,6 +591,10 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted: var(--sidebar-muted);
 
+  --color-frame-line: var(--frame-line);
+  --color-panel: var(--panel);
+  --color-canvas: var(--canvas);
+
   --color-primary: var(--text-primary);
   --color-secondary: var(--text-secondary);
   --color-muted: var(--text-muted);
@@ -591,6 +646,15 @@
   --shadow-float: var(--shadow-float);
 
   --ease-shell: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* How much of the row the section panel takes (0 without one), set by the shell. Registered as a
+   length so it can glide: the title bar's lead follows the panel as it slides in and out, on the
+   same beat (panelMotion.ts: 340ms, the same curve). */
+@property --panel-span {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
 }
 
 @layer base {
@@ -738,25 +802,477 @@
   }
 
   .app-shell {
-    background: var(--surface);
+    background: var(--frame-to);
   }
 
+  /* The window itself: the icon rail, a page's title bar and the gutters around the
+     card all sit directly on it, so they read as one surface. */
   .app-frame {
-    background: linear-gradient(160deg, #e5f4f9a8, #eff7f8a8 65%, #edf1eac4);
-    backdrop-filter: blur(32px) saturate(140%);
-    -webkit-backdrop-filter: blur(32px) saturate(140%);
+    background: linear-gradient(160deg, var(--frame-from), var(--frame-to));
   }
 
+  /* The icon rail: the same width on every page. */
   .sidebar-glass {
-    width: 246px;
-  }
-
-  .sidebar-glass[data-collapsed='true'] {
     width: 72px;
   }
+  /* In a window too short for every icon only the middle of the rail scrolls (Settings and the
+     profile stay pinned); the icons fade where there are more behind the edge. */
+  .rail-scroll[data-more-above] {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22px);
+    mask-image: linear-gradient(to bottom, transparent, #000 22px);
+  }
+  .rail-scroll[data-more-below] {
+    -webkit-mask-image: linear-gradient(to top, transparent, #000 22px);
+    mask-image: linear-gradient(to top, transparent, #000 22px);
+  }
+  .rail-scroll[data-more-above][data-more-below] {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 22px,
+      #000 calc(100% - 22px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 22px,
+      #000 calc(100% - 22px),
+      transparent
+    );
+  }
 
+  /* Title bar ------------------------------------------------------------
+     Across the top of the window beside the rail, on the frame (TitleBar.tsx): Back and
+     Forward, as wide as the panel below so the tabs start above the card, then the tabs,
+     "+", room to drag the window by, and the search, theme and notifications. Below it the
+     panel and the card give up their top gutter: the title bar is the space above them. */
+  .titlebar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 44px;
+    min-width: 0;
+    padding-right: var(--frame-gutter);
+    color: var(--panel-muted);
+    user-select: none;
+  }
+  .titlebar-lead {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-self: stretch;
+    align-items: center;
+    gap: 2px;
+    padding: 0 8px;
+  }
+  /* As wide as the panel below it, and gliding with it; even the narrowest panel keeps room
+     for the three buttons. */
+  .titlebar-lead {
+    min-width: var(--panel-span);
+  }
+  .app-column {
+    transition: --panel-span 340ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  /* A dragged edge is followed at once. */
+  :root[data-resizing] .app-column {
+    transition: none;
+  }
+  /* The panel's edge, carried on up into the title bar: a short line right above the seam
+     between panel and card, stopping short of both, so the two read as one edge with a break. */
+  .titlebar-lead::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    right: 0;
+    bottom: 12px;
+    width: 1px;
+    background: var(--frame-line);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .titlebar-lead.has-panel::after {
+    opacity: 1;
+  }
+  /* The tabs begin a step past that line, as a row of their own above the card. */
+  .app-tabs {
+    transition: margin-left 340ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .titlebar-lead.has-panel + .app-tabs {
+    margin-left: 10px;
+  }
+  .titlebar-button {
+    flex: none;
+    color: var(--panel-muted);
+  }
+  .titlebar-button:hover:not(:disabled) {
+    background: var(--panel-hover);
+    color: var(--panel-text);
+  }
+  .titlebar-fill {
+    flex: 1;
+    align-self: stretch;
+    min-width: 24px;
+  }
+  .titlebar-tools {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+  }
+  .app-column[data-titlebar] .workspace,
+  .app-column[data-titlebar] .section-panel-slot > .section-panel {
+    margin-top: 0;
+  }
+
+  /* The tabs: the open one a pill of the card's surface, the others divided by hairlines
+     that step aside for the open and the hovered tab. */
+  .app-tabs {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    height: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .app-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .app-tab {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 30px;
+    max-width: 200px;
+    min-width: 96px;
+    border-radius: var(--radius-xs);
+    color: var(--panel-muted);
+    transition:
+      background 150ms ease,
+      color 150ms ease;
+  }
+  .app-tab + .app-tab::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 0;
+    width: 1px;
+    background: var(--frame-line);
+  }
+  .app-tab.is-active::before,
+  .app-tab.is-active + .app-tab::before,
+  .app-tab:hover::before,
+  .app-tab:hover + .app-tab::before {
+    opacity: 0;
+  }
+  .app-tab:hover {
+    background: var(--panel-hover);
+    color: var(--panel-text);
+  }
+  .app-tab.is-active {
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    color: var(--text-primary);
+  }
+  .app-tab > button:first-child {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 100%;
+    padding: 0 2px 0 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: left;
+  }
+  .app-tab > button:first-child:last-child {
+    padding-right: 10px;
+  }
+  .app-tab.is-active > button:first-child {
+    font-weight: 600;
+  }
+  .app-tab > button:first-child svg {
+    flex: none;
+  }
+  .app-tab > button:first-child span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  /* Shown on the open and the hovered tab, and whenever it has focus: never display: none. */
+  .app-tab-close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+    border-radius: 5px;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .app-tab:hover .app-tab-close,
+  .app-tab.is-active .app-tab-close,
+  .app-tab-close:focus-visible {
+    opacity: 0.65;
+  }
+  .app-tab .app-tab-close:hover {
+    background: var(--panel-active);
+    opacity: 1;
+  }
+
+  /* The card every page is shown in, floating on the frame with a gutter on every side.
+     Documents draws the same card itself (documents.css). */
   .workspace {
+    margin: var(--frame-gutter);
+    border: 1px solid var(--frame-line);
+    border-radius: var(--radius-md);
     background: var(--surface);
+    box-shadow: var(--shadow-soft);
+  }
+  /* Beside a section's panel it joins it: the panel's right border is the seam, so the
+     card gives up its gutter, left border and left corners on that side. */
+  .workspace[data-panel] {
+    margin-left: 0;
+    border-left-width: 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  }
+  /* While a panel slides in or out beneath it, the card is a card of its own: its left edge
+     glides over the panel with its border and corners, and joins the panel once it rests. */
+  .workspace[data-panel][data-panel-moving] {
+    border-left-width: 1px;
+    border-radius: var(--radius-md);
+  }
+  /* A page that draws its own title bar and cards (Documents) sits on the frame itself. */
+  .workspace[data-frame='none'] {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* Section panel ----------------------------------------------------------
+     A section's own sidebar between the rail and the card (SectionPanel, Panel.tsx).
+     The slot the shell keeps for it takes no room of its own, so an empty slot costs
+     nothing and the panel is a flex item of the frame. Documents draws its panel in
+     its own title-bar layout and uses the same surface, header, rows and footer. */
+  .section-panel-slot {
+    display: contents;
+  }
+  .section-panel-slot[hidden] {
+    display: none;
+  }
+  .section-panel {
+    position: relative;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    width: var(--panel-width);
+    min-height: 0;
+    border: 1px solid var(--frame-line);
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+    background: var(--panel);
+    color: var(--panel-text);
+    font-size: 13px;
+  }
+  /* Top and bottom line up with the card's. */
+  .section-panel-slot > .section-panel {
+    margin-block: var(--frame-gutter);
+  }
+  /* The row a panel and its card share; a panel on its way out may lie over it (panelMotion). */
+  .panel-stage {
+    position: relative;
+  }
+  /* A panel's still copy as it slides away: seen, never touched. */
+  .panel-ghost {
+    pointer-events: none;
+  }
+  /* The edge of a resizable panel: a strip over the seam with the card, a line where it is
+     held. Above the card, which follows it in the frame. */
+  .panel-resizer {
+    position: absolute;
+    top: 0;
+    right: -5px;
+    bottom: 0;
+    z-index: 2;
+    width: 9px;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .panel-resizer::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background-color 120ms ease;
+  }
+  .panel-resizer:hover::after,
+  .panel-resizer:focus-visible::after,
+  :root[data-resizing] .panel-resizer::after {
+    background: var(--accent-primary);
+  }
+  .panel-resizer:focus-visible {
+    outline: none;
+  }
+  /* While a panel is dragged, the whole window shows the resize cursor and selects nothing. */
+  :root[data-resizing] {
+    cursor: col-resize;
+  }
+  :root[data-resizing] * {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
+
+  /* The header: a title (or a switcher) and a few small icon actions. */
+  .panel-header {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    min-height: 46px;
+    padding: 4px 8px 4px 12px;
+  }
+  .panel-header-lead {
+    flex: 1;
+    min-width: 0;
+  }
+  .panel-title {
+    margin: 0;
+    overflow: hidden;
+    color: var(--panel-text);
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 32px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .panel-actions {
+    display: flex;
+    flex: none;
+    gap: 2px;
+  }
+  .panel-action {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    color: var(--panel-muted);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+  .panel-action:hover:not(:disabled) {
+    background: var(--panel-hover);
+    color: var(--panel-text);
+  }
+  .panel-action[aria-current='page'] {
+    background: var(--panel-active);
+    color: var(--panel-text);
+  }
+  .panel-action:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  /* What scrolls between header and footer. */
+  .panel-body {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0 8px 10px;
+  }
+  .panel-section + .panel-section {
+    margin-top: 6px;
+  }
+  .panel-heading {
+    margin: 8px 8px 6px;
+    color: var(--panel-muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* A row: 30px, the icon muted, only the open one washed and bold. */
+  .panel-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 30px;
+    border-radius: var(--radius-xs);
+  }
+  .panel-row:hover {
+    background: var(--panel-hover);
+  }
+  .panel-row.is-active {
+    background: var(--panel-active);
+    color: var(--panel-text);
+  }
+  .panel-item {
+    gap: 8px;
+    width: 100%;
+    padding: 0 8px;
+    text-align: left;
+    font-size: 13px;
+  }
+  .panel-item-icon {
+    flex: none;
+    color: var(--panel-muted);
+  }
+  .panel-row.is-active .panel-item-icon {
+    color: var(--panel-text);
+  }
+  .panel-item-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .panel-row.is-active .panel-item-label {
+    font-weight: 600;
+  }
+  .panel-item-count {
+    flex: none;
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--panel-active);
+    color: var(--panel-text);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+    text-align: center;
+  }
+  .panel-row.is-active .panel-item-count {
+    background: var(--surface);
+  }
+
+  /* The foot: quiet rows that stay put, just above the panel's bottom edge. */
+  .panel-footer {
+    flex: none;
+    margin: 2px 8px 4px;
+    color: var(--panel-muted);
+  }
+  .panel-footer .panel-item {
+    font-size: 12.5px;
+  }
+  .panel-footer .panel-item-icon {
+    width: 15px;
+    height: 15px;
+    stroke-width: 2;
   }
 
   /* Quiet, neutral surfaces keep the calendar grid distinct from event colours. */
@@ -890,28 +1406,8 @@
     );
   }
 
-  [data-theme='dark'] .app-frame {
-    background: linear-gradient(160deg, #1f3043ce, #1b2530d9);
-  }
-
-  [data-theme^='flexoki'] .app-frame {
-    background: var(--app-background);
-  }
-
   [data-theme^='flexoki'] .calendar-grid {
     --calendar-today: var(--accent-coral);
-  }
-
-  @media (max-height: 880px) {
-    .semester-note {
-      display: none;
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .sidebar-glass {
-      width: 214px;
-    }
   }
 }
 
@@ -1050,6 +1546,11 @@ html.notch-window body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .app-column,
+  .app-tabs,
+  .titlebar-lead::after {
+    transition: none !important;
+  }
   *,
   *::before,
   *::after {
@@ -1059,33 +1560,27 @@ html.notch-window body {
   }
 }
 
+/* A short window: the rail gives up some breathing room, so more icons are in view before it scrolls. */
+@media (max-height: 760px) {
+  .sidebar-brand {
+    height: 50px;
+    padding-bottom: 6px;
+  }
+  .sidebar-profile {
+    padding-block: 8px;
+  }
+}
+
 @media (max-width: 700px) {
   .app-shell {
     padding: 0;
   }
-  .sidebar-glass,
-  .sidebar-glass[data-collapsed='true'] {
+  .sidebar-glass {
     width: 62px;
     padding-inline: 7px;
   }
-  .sidebar-label,
-  .sidebar-expanded-control {
-    display: none;
-  }
-  .sidebar-brand,
-  .nav-link {
-    justify-content: center;
-    padding-inline: 0;
-  }
-  .sidebar-section-label {
-    height: 10px;
-    overflow: hidden;
-    font-size: 0;
-    padding: 0;
-  }
   .sidebar-profile {
-    justify-content: center;
-    padding: 6px 0;
+    padding-block: 6px;
   }
 }
 

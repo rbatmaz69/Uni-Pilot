@@ -11,22 +11,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Code2,
   Compass,
   Globe2,
-  GraduationCap,
   LayoutGrid,
   List,
   MapPin,
   Plus,
   Search,
   Share2,
-  SlidersHorizontal,
-  Sparkles,
-  Users,
   X,
 } from 'lucide-react';
 import { Page } from '@/components/layout';
+import { useSectionPanelShown } from '@/components/layout/sectionPanelHost';
 import { Modal } from '@/components/ui/Modal';
 import { NAV_ITEMS } from '@/lib/navigation';
 import { localDateKey, parseDateKey } from '@/lib/date';
@@ -41,17 +37,26 @@ import { useDiscoveryStore } from '@/features/events/store/discoveryStore';
 import { useEventStore } from '@/features/calendar/store/eventStore';
 import { EventArtwork } from '@/features/events/components/EventArtwork';
 import { CreateStudentEvent } from '@/features/events/components/CreateStudentEvent';
+import { CollectionSwitch } from '@/features/events/components/CollectionSwitch';
+import { EventsPanel } from '@/features/events/components/EventsPanel';
+import {
+  CATEGORY_ICONS,
+  COLLECTIONS,
+  FORMATS,
+  type CategoryFilter,
+  type Collection,
+  type Format,
+} from '@/features/events/lib/collections';
 import '@/features/events/events.css';
-
-const categoryIcons = [Compass, Code2, Sparkles, GraduationCap, Users, Globe2];
 
 export function EventsExperience() {
   const navigate = useNavigate();
   const { savedIds, createdEvents, toggleSaved, createEvent } = useDiscoveryStore();
   const calendarEvents = useEventStore((state) => state.events);
   const addToCalendar = useEventStore((state) => state.add);
-  const [tab, setTab] = useState<'discover' | 'saved' | 'mine'>('discover');
-  const [category, setCategory] = useState('All events');
+  const panelShown = useSectionPanelShown();
+  const [tab, setTab] = useState<Collection>('discover');
+  const [category, setCategory] = useState<CategoryFilter>('All events');
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [date, setDate] = useState('');
@@ -59,8 +64,7 @@ export function EventsExperience() {
     const value = parseDateKey(STUDENT_EVENTS[0]!.date);
     return new Date(value.getFullYear(), value.getMonth(), 1);
   });
-  const [format, setFormat] = useState('all');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [format, setFormat] = useState<Format>('all');
   const [sort, setSort] = useState<'soonest' | 'latest'>('soonest');
   const [selected, setSelected] = useState<StudentEvent | null>(null);
   const [creating, setCreating] = useState(false);
@@ -95,6 +99,14 @@ export function EventsExperience() {
     setDate('');
     setFormat('all');
   };
+  const filtersActive = category !== 'All events' || format !== 'all' || !!date || !!query.trim();
+  const selectCollection = (next: Collection) => {
+    setTab(next);
+    clearFilters();
+  };
+  const counts = { saved: savedIds.length, mine: myEvents.length };
+  const collection = COLLECTIONS.find((item) => item.id === tab)!;
+  const emptyMine = tab === 'mine' && !myEvents.length;
   const openEvent = (event: StudentEvent) => {
     setSelected(event);
     setShareText('');
@@ -123,83 +135,39 @@ export function EventsExperience() {
     openEvent(event);
   }
   return (
-    <Page item={NAV_ITEMS.events} hideHeader>
+    <Page item={NAV_ITEMS.events} quietTitle>
       <div className="events-page">
-        <div className="events-heading">
-          <div>
-            <h1>{NAV_ITEMS.events.label}</h1>
-            <p>{NAV_ITEMS.events.subtitle}</p>
+        <EventsPanel
+          collection={tab}
+          onCollection={selectCollection}
+          counts={counts}
+          category={category}
+          onCategory={setCategory}
+          format={format}
+          onFormat={setFormat}
+          onCreate={() => setCreating(true)}
+        />
+        <div className="events-stage">
+          <div className="events-heading">
+            <div>
+              <h2>{collection.label}</h2>
+              <p>{collection.blurb}</p>
+            </div>
+            {!panelShown && (
+              <div className="events-heading-tools">
+                <CollectionSwitch
+                  collection={tab}
+                  onCollection={selectCollection}
+                  counts={counts}
+                />
+                <button className="ev-button ev-button--primary" onClick={() => setCreating(true)}>
+                  <Plus size={16} aria-hidden /> Create event
+                </button>
+              </div>
+            )}
           </div>
-          <button className="ev-button ev-button--primary" onClick={() => setCreating(true)}>
-            <Plus size={16} /> Create event
-          </button>
-        </div>
-        <div
-          className="events-top-tabs"
-          aria-label="Event collections"
-          role="tablist"
-          onKeyDown={(event) => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-            event.preventDefault();
-            const tabs = ['discover', 'saved', 'mine'] as const;
-            const index = tabs.indexOf(tab);
-            const next =
-              event.key === 'Home'
-                ? 0
-                : event.key === 'End'
-                  ? 2
-                  : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
-            setTab(tabs[next]!);
-            clearFilters();
-            event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
-          }}
-        >
-          <button
-            role="tab"
-            aria-selected={tab === 'discover'}
-            tabIndex={tab === 'discover' ? 0 : -1}
-            id="events-tab-discover"
-            aria-controls="events-collection-panel"
-            onClick={() => {
-              setTab('discover');
-              clearFilters();
-            }}
-          >
-            <Compass size={15} /> Discover
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'saved'}
-            tabIndex={tab === 'saved' ? 0 : -1}
-            id="events-tab-saved"
-            aria-controls="events-collection-panel"
-            onClick={() => {
-              setTab('saved');
-              clearFilters();
-            }}
-          >
-            <Bookmark size={15} /> Saved <span>{savedIds.length}</span>
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'mine'}
-            tabIndex={tab === 'mine' ? 0 : -1}
-            id="events-tab-mine"
-            aria-controls="events-collection-panel"
-            onClick={() => {
-              setTab('mine');
-              clearFilters();
-            }}
-          >
-            <CalendarDays size={15} /> My events <span>{myEvents.length}</span>
-          </button>
-        </div>
-        <div id="events-collection-panel" role="tabpanel" aria-labelledby={`events-tab-${tab}`}>
           <div className="events-content-layout">
             <section className="events-discovery" aria-label="Browse student events">
-              <h2 className="sr-only">
-                {tab === 'saved' ? 'Saved events' : tab === 'mine' ? 'My events' : 'All events'}
-              </h2>
               <div className="events-search-row">
                 <label className="events-search">
                   <Search size={17} />
@@ -215,14 +183,20 @@ export function EventsExperience() {
                     </button>
                   )}
                 </label>
-                <button
-                  className={`ev-button events-filter-button ${filtersOpen || format !== 'all' ? 'is-active' : ''}`}
-                  onClick={() => setFiltersOpen(!filtersOpen)}
-                  aria-expanded={filtersOpen}
-                >
-                  <SlidersHorizontal size={15} />
-                  <span>Filters</span>
-                </button>
+                {!panelShown && (
+                  <select
+                    className="events-format-select"
+                    aria-label="Event format"
+                    value={format}
+                    onChange={(event) => setFormat(event.target.value as Format)}
+                  >
+                    {FORMATS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <div className="events-view-toggle" role="group" aria-label="Event view">
                   <button
                     aria-label="Grid view"
@@ -240,44 +214,36 @@ export function EventsExperience() {
                   </button>
                 </div>
               </div>
-              {filtersOpen && (
-                <div className="events-extra-filters">
-                  <label>
-                    Where
-                    <select
-                      aria-label="Event format"
-                      value={format}
-                      onChange={(event) => setFormat(event.target.value)}
-                    >
-                      <option value="all">All locations</option>
-                      <option value="in-person">In person</option>
-                      <option value="online">Online</option>
-                    </select>
-                  </label>
-                  <button onClick={clearFilters}>Reset filters</button>
+              {!panelShown && (
+                <div className="events-categories" role="group" aria-label="Event category">
+                  {CATEGORIES.map((item) => {
+                    const Icon = CATEGORY_ICONS[item];
+                    return (
+                      <button
+                        key={item}
+                        aria-pressed={category === item}
+                        onClick={() => setCategory(item)}
+                      >
+                        <Icon size={14} />
+                        {item}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
-              <div className="events-categories" role="group" aria-label="Event category">
-                {CATEGORIES.map((item, index) => {
-                  const Icon = categoryIcons[index]!;
-                  return (
-                    <button
-                      key={item}
-                      aria-pressed={category === item}
-                      onClick={() => setCategory(item)}
-                    >
-                      <Icon size={14} />
-                      {item}
-                    </button>
-                  );
-                })}
-              </div>
               <div className="events-results-meta">
                 <span>
-                  {filtered.length} {filtered.length === 1 ? 'event' : 'events'}
+                  <span aria-live="polite">
+                    {filtered.length} {filtered.length === 1 ? 'event' : 'events'}
+                  </span>
                   {date && (
                     <button onClick={() => setDate('')} aria-label="Clear date filter">
                       {eventDate(date)} <X size={12} />
+                    </button>
+                  )}
+                  {filtersActive && (
+                    <button className="events-reset" onClick={clearFilters}>
+                      Reset filters
                     </button>
                   )}
                 </span>
@@ -373,22 +339,33 @@ export function EventsExperience() {
                   <h3>
                     {tab === 'saved' && !savedIds.length
                       ? 'Keep a little inspiration for later.'
-                      : 'No events here just yet.'}
+                      : emptyMine
+                        ? 'Nothing planned yet.'
+                        : 'No events here just yet.'}
                   </h3>
                   <p>
                     {tab === 'saved' && !savedIds.length
                       ? 'Tap the bookmark on an event to save it here.'
-                      : 'Try another category, date, or search to find your next thing.'}
+                      : emptyMine
+                        ? 'Add an event to your calendar, or create one for other students.'
+                        : 'Try another category, date, or search to find your next thing.'}
                   </p>
-                  <button
-                    className="ev-button"
-                    onClick={() => {
-                      clearFilters();
-                      if (tab !== 'discover') setTab('discover');
-                    }}
-                  >
-                    Explore all events <ArrowRight size={14} />
-                  </button>
+                  <div className="events-empty-actions">
+                    <button
+                      className="ev-button"
+                      onClick={() => {
+                        clearFilters();
+                        if (tab !== 'discover') setTab('discover');
+                      }}
+                    >
+                      Explore all events <ArrowRight size={14} />
+                    </button>
+                    {emptyMine && (
+                      <button className="ev-button" onClick={() => setCreating(true)}>
+                        <Plus size={14} aria-hidden /> Create an event
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               <p className="events-preview-note">“Example” listings are sample events.</p>

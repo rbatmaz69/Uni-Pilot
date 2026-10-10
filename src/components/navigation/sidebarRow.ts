@@ -12,10 +12,10 @@ export type OpenSidebarMenu = (
   items: readonly MenuEntry[],
 ) => void;
 
-export function sidebarRowClass(active: boolean, collapsed: boolean) {
+/** A row of the icon rail: just the glyph, centred, washed while it is the open page. */
+export function sidebarRowClass(active: boolean) {
   return cn(
-    'nav-link group relative flex h-[30px] w-full select-none items-center rounded-sm text-[13px] transition-colors duration-150',
-    collapsed ? 'justify-center' : 'gap-2.5 px-2.5',
+    'group relative flex h-[30px] w-full select-none items-center justify-center rounded-sm text-[13px] transition-colors duration-150',
     active
       ? 'bg-sidebar-active font-medium text-sidebar-foreground'
       : 'text-sidebar-foreground/80 hover:bg-sidebar-hover hover:text-sidebar-foreground',

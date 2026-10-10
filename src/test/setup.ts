@@ -4,11 +4,12 @@ import { afterEach, beforeEach } from 'vitest';
 import { useSourceStore } from '@/features/calendar/store/sourceStore';
 import { useTaskStore } from '@/features/calendar/store/taskStore';
 import { useEventStore } from '@/features/calendar/store/eventStore';
-import { NO_HISTORY } from '@/features/integrations/lib/iliasBrowser';
+import { NO_HISTORY, NO_LOCATION } from '@/features/integrations/lib/iliasBrowser';
 import {
   resetIliasBrowserListening,
   useIliasBrowserStore,
 } from '@/features/integrations/store/iliasBrowserStore';
+import { useDocumentsLayoutStore } from '@/features/documents/store/documentsLayoutStore';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import {
   resetCourseFilesListening,
@@ -17,6 +18,7 @@ import {
 import { useReminderStore } from '@/features/reminders/store/reminderStore';
 import { DEFAULT_SETTINGS } from '@/features/reminders/lib/engine';
 import { useSidebarStore } from '@/store/sidebarStore';
+import { useTabStore } from '@/store/tabStore';
 import { useUiStore } from '@/store/uiStore';
 import { useFocusStore } from '@/features/focus/store/focusStore';
 
@@ -30,6 +32,7 @@ HTMLMediaElement.prototype.load = () => {};
 afterEach(() => {
   cleanup();
   useFocusStore.setState(useFocusStore.getInitialState(), true);
+  useTabStore.setState(useTabStore.getInitialState(), true);
   localStorage.clear();
   useEventStore.setState({ events: [] });
   useReminderStore.setState({
@@ -40,23 +43,23 @@ afterEach(() => {
     settings: DEFAULT_SETTINGS,
   });
   useUiStore.setState({
-    sidebarCollapsed: false,
     studentEventsCollapsed: false,
     theme: 'light',
-    immersive: false,
+    panelOpen: true,
+    iliasMode: false,
+    panelWidths: {},
   });
   useSidebarStore.setState({
     favorites: [],
     order: {},
     hidden: [],
-    collapsedSections: [],
     documentDrag: null,
     documentDragOver: false,
     activeDocument: null,
   });
   useSourceStore.setState({ sources: [], syncingIds: [] });
   useTaskStore.setState({ tasks: [] });
-  useIliasBrowserStore.setState({ history: NO_HISTORY, downloads: [] });
+  useIliasBrowserStore.setState({ history: NO_HISTORY, location: NO_LOCATION, downloads: [] });
   resetIliasBrowserListening();
   useCourseFilesStore.setState({
     installation: null,
@@ -67,6 +70,7 @@ afterEach(() => {
     saving: {},
   });
   resetCourseFilesListening();
+  useDocumentsLayoutStore.setState({ sidebarView: 'files' });
   useNoteStyleStore.setState({
     style: 'standard',
     layout: 'pages',

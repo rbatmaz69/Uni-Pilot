@@ -356,7 +356,7 @@ name and size keeps its ETag; `getlastmodified` is the better signal. ✅
 
 **Parse in Rust, not in the page.** The raw HTML carries session-bound links and the CSRF tokens
 (`rtoken`) that authorise state-changing commands. Keeping it on the Rust side matches how
-downloads already work — "the strip only ever learns the file name" — and the page receives only
+downloads already work — "the panel only ever learns the file name" — and the page receives only
 typed models. It costs one new crate (`scraper`, which both KIT downloaders use). Parsing in
 TypeScript with `DOMParser` would fit the existing `lib/ilias/parse*.ts` pattern and cost nothing
 new, but would hand full ILIAS pages to the webview. The models go into `lib/types.ts`, which was

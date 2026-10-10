@@ -1,13 +1,13 @@
 /**
  * The Inbox across the shell: the university account found by its address,
- * messages sorted by sender and course, a message read in the pane and marked
- * read in Mail, a reply handed to Mail as a draft, a new message sent once the
- * student confirmed it, triage and the board — and
+ * messages sorted by sender and course through the Mail panel, a message read
+ * in the pane and marked read in Mail, a reply handed to Mail as a draft, a new
+ * message sent once the student confirmed it, triage and the board — and
  * what the page says when Mail cannot help. Rust and Mail are a stand-in
  * answering like `apple_mail.rs` does.
  */
 
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -156,6 +156,13 @@ afterEach(() => {
 });
 
 const row = (name: string | RegExp) => screen.findByRole('button', { name });
+/** The Mail panel: the shell shows it between the rail and the card. It is the message list. */
+const panel = () => within(screen.getByRole('complementary', { name: 'Mail' }));
+/** The menu of senders and courses, opened from the button beside the search. */
+async function filterMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Filter by sender or course' }));
+  return within(screen.getByRole('menu', { name: 'Filter by sender or course' }));
+}
 
 describe('the inbox', () => {
   it('finds the university account by its address and sums up what is new', async () => {
@@ -180,6 +187,15 @@ describe('the inbox', () => {
   });
 
   /** Mail is busy enough; switching back to the window must not ask it again at once. */
+  it('counts a single attachment as one file, before Mail has named it', async () => {
+    pretendDesktop();
+    renderApp('/inbox');
+
+    const message = await row(/Blatt 4/);
+    expect(within(message).getByLabelText('1 attachment')).toHaveTextContent('1 file');
+    expect(within(message).getByLabelText('1 attachment')).not.toHaveTextContent('1 files');
+  });
+
   it('does not ask Mail again the moment the window comes back', async () => {
     pretendDesktop();
     renderApp('/inbox');
@@ -209,10 +225,8 @@ describe('the inbox', () => {
 
     const message = await row(/Blatt 4 ist online/);
     expect(message).toHaveTextContent('Datenbanken 1');
-    expect(screen.getByRole('button', { name: /Datenbanken 1\s*1/ })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    const menu = await filterMenu(userEvent.setup());
+    expect(menu.getByRole('menuitemradio', { name: 'Datenbanken 1 1' })).not.toBeChecked();
   });
 
   it('reads a message in the pane and marks it read in Mail', async () => {
@@ -316,20 +330,20 @@ describe('the inbox', () => {
     expect(within(column).getByRole('button', { name: /Blatt 4/ })).toBeInTheDocument();
   });
 
-  it('filters by who wrote, and searches', async () => {
+  it('filters by who wrote from the panel, and searches', async () => {
     pretendDesktop();
     const user = userEvent.setup();
     renderApp('/inbox');
 
     await row(/Blatt 4/);
-    const chips = screen.getByRole('group', { name: 'Show' });
-    await user.click(screen.getByLabelText('Filter by sender or course'));
-    await user.click(within(chips).getByRole('button', { name: /^ILIAS/ }));
+    await user.click((await filterMenu(user)).getByRole('menuitemradio', { name: 'ILIAS 1' }));
     const list = screen.getByRole('region', { name: 'Messages' });
     expect(within(list).getAllByRole('button')).toHaveLength(1);
     expect(within(list).getByRole('button', { name: /Neue Datei/ })).toBeInTheDocument();
+    expect((await filterMenu(user)).getByRole('menuitemradio', { name: 'ILIAS 1' })).toBeChecked();
+    await user.keyboard('{Escape}');
 
-    await user.click(within(chips).getByRole('button', { name: 'All' }));
+    await user.click(panel().getByRole('button', { name: 'All mail' }));
     await user.type(screen.getByRole('searchbox', { name: 'Search mail' }), 'lerngruppe');
     expect(within(list).getAllByRole('button')).toHaveLength(1);
   });
@@ -348,26 +362,364 @@ describe('the inbox', () => {
     expect(screen.getByRole('searchbox', { name: 'Search mail' })).toHaveValue('');
   });
 
-  it('closes the filter menu, returns focus, and lets a course filter be cleared', async () => {
-    pretendDesktop();
-    const user = userEvent.setup();
-    renderApp('/inbox');
-    await row(/Blatt 4/);
-    const trigger = screen.getByLabelText('Filter by sender or course');
-    await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: /Datenbanken 1\s*1/ }));
-    expect(trigger.closest('details')).not.toHaveAttribute('open');
-    expect(trigger).toHaveFocus();
-    expect(
-      within(screen.getByRole('region', { name: 'Messages' })).getAllByRole('button'),
-    ).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: /Datenbanken 1.*Clear filter/ }));
-    expect(
-      within(screen.getByRole('region', { name: 'Messages' })).getAllByRole('button'),
-    ).toHaveLength(3);
-    await user.click(trigger);
-    await user.keyboard('{Escape}');
-    expect(trigger.closest('details')).not.toHaveAttribute('open');
+  describe('the Mail panel', () => {
+    const messages = () => within(screen.getByRole('region', { name: 'Messages' }));
+
+    it('is the inbox: views, the messages, and senders and courses with their counts', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      const mail = panel();
+      expect(screen.getByRole('complementary', { name: 'Mail' })).toBeVisible();
+      // Accounts: iCloud and the university's. Mail's title is the switcher.
+      expect(mail.getByRole('heading', { level: 2 })).toHaveTextContent('Mail');
+      expect(mail.getByRole('region', { name: 'Messages' })).toBeVisible();
+      expect(mail.getByRole('button', { name: 'All mail' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      expect(mail.getByRole('button', { name: 'Unread 1' })).toBeVisible();
+      // Nothing is sorted "to answer" yet: no number, but the view stays.
+      expect(mail.getByRole('button', { name: 'To answer' })).toBeVisible();
+      const menu = await filterMenu(user);
+      const senders = menu.getByRole('group', { name: 'Senders' });
+      expect(within(senders).getByRole('menuitemradio', { name: 'University 1' })).toBeVisible();
+      expect(within(senders).getByRole('menuitemradio', { name: 'ILIAS 1' })).toBeVisible();
+      expect(within(senders).getByRole('menuitemradio', { name: 'Students 1' })).toBeVisible();
+      const courses = menu.getByRole('group', { name: 'Courses' });
+      expect(within(courses).getByRole('menuitemradio', { name: 'Datenbanken 1 1' })).toBeVisible();
+    });
+
+    it('shows only what is unread, and only what is to answer once sorted', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      await user.click(panel().getByRole('button', { name: 'Unread 1' }));
+      expect(messages().getAllByRole('button')).toHaveLength(1);
+      expect(panel().getByRole('button', { name: 'Unread 1' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      expect(panel().getByRole('button', { name: 'All mail' })).not.toHaveAttribute('aria-current');
+
+      await user.click(panel().getByRole('button', { name: 'All mail' }));
+      await user.click(await row(/Lerngruppe/));
+      await user.click(
+        within(await screen.findByRole('group', { name: 'Sort this message' })).getByRole(
+          'button',
+          { name: 'Needs reply' },
+        ),
+      );
+      await user.click(panel().getByRole('button', { name: 'To answer 1' }));
+      expect(messages().getAllByRole('button')).toHaveLength(1);
+      expect(messages().getByRole('button', { name: /Lerngruppe/ })).toBeInTheDocument();
+    });
+
+    it('filters by course, says so above the list, and lets that be cleared', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      expect(screen.queryByRole('button', { name: /^Clear filter/ })).not.toBeInTheDocument();
+      await user.click(
+        (await filterMenu(user)).getByRole('menuitemradio', { name: 'Datenbanken 1 1' }),
+      );
+      expect(messages().getAllByRole('button')).toHaveLength(1);
+      expect(panel().getByRole('button', { name: 'All mail' })).not.toHaveAttribute('aria-current');
+
+      await user.click(screen.getByRole('button', { name: 'Clear filter: Datenbanken 1' }));
+      expect(messages().getAllByRole('button')).toHaveLength(3);
+      expect(panel().getByRole('button', { name: 'All mail' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      expect(screen.queryByRole('button', { name: /^Clear filter/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps the filter, visible and clearable, while the panel is hidden', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      await user.click(panel().getByRole('button', { name: 'Unread 1' }));
+      await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+      expect(screen.queryByRole('complementary', { name: 'Mail' })).not.toBeInTheDocument();
+      // The list moves into the card, with the views, still filtered.
+      expect(messages().getAllByRole('button')).toHaveLength(1);
+      expect(screen.getByRole('button', { name: 'Unread 1' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+
+      await user.click(screen.getByRole('button', { name: 'All mail' }));
+      expect(messages().getAllByRole('button')).toHaveLength(3);
+
+      // The panel comes back showing what the card is showing.
+      await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
+      expect(panel().getByRole('button', { name: 'All mail' })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+    });
+
+    it('writes a new message, from the panel only', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      const compose = screen.getAllByRole('button', { name: 'New message' });
+      expect(compose).toHaveLength(1);
+      expect(panel().getByRole('button', { name: 'New message' })).toBe(compose[0]);
+
+      await user.click(compose[0]!);
+      expect(screen.getByRole('dialog', { name: 'New message' })).toBeVisible();
+    });
+
+    it('asks Mail again from the panel, and waits while it is asked', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+      const asked = () => invoke.mock.calls.filter(([command]) => command === 'mail_inbox').length;
+      expect(asked()).toBe(1);
+
+      let answer: (messages: unknown) => void = () => undefined;
+      const listed = invoke.getMockImplementation()!;
+      invoke.mockImplementation((command, args) =>
+        command === 'mail_inbox'
+          ? new Promise((resolve) => {
+              answer = resolve;
+            })
+          : listed(command, args),
+      );
+      const refresh = screen.getAllByRole('button', { name: 'Refresh' });
+      expect(refresh).toHaveLength(1);
+      expect(refresh[0]).toBe(panel().getByRole('button', { name: 'Refresh' }));
+
+      await user.click(refresh[0]!);
+      expect(asked()).toBe(2);
+      expect(refresh[0]).toBeDisabled();
+      await act(() => {
+        answer(MESSAGES);
+        return Promise.resolve();
+      });
+      expect(refresh[0]).toBeEnabled();
+    });
+
+    describe('with the panel hidden', () => {
+      const hidePanel = async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+        expect(screen.queryByRole('complementary', { name: 'Mail' })).not.toBeInTheDocument();
+      };
+
+      it('moves the account, Refresh and New message into the card, once each', async () => {
+        pretendDesktop();
+        const user = userEvent.setup();
+        renderApp('/inbox');
+        await row(/Blatt 4/);
+        // Shown, the panel has them: the card does not repeat them.
+        expect(
+          screen.queryByRole('button', { name: 'stud.hs-heilbronn.de' }),
+        ).not.toBeInTheDocument();
+
+        await hidePanel(user);
+        expect(screen.getAllByRole('button', { name: 'New message' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'stud.hs-heilbronn.de' })).toHaveLength(1);
+
+        await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
+        expect(panel().getByRole('button', { name: 'New message' })).toBeVisible();
+        expect(panel().getByRole('button', { name: 'Refresh' })).toBeVisible();
+        expect(screen.getAllByRole('button', { name: 'New message' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+        expect(
+          screen.queryByRole('button', { name: 'stud.hs-heilbronn.de' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('writes a new message from the card', async () => {
+        pretendDesktop();
+        const user = userEvent.setup();
+        renderApp('/inbox');
+        await row(/Blatt 4/);
+        await hidePanel(user);
+
+        await user.click(screen.getByRole('button', { name: 'New message' }));
+        expect(screen.getByRole('dialog', { name: 'New message' })).toBeVisible();
+      });
+
+      it('asks Mail again from the card, and waits while it is asked', async () => {
+        pretendDesktop();
+        const user = userEvent.setup();
+        renderApp('/inbox');
+        await row(/Blatt 4/);
+        await hidePanel(user);
+        const asked = () =>
+          invoke.mock.calls.filter(([command]) => command === 'mail_inbox').length;
+        expect(asked()).toBe(1);
+
+        let answer: (messages: unknown) => void = () => undefined;
+        const listed = invoke.getMockImplementation()!;
+        invoke.mockImplementation((command, args) =>
+          command === 'mail_inbox'
+            ? new Promise((resolve) => {
+                answer = resolve;
+              })
+            : listed(command, args),
+        );
+        const refresh = screen.getByRole('button', { name: 'Refresh' });
+
+        await user.click(refresh);
+        expect(asked()).toBe(2);
+        expect(refresh).toBeDisabled();
+        await act(() => {
+          answer(MESSAGES);
+          return Promise.resolve();
+        });
+        expect(refresh).toBeEnabled();
+      });
+
+      it('reads another of Mail’s accounts from the card and starts that inbox unfiltered', async () => {
+        pretendDesktop();
+        const user = userEvent.setup();
+        renderApp('/inbox');
+        await row(/Blatt 4/);
+        await user.click(panel().getByRole('button', { name: 'Unread 1' }));
+        await hidePanel(user);
+
+        const account = screen.getByRole('button', { name: 'stud.hs-heilbronn.de' });
+        expect(account).toHaveAttribute('aria-haspopup', 'menu');
+        // The card's heading is the inbox's; the switcher brings no heading of its own.
+        expect(screen.queryByRole('heading', { name: 'Mail' })).not.toBeInTheDocument();
+        await user.click(account);
+        const menu = screen.getByRole('menu', { name: 'Mail accounts' });
+        expect(
+          within(menu).getByRole('menuitemradio', { name: 'stud.hs-heilbronn.de' }),
+        ).toBeChecked();
+
+        await user.click(within(menu).getByRole('menuitemradio', { name: 'iCloud' }));
+        expect(invoke).toHaveBeenCalledWith('mail_inbox', { account: 'iCloud' });
+        expect(useMailStore.getState().account).toBe('iCloud');
+        expect(await screen.findByRole('button', { name: 'iCloud' })).toBeVisible();
+        expect(screen.queryByRole('button', { name: /^Clear filter/ })).not.toBeInTheDocument();
+      });
+
+      it('leaves the account out when Mail has only one', async () => {
+        pretendDesktop();
+        const user = userEvent.setup();
+        answerLikeRust({}, [ACCOUNTS[1]!]);
+        renderApp('/inbox');
+        await row(/Blatt 4/);
+        await hidePanel(user);
+
+        expect(screen.getByRole('button', { name: 'New message' })).toBeVisible();
+        expect(screen.queryByRole('button', { name: 'Switch account' })).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'stud.hs-heilbronn.de' }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('leaves the card the open message, with the heading and the view toggle', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+      const card = within(screen.getByRole('main'));
+
+      // The list, its search and its views are the panel, and only there.
+      expect(card.queryByRole('region', { name: 'Messages' })).not.toBeInTheDocument();
+      expect(card.queryByRole('searchbox', { name: 'Search mail' })).not.toBeInTheDocument();
+      expect(card.queryByRole('group', { name: 'Show' })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('searchbox', { name: 'Search mail' })).toHaveLength(1);
+      expect(card.getByRole('group', { name: 'View' })).toBeVisible();
+      expect(card.getByRole('heading', { name: /1 unread/ })).toBeVisible();
+
+      await user.click(panel().getByRole('button', { name: /Blatt 4/ }));
+      expect(await card.findByRole('group', { name: 'Sort this message' })).toBeVisible();
+    });
+
+    it('leads to the mail settings', async () => {
+      pretendDesktop();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      expect(panel().getByRole('link', { name: 'Mail settings' })).toHaveAttribute(
+        'href',
+        '/settings?section=mail',
+      );
+    });
+  });
+
+  describe('the account switcher', () => {
+    it('is only the title when Mail has one account', async () => {
+      pretendDesktop();
+      answerLikeRust({}, [ACCOUNTS[1]!]);
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      expect(
+        within(screen.getByRole('complementary', { name: 'Mail' })).getByRole('heading', {
+          name: 'Mail',
+        }),
+      ).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Mail' })).not.toBeInTheDocument();
+    });
+
+    it('reads another of Mail’s accounts and starts that inbox unfiltered', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+      await user.click(panel().getByRole('button', { name: 'Unread 1' }));
+
+      const title = panel().getByRole('button', { name: 'Mail' });
+      expect(title).toHaveAttribute('aria-haspopup', 'menu');
+      expect(title).toHaveAttribute('aria-expanded', 'false');
+      await user.click(title);
+      const menu = screen.getByRole('menu', { name: 'Mail accounts' });
+      expect(
+        within(menu).getByRole('menuitemradio', { name: 'stud.hs-heilbronn.de' }),
+      ).toBeChecked();
+      expect(within(menu).getByRole('menuitemradio', { name: 'iCloud' })).not.toBeChecked();
+
+      await user.click(within(menu).getByRole('menuitemradio', { name: 'iCloud' }));
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(invoke).toHaveBeenCalledWith('mail_inbox', { account: 'iCloud' });
+      expect(useMailStore.getState().account).toBe('iCloud');
+      await row(/Blatt 4/);
+      expect(screen.queryByRole('button', { name: /^Clear filter/ })).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole('region', { name: 'Messages' })).getAllByRole('button'),
+      ).toHaveLength(3);
+    });
+
+    it('closes with Escape and gives the focus back, and stays put on the account it has', async () => {
+      pretendDesktop();
+      const user = userEvent.setup();
+      renderApp('/inbox');
+      await row(/Blatt 4/);
+
+      const title = panel().getByRole('button', { name: 'Mail' });
+      await user.click(title);
+      expect(screen.getByRole('menuitemradio', { name: 'stud.hs-heilbronn.de' })).toHaveFocus();
+      await user.keyboard('{ArrowUp}');
+      expect(screen.getByRole('menuitemradio', { name: 'iCloud' })).toHaveFocus();
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(title).toHaveFocus();
+
+      await user.click(title);
+      await user.click(screen.getByRole('menuitemradio', { name: 'stud.hs-heilbronn.de' }));
+      expect(invoke.mock.calls.filter(([command]) => command === 'mail_inbox')).toHaveLength(1);
+    });
   });
 
   it('starts a different message with a fresh reply and folded quote', async () => {
@@ -497,8 +849,11 @@ describe('the inbox', () => {
     const user = userEvent.setup();
     renderApp('/inbox');
 
-    await user.click(await screen.findByRole('button', { name: 'Gmail · me@gmail.com' }));
+    const choice = await screen.findByRole('button', { name: 'Gmail · me@gmail.com' });
+    expect(screen.queryByRole('complementary', { name: 'Mail' })).not.toBeInTheDocument();
+    await user.click(choice);
     expect(await screen.findByRole('region', { name: 'Messages' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Mail' })).toBeVisible();
     expect(invoke).toHaveBeenCalledWith('mail_inbox', { account: 'Gmail' });
   });
 });
@@ -509,6 +864,7 @@ describe('when Mail cannot help', () => {
     expect(
       screen.getByRole('heading', { name: 'Your mail comes through the desktop app' }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Mail' })).not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith('mail_accounts', expect.anything());
   });
 
@@ -519,6 +875,7 @@ describe('when Mail cannot help', () => {
     expect(
       await screen.findByRole('heading', { name: 'Allow Uni Pilot to ask Apple Mail' }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Mail' })).not.toBeInTheDocument();
   });
 
   it('offers to open Mail rather than starting it unasked', async () => {

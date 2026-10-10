@@ -48,7 +48,7 @@ describe('history', () => {
     await expect(readIliasHistory()).resolves.toEqual({ canGoBack: true, canGoForward: false });
   });
 
-  /** A missing answer means nothing to go to, not a crash in the strip. */
+  /** A missing answer means nothing to go to, not a crash in the panel. */
   it('treats no answer as nowhere to go', async () => {
     await expect(readIliasHistory()).resolves.toEqual({ canGoBack: false, canGoForward: false });
   });
@@ -106,19 +106,22 @@ describe('signOutOfIlias', () => {
 });
 
 describe('listenToIlias', () => {
-  it('hands each event to its listener, and stops both', async () => {
+  it('hands each event to its listener, and stops all', async () => {
     const onDownload = vi.fn();
     const onHistory = vi.fn();
-    const stop = await listenToIlias({ onDownload, onHistory });
+    const onLocation = vi.fn();
+    const stop = await listenToIlias({ onDownload, onHistory, onLocation });
 
     const report = { id: 1, fileName: 'a.pdf', state: 'finished', openable: true };
     listeners.get('ilias-download')?.({ payload: report });
     listeners.get('ilias-history')?.({ payload: { canGoBack: true, canGoForward: false } });
+    listeners.get('ilias-location')?.({ payload: { refId: '717' } });
 
     expect(onDownload).toHaveBeenCalledWith(report);
     expect(onHistory).toHaveBeenCalledWith({ canGoBack: true, canGoForward: false });
+    expect(onLocation).toHaveBeenCalledWith({ refId: '717' });
 
     stop();
-    expect(stopped.sort()).toEqual(['ilias-download', 'ilias-history']);
+    expect(stopped.sort()).toEqual(['ilias-download', 'ilias-history', 'ilias-location']);
   });
 });

@@ -29,6 +29,7 @@ export interface SlashCommandStorage {
   keyHandler: (event: KeyboardEvent) => boolean;
   /** Opens the image picker for the Image command. */
   pickImage: () => void;
+  pickPdf: () => void;
 }
 
 declare module '@tiptap/core' {
@@ -49,6 +50,14 @@ export function registerSlashKeys(editor: Editor, handler: SlashCommandStorage['
 }
 
 /** Lets the Image command open the host's file picker; returns the unregister function. */
+export function registerPdfPicker(editor: Editor, pick: () => void) {
+  const storage = editor.storage.slashCommand;
+  storage.pickPdf = pick;
+  return () => {
+    if (storage.pickPdf === pick) storage.pickPdf = () => undefined;
+  };
+}
+
 export function registerImagePicker(editor: Editor, pick: () => void) {
   const storage = editor.storage.slashCommand;
   storage.pickImage = pick;
@@ -81,7 +90,7 @@ export const SlashCommandExtension = Extension.create<SlashCommandOptions, Slash
     return { onChange: () => undefined };
   },
   addStorage() {
-    return { keyHandler: () => false, pickImage: () => undefined };
+    return { keyHandler: () => false, pickImage: () => undefined, pickPdf: () => undefined };
   },
   addProseMirrorPlugins() {
     const { options, storage } = this;
@@ -95,7 +104,13 @@ export const SlashCommandExtension = Extension.create<SlashCommandOptions, Slash
         allow: ({ state, range }) => allowsSlashMenu(state.doc, range.from),
         items: ({ query }) => filterSlashCommands(query),
         command: ({ editor, range, props }) =>
-          runSlashCommand(editor, range, props, () => storage.pickImage()),
+          runSlashCommand(
+            editor,
+            range,
+            props,
+            () => storage.pickImage(),
+            () => storage.pickPdf(),
+          ),
         render: () => {
           const publish = (props: {
             query: string;

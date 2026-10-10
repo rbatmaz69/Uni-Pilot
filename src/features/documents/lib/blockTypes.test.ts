@@ -117,6 +117,15 @@ describe('running / commands', () => {
     expect(saved(current)).toBe('Gauss as a child[^1]\n\n[^1]: A legend.\n');
   });
 
+  it('finds PDF uploads and opens the picker after removing the query', () => {
+    const current = open('Intro ');
+    const pickPdf = vi.fn();
+    expect(filterSlashCommands('pdf')[0]?.id).toBe('pdf');
+    runSlashCommand(current, typeSlash(current, 'pdf'), command('pdf'), vi.fn(), pickPdf);
+    expect(pickPdf).toHaveBeenCalledOnce();
+    expect(saved(current)).toBe('Intro\n');
+  });
+
   it('asks the host for an image after removing the query', () => {
     const current = open('Intro ');
     const insertImage = vi.fn();

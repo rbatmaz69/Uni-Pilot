@@ -8,6 +8,7 @@ import {
   countWords,
   findMatches,
   noteStats,
+  plainStats,
 } from './noteOutline';
 
 let editor: Editor | null = null;
@@ -79,6 +80,19 @@ describe('note stats', () => {
       openTasks: 1,
       readingMinutes: 1,
     });
+  });
+
+  it('counts a plain-text note the same way, without structure', () => {
+    expect(plainStats('Die Standard-Abweichung\nist   größer.\n')).toEqual({
+      words: 4,
+      characters: 32,
+      headings: 0,
+      images: 0,
+      tasks: 0,
+      openTasks: 0,
+      readingMinutes: 1,
+    });
+    expect(plainStats('')).toMatchObject({ words: 0, characters: 0 });
   });
 });
 

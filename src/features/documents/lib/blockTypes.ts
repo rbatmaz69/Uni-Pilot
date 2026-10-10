@@ -117,6 +117,7 @@ export interface SlashCommand {
     | 'divider'
     | 'table'
     | 'image'
+    | 'pdf'
     | 'mermaid'
     | 'formula'
     | 'inlineFormula'
@@ -193,6 +194,13 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     keywords: ['picture', 'photo', 'screenshot', 'img'],
     group: 'Insert',
   },
+  {
+    id: 'pdf',
+    label: 'PDF',
+    hint: 'Embed a PDF or show a file card',
+    keywords: ['document', 'attachment', 'file'],
+    group: 'Insert',
+  },
   ...(
     [
       ['sticky-yellow', 'Sticky note', ['sticky', 'card', 'haftnotiz']],
@@ -246,6 +254,7 @@ export function runSlashCommand(
   range: Range,
   command: SlashCommand,
   insertImage: () => void,
+  insertPdf: () => void = () => undefined,
 ) {
   if (!editor.isEditable) return;
   const type = BLOCK_TYPES.find((block) => block.id === command.id);
@@ -257,6 +266,9 @@ export function runSlashCommand(
   else if (command.id === 'image') {
     chain.run();
     insertImage();
+  } else if (command.id === 'pdf') {
+    chain.run();
+    insertPdf();
   } else if (command.id === 'formula' || command.id === 'inlineFormula') {
     chain.run();
     insertFormula(editor, command.id === 'formula');

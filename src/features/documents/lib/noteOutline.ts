@@ -108,6 +108,20 @@ export function noteStats(doc: ProseMirrorNode): NoteStats {
   };
 }
 
+/** The figures of a plain-text note: it has no structure beyond its words. */
+export function plainStats(text: string): NoteStats {
+  const words = countWords(text);
+  return {
+    words,
+    characters: text.replace(/\s/g, '').length,
+    headings: 0,
+    images: 0,
+    tasks: 0,
+    openTasks: 0,
+    readingMinutes: readingMinutes(words),
+  };
+}
+
 // Stands in for inline nodes (images, line breaks) so a match never spans one.
 const OBJECT = '￼';
 

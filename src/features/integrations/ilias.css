@@ -1,0 +1,67 @@
+/*
+ * ILIAS mode (src-tauri/src/ilias_view.rs): Uni Pilot's webview is only the left
+ * column — the icon rail and the ILIAS panel — and ILIAS, a native webview
+ * placed beside it, is the card. `AppLayout` marks the shell `data-ilias-mode`.
+ */
+
+/* A fixed width, not the usual `clamp(…, 19vw, …)`: the viewport is now the column
+   itself, so a width taken from it would feed back into the column it measures. */
+.app-shell[data-ilias-mode] {
+  --panel-width: 240px;
+}
+
+/* The rail keeps its width. Below 700px, which the column always is, it would
+   narrow to 62px and change the column's width with it. */
+.app-shell[data-ilias-mode] .sidebar-glass {
+  width: 72px;
+  padding-inline: 8px;
+}
+.app-shell[data-ilias-mode] .sidebar-profile {
+  padding-block: 0.75rem;
+}
+
+/* No webview covers the gutter around ILIAS, so the window's own background shows
+   there; Rust sets it to --frame-to. The frame is that one colour too, or the two
+   would meet in a seam. */
+.app-shell[data-ilias-mode] .app-frame {
+  background: var(--frame-to);
+}
+
+/* Where ILIAS goes, drawn like the card beside a panel (.workspace[data-panel]). It
+   is only ever seen before the window is laid out, or while a dialog has the window
+   to itself; ILIAS then covers it. */
+.ilias-stage {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  margin: var(--frame-gutter) var(--frame-gutter) var(--frame-gutter) 0;
+  border: 1px solid var(--frame-line);
+  border-left-width: 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--surface-secondary);
+  color: var(--text-muted);
+}
+
+/* The panel's own lines: which ILIAS this is, what went wrong, and what has not
+   been read yet. Quiet, like the rows around them. */
+.ilias-panel-note {
+  margin: 2px 8px 6px;
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.ilias-panel-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-coral-soft);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}

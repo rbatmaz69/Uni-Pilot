@@ -1,7 +1,9 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDown, ArrowUp, File, FileText, Folder, Star, StarOff } from 'lucide-react';
+import { ArrowDown, ArrowUp, File, FileText, Star, StarOff } from 'lucide-react';
+import { FolderIcon } from '@/features/documents/components/FolderIcon';
 import { Tooltip } from '@/components/ui';
+import { newTabHandlers } from '@/lib/tabActions';
 import {
   DOCUMENT_DRAG_TYPE,
   favoriteHref,
@@ -13,7 +15,6 @@ import {
 } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
 import { FAVORITES_SECTION, useSidebarStore } from '@/store/sidebarStore';
-import { SectionHeader } from './SectionHeader';
 import {
   SIDEBAR_ICON,
   sidebarIconClass,
@@ -26,12 +27,10 @@ const TYPE = sidebarDragType(FAVORITES_SECTION);
 const LABEL_ID = 'nav-section-favorites';
 
 function iconFor(favorite: SidebarFavorite) {
-  if (favorite.folder) return Folder;
   return /\.(md|markdown|txt)$/i.test(favorite.name) ? FileText : File;
 }
 
 interface FavoritesSectionProps {
-  collapsed: boolean;
   /** The favorite the Documents page currently shows, if any. */
   activePath: string | null;
   /** A document is being dragged somewhere in the app. */
@@ -42,19 +41,13 @@ interface FavoritesSectionProps {
 }
 
 /**
- * Folders and documents the student keeps at hand. Anything dragged from the
- * document explorer onto the sidebar lands here; rows reorder by dragging.
+ * Folders and documents the student keeps at hand, as icons under the pages.
+ * Anything dragged from the document explorer onto the sidebar lands here;
+ * rows reorder by dragging. With none yet, the section only shows while
+ * something is on its way.
  */
-export function FavoritesSection({
-  collapsed,
-  activePath,
-  receiving,
-  over,
-  onMenu,
-}: FavoritesSectionProps) {
+export function FavoritesSection({ activePath, receiving, over, onMenu }: FavoritesSectionProps) {
   const favorites = useSidebarStore((state) => state.favorites);
-  const folded = useSidebarStore((state) => state.collapsedSections.includes(FAVORITES_SECTION));
-  const toggleSection = useSidebarStore((state) => state.toggleSection);
   const addFavorite = useSidebarStore((state) => state.addFavorite);
   const moveFavorite = useSidebarStore((state) => state.moveFavorite);
   const removeFavorite = useSidebarStore((state) => state.removeFavorite);
@@ -94,8 +87,7 @@ export function FavoritesSection({
       requestAnimationFrame(() => link.focus());
   }
 
-  if (collapsed && !favorites.length && !receiving) return null;
-  const open = collapsed || !folded || receiving;
+  if (!favorites.length && !receiving) return null;
 
   return (
     <div
@@ -106,14 +98,10 @@ export function FavoritesSection({
       data-over={over || undefined}
       className="favorites-section mb-3 rounded-md last:mb-1"
     >
-      <SectionHeader
-        id={LABEL_ID}
-        label="Favorites"
-        collapsed={collapsed}
-        folded={folded && !receiving}
-        onToggle={() => toggleSection(FAVORITES_SECTION)}
-      />
-      {open && favorites.length > 0 && (
+      <div id={LABEL_ID} className="sr-only">
+        Favorites
+      </div>
+      {favorites.length > 0 && (
         <ul className="sidebar-sortable mt-0.5 space-y-px" {...sortable.list}>
           {favorites.map((favorite, index) => {
             const Icon = iconFor(favorite);
@@ -121,13 +109,13 @@ export function FavoritesSection({
             const current = activePath === favorite.path;
             return (
               <li key={favorite.path} {...sortable.row(favorite.path, index)}>
-                <Tooltip label={label} disabled={!collapsed} className="w-full">
+                <Tooltip label={label} className="w-full">
                   <Link
                     to={favoriteHref(favorite)}
+                    {...newTabHandlers(favoriteHref(favorite))}
                     aria-label={label}
                     aria-current={current ? 'page' : undefined}
-                    title={collapsed ? undefined : favorite.path}
-                    className={sidebarRowClass(current, collapsed)}
+                    className={sidebarRowClass(current)}
                     onKeyDown={(event) => stepByKey(event, favorite)}
                     onContextMenu={(event) =>
                       onMenu(event, label, [
@@ -154,9 +142,10 @@ export function FavoritesSection({
                       ])
                     }
                   >
-                    <Icon {...SIDEBAR_ICON} className={sidebarIconClass(current)} aria-hidden />
-                    {!collapsed && (
-                      <span className="sidebar-label min-w-0 flex-1 truncate">{label}</span>
+                    {favorite.folder ? (
+                      <FolderIcon path={favorite.path} />
+                    ) : (
+                      <Icon {...SIDEBAR_ICON} className={sidebarIconClass(current)} aria-hidden />
                     )}
                   </Link>
                 </Tooltip>
@@ -165,22 +154,17 @@ export function FavoritesSection({
           })}
         </ul>
       )}
-      {open && !favorites.length && (
+      {!favorites.length && (
         <div
           className={cn(
-            'favorites-empty mt-1 flex items-center gap-2 rounded-sm border border-dashed px-2.5 py-2 text-[12px] leading-snug transition-colors',
-            collapsed && 'justify-center px-0',
+            'favorites-empty mt-1 flex items-center justify-center rounded-sm border border-dashed py-2 transition-colors',
             over
               ? 'border-accent bg-accent-soft text-accent'
               : 'border-sidebar-border text-sidebar-muted',
           )}
         >
           <Star size={14} strokeWidth={1.75} aria-hidden className="flex-none" />
-          {!collapsed && (
-            <span className="sidebar-label">
-              {receiving ? 'Drop to add to Favorites' : 'Drag folders and notes here'}
-            </span>
-          )}
+          <span className="sr-only">Drop to add to Favorites</span>
         </div>
       )}
     </div>

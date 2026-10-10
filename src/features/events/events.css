@@ -85,18 +85,23 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 4px;
 }
+/* Everything the page lays out against the card's width (the panel takes some of it), not the window's. */
+.events-stage {
+  container: events / inline-size;
+}
 .events-heading {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 20px;
-  padding: 0 0 16px;
+  gap: 12px 20px;
+  padding: 2px 0 18px;
 }
 
-.events-heading h1 {
-  font-size: 32px;
+.events-heading h2 {
+  font-size: 28px;
   line-height: 1.2;
-  letter-spacing: -1.7px;
+  letter-spacing: -1.2px;
   font-weight: 650;
   margin: 0 0 4px;
 }
@@ -104,6 +109,56 @@
 .events-heading p {
   color: var(--text-secondary);
   font-size: 12px;
+}
+/* Only while the panel is hidden: the collections and "Create event" move into the card. */
+.events-heading-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.events-segments {
+  display: inline-flex;
+  padding: 3px;
+  gap: 1px;
+  border: 1px solid var(--ev-line);
+  border-radius: var(--radius-sm);
+}
+.events-segments button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-xs);
+  color: var(--ev-muted);
+  font-size: 11px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.events-segments button:hover {
+  color: var(--ev-ink);
+}
+.events-segments button[aria-pressed='true'] {
+  background: var(--ev-green-soft);
+  color: var(--ev-green);
+}
+/* In the panel: a facet narrows the list rather than taking you somewhere, so its open row
+   gets a lighter wash than a collection's. */
+.panel-item.events-facet.is-active {
+  background: color-mix(in oklab, var(--panel-active) 45%, transparent);
+}
+.events-segment-count {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ev-paper);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.events-segments button[aria-pressed='true'] .events-segment-count {
+  background: var(--surface);
 }
 .ev-button {
   display: inline-flex;
@@ -134,36 +189,6 @@
   filter: brightness(1.13);
   color: var(--surface);
 }
-.events-top-tabs {
-  display: flex;
-  align-items: center;
-  gap: 26px;
-  border-bottom: 1px solid var(--ev-line);
-  margin-bottom: 16px;
-}
-.events-top-tabs > button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 0 10px;
-  color: var(--ev-muted);
-  border-bottom: 2px solid transparent;
-  font-size: 12px;
-  margin-bottom: -1px;
-}
-.events-top-tabs > button[aria-selected='true'] {
-  color: var(--ev-green);
-  border-color: var(--ev-green);
-  font-weight: 650;
-}
-.events-top-tabs > button > span {
-  font-size: 9px;
-  background: var(--ev-paper);
-  border-radius: var(--radius-xs);
-  min-width: 19px;
-  padding: 1px 5px;
-}
-
 .events-content-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 242px;
@@ -221,12 +246,19 @@
 .events-search svg {
   flex-shrink: 0;
 }
-.events-filter-button {
+.events-format-select {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--ev-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ev-ink);
   font-size: 10px;
+  cursor: pointer;
 }
-.events-filter-button.is-active {
-  background: var(--ev-green-soft);
-  color: var(--ev-green);
+.events-format-select:hover {
+  border-color: var(--ev-green);
 }
 .events-categories {
   display: flex;
@@ -261,6 +293,9 @@
   color: var(--ev-muted);
   margin-bottom: 12px;
 }
+.events-search-row + .events-results-meta {
+  margin-top: 16px;
+}
 .events-results-meta > span {
   display: flex;
   align-items: center;
@@ -270,6 +305,14 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  color: var(--ev-green);
+}
+.events-results-meta > span > .events-reset {
+  color: var(--ev-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.events-results-meta > span > .events-reset:hover {
   color: var(--ev-green);
 }
 .events-results-meta label {
@@ -609,6 +652,12 @@
   gap: 13px;
   color: var(--ev-muted);
 }
+.events-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
 .events-empty h3 {
   color: var(--ev-ink);
   font-size: 17px;
@@ -616,32 +665,6 @@
 .events-empty p {
   font-size: 12px;
   max-width: 320px;
-}
-.events-extra-filters {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 10px;
-  padding: 12px;
-  background: var(--ev-paper);
-  border-radius: var(--radius-sm);
-  margin-top: 8px;
-  font-size: 11px;
-}
-.events-extra-filters label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.events-extra-filters select {
-  border: 1px solid var(--ev-line);
-  border-radius: var(--radius-xs);
-  padding: 6px;
-  background: var(--surface);
-}
-.events-extra-filters button {
-  color: var(--ev-green);
-  padding: 5px;
 }
 .events-timeline {
   display: flex;
@@ -844,7 +867,8 @@
   border-radius: 50%;
   padding: 3px;
 }
-@media (min-width: 1550px) {
+/* Layout follows the width of the stage (the card minus the panel), not the window. */
+@container events (min-width: 1380px) {
   .events-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -853,17 +877,13 @@
     gap: 30px;
   }
 }
-@media (max-width: 1150px) {
+@container events (max-width: 1030px) {
   .events-content-layout {
     grid-template-columns: minmax(0, 1fr) 215px;
     gap: 20px;
   }
-  .events-page {
-    padding-left: 0;
-    padding-right: 0;
-  }
 }
-@media (max-width: 1000px) {
+@container events (max-width: 800px) {
   .events-content-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -876,28 +896,25 @@
     margin-top: 0;
   }
 }
-@media (max-width: 600px) {
+@container events (max-width: 520px) {
   .events-heading {
     gap: 10px;
     padding-top: 0;
   }
-  .events-heading h1 {
-    font-size: 33px;
+  .events-heading h2 {
+    font-size: 26px;
   }
   .events-heading p {
     font-size: 10px;
   }
-  .events-heading > button {
-    font-size: 10px;
-    padding: 9px;
+  .events-heading-tools,
+  .events-segments {
+    width: 100%;
   }
-
-  .events-top-tabs {
-    gap: 19px;
-  }
-  .events-top-tabs > button {
-    font-size: 10px;
-    gap: 5px;
+  .events-segments button {
+    flex: 1;
+    justify-content: center;
+    padding: 0 6px;
   }
   .events-grid {
     grid-template-columns: 1fr;
@@ -910,11 +927,9 @@
   .student-event-body {
     padding: 12px 12px 15px;
   }
-
   .student-event-body h3 {
     font-size: 12px;
   }
-
   .events-categories {
     gap: 5px;
   }
@@ -924,9 +939,6 @@
   }
   .events-aside {
     grid-template-columns: 1fr;
-  }
-  .events-filter-button span {
-    display: none;
   }
   .events-timeline .student-event-card {
     grid-template-columns: 58px minmax(0, 1fr) 65px;
@@ -941,6 +953,15 @@
     bottom: 5px;
     right: 5px;
   }
+}
+@media (max-width: 1150px) {
+  .events-page {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+/* The create dialog sits outside the stage, so it follows the window. */
+@media (max-width: 600px) {
   .event-form-row {
     grid-template-columns: 1fr;
   }
@@ -955,18 +976,6 @@
   }
   .event-cover-choices > button {
     height: 60px;
-  }
-}
-@media (max-width: 390px) {
-  .events-grid {
-    grid-template-columns: 1fr;
-  }
-  .student-event-visual {
-    height: 175px;
-  }
-  .events-heading > button {
-    gap: 4px;
-    padding: 7px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

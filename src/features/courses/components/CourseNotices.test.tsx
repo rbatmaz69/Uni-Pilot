@@ -144,7 +144,7 @@ describe('the notice that ILIAS wants a sign-in', () => {
     expect(screen.getByRole('button', { name: 'Sign in to ILIAS' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Set it up again in Settings' })).toHaveAttribute(
       'href',
-      '/settings',
+      '/settings?section=sign-in',
     );
   });
 });

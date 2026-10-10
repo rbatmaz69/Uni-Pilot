@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { useNoteStyleStore } from './noteStyleStore';
 
 const migrate = (state: object, version: number) =>
@@ -52,5 +52,40 @@ describe('note style settings', () => {
     });
     useNoteStyleStore.getState().toggleMarkers();
     expect(useNoteStyleStore.getState()).toMatchObject({ markers: false, markerOnly: null });
+  });
+
+  describe('note properties', () => {
+    afterEach(() => {
+      useNoteStyleStore.setState(useNoteStyleStore.getInitialState());
+      localStorage.clear();
+    });
+
+    it('shows them by default and toggles them', () => {
+      expect(useNoteStyleStore.getInitialState().properties).toBe(true);
+      useNoteStyleStore.getState().toggleProperties();
+      expect(useNoteStyleStore.getState().properties).toBe(false);
+      useNoteStyleStore.getState().toggleProperties();
+      expect(useNoteStyleStore.getState().properties).toBe(true);
+    });
+
+    it('persists the choice with the other page settings', () => {
+      useNoteStyleStore.getState().toggleProperties();
+      expect(JSON.parse(localStorage.getItem('uni-pilot.note-style')!)).toMatchObject({
+        state: { properties: false },
+      });
+    });
+
+    it('opens settings saved before the block existed with it shown', async () => {
+      localStorage.setItem(
+        'uni-pilot.note-style',
+        JSON.stringify({ state: { layout: 'card', sidebar: false }, version: 2 }),
+      );
+      await useNoteStyleStore.persist.rehydrate();
+      expect(useNoteStyleStore.getState()).toMatchObject({
+        layout: 'card',
+        sidebar: false,
+        properties: true,
+      });
+    });
   });
 });

@@ -15,7 +15,7 @@ const FULL_BLEED_PATHS = new Set(['/calendar', '/inbox', '/documents']);
 export function MainContent() {
   const { pathname } = useLocation();
   const fullBleed = FULL_BLEED_PATHS.has(pathname);
-  const immersive = useUiStore((state) => state.immersive);
+  const iliasMode = useUiStore((state) => state.iliasMode);
   // The document explorer lays out its own panes and scrolls them itself.
   const documents = pathname === '/documents';
   // The focus timer fills the window and never scrolls.
@@ -27,21 +27,21 @@ export function MainContent() {
       tabIndex={-1}
       className={cn(
         'min-h-0 flex-1',
-        immersive || documents || isFocus ? 'overflow-hidden' : 'scroll-area overflow-y-auto',
+        iliasMode || documents || isFocus ? 'overflow-hidden' : 'scroll-area overflow-y-auto',
       )}
     >
       <div
         key={pathname}
         className={cn(
           'mx-auto flex w-full flex-col',
-          // Edge to edge when immersive, and still: the page is laid out
+          // Edge to edge in ILIAS mode, and still: the page is laid out
           // against the window, and a sliding entrance would be measured
           // mid-slide.
-          !immersive && 'animate-page-enter px-3.5 pb-3.5 sm:px-5 xl:px-6',
+          !iliasMode && 'animate-page-enter px-3.5 pb-3.5 sm:px-5 xl:px-6',
           // `h-full` rather than `min-h-full`: a full-bleed page sizes its own
           // panes against the window, which it can only do from a column that
           // is the window rather than one free to grow past it.
-          immersive
+          iliasMode
             ? 'h-full max-w-none'
             : documents
               ? 'h-full max-w-none !p-0'

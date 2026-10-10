@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { NAV_ITEMS } from '@/lib/navigation';
 import type { NavItem } from '@/types';
 
 interface PageProps {
@@ -47,12 +48,23 @@ export function Page({
           <p>{item.subtitle}</p>
         </div>
       ) : null}
-      {children ?? <PagePlaceholder>{item.placeholder}</PagePlaceholder>}
+      {children ?? (
+        <PagePlaceholder backToDashboard={item.path !== NAV_ITEMS.dashboard.path}>
+          {item.placeholder}
+        </PagePlaceholder>
+      )}
     </div>
   );
 }
 
-function PagePlaceholder({ children }: { children: ReactNode }) {
+function PagePlaceholder({
+  children,
+  backToDashboard,
+}: {
+  children: ReactNode;
+  /** Every page but the dashboard itself can lead back to it. */
+  backToDashboard: boolean;
+}) {
   return (
     <div className="flex min-h-[370px] flex-col items-center justify-center rounded-2xl border border-line-soft bg-surface-secondary/50 px-6 py-16 text-center">
       <span className="grid h-14 w-14 place-items-center rounded-2xl border border-line bg-surface text-accent shadow-soft">
@@ -65,13 +77,15 @@ function PagePlaceholder({ children }: { children: ReactNode }) {
         A little space for what&apos;s next.
       </h2>
       <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-secondary">{children}</p>
-      <Link
-        to="/dashboard"
-        className="mt-6 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-xs font-medium text-secondary transition-colors hover:border-accent hover:text-accent"
-      >
-        <ArrowLeft size={14} />
-        Back to dashboard
-      </Link>
+      {backToDashboard ? (
+        <Link
+          to={NAV_ITEMS.dashboard.path}
+          className="mt-6 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-xs font-medium text-secondary transition-colors hover:border-accent hover:text-accent"
+        >
+          <ArrowLeft size={14} />
+          Back to dashboard
+        </Link>
+      ) : null}
     </div>
   );
 }

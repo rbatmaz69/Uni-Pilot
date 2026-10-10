@@ -8,6 +8,7 @@ import { NAV_ITEMS } from '@/lib/navigation';
 import { installationHost, useAutoSignInStore, useFaceBar } from '@/features/auto-sign-in';
 import { useCourseStore } from '@/features/courses/store/courseStore';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
+import { settingsSectionPath } from '@/features/settings/lib/sections';
 
 interface EmptyStateProps {
   icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
@@ -117,7 +118,7 @@ function SignInNotice({ onRetry }: { onRetry: () => void }) {
         {known?.credentials && known.stale ? (
           <p className="mt-1 text-[12.5px] leading-relaxed text-secondary">
             HHN did not accept the stored password.{' '}
-            <Link to={NAV_ITEMS.settings.path} className="text-accent hover:underline">
+            <Link to={settingsSectionPath('sign-in')} className="text-accent hover:underline">
               Set it up again in Settings
             </Link>
             .

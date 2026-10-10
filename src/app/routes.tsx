@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/layout';
 import { DEFAULT_ROUTE, NAV_ITEMS } from '@/lib/navigation';
+import { startLocation } from '@/store/tabStore';
 import {
   AiAssistantPage,
   CalendarPage,
@@ -19,11 +20,16 @@ import {
   TasksPage,
 } from '@/pages';
 
+/** The app opens where its open tab was when it closed (`startLocation`). */
+function Start() {
+  return <Navigate to={startLocation()} replace />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route index element={<Navigate to={DEFAULT_ROUTE} replace />} />
+        <Route index element={<Start />} />
         <Route path={NAV_ITEMS.dashboard.path} element={<DashboardPage />} />
         <Route path={NAV_ITEMS.inbox.path} element={<InboxPage />} />
         <Route path={NAV_ITEMS.studies.path} element={<StudiesPage />} />

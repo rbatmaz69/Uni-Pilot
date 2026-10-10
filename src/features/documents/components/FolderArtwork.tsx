@@ -11,6 +11,7 @@ import {
 import { loadNotePreview, loadThumbnail } from '../lib/previewCache';
 import { DocumentThumbnail } from './DocumentThumbnail';
 import { NoteVisualPreview } from './NoteVisualPreview';
+import { useFolderAppearance } from '../store/folderAppearanceStore';
 
 type Peek = { entry: DocumentEntry; note?: string; media?: DocumentPreviewData };
 
@@ -18,10 +19,14 @@ type Peek = { entry: DocumentEntry; note?: string; media?: DocumentPreviewData }
 export const FolderArtwork = memo(function FolderArtwork({
   entry,
   enabled,
+  appearancePath = entry.path,
 }: {
   entry: DocumentEntry;
   enabled: boolean;
+  /** ILIAS courses keep a stable appearance even before they have a local folder. */
+  appearancePath?: string;
 }) {
+  const appearance = useFolderAppearance(appearancePath, entry.name);
   const [peek, setPeek] = useState<{ path: string; items: Peek[] } | null>(null);
   useEffect(() => {
     if (!enabled) return;
@@ -61,7 +66,11 @@ export const FolderArtwork = memo(function FolderArtwork({
   }, [entry.path, entry.modified, enabled]);
 
   return (
-    <div className="canvas-folder-art" aria-hidden>
+    <div
+      className="canvas-folder-art"
+      style={{ '--card-tone': appearance.color } as CSSProperties}
+      aria-hidden
+    >
       <div className="canvas-folder-pocket">
         {(peek?.path === entry.path ? peek.items : []).map((item, index) => (
           <div

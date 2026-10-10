@@ -1,10 +1,11 @@
 /**
  * ILIAS mode across the whole shell: on the ILIAS page, in the desktop app and
- * connected, the sidebar and header step aside for the strip — and come back
- * the moment the student leaves.
+ * connected, the header and the card step aside for the ILIAS panel — the icon
+ * rail stays, as the way out — and everything comes back the moment the student
+ * leaves.
  */
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useIliasStore } from '@/features/integrations/store/iliasStore';
@@ -30,7 +31,12 @@ const pretendDesktop = () =>
 const sidebar = () => screen.queryByRole('complementary', { name: 'Main navigation' });
 
 beforeEach(() => {
-  invoke.mockReset().mockResolvedValue(undefined);
+  // ILIAS answers the course list with a list; the rest of the commands with nothing.
+  invoke
+    .mockReset()
+    .mockImplementation((command) =>
+      Promise.resolve(command === 'ilias_sync_courses' ? [] : undefined),
+    );
   useIliasStore.setState({
     connection: {
       name: 'Hochschule Heilbronn',
@@ -49,27 +55,61 @@ afterEach(() => {
 });
 
 describe('ILIAS mode', () => {
-  it('clears the sidebar and header away for the strip', async () => {
+  it('keeps the icon rail and brings the ILIAS panel, in place of the header and the card', async () => {
     pretendDesktop();
     renderApp('/ilias');
 
     expect(
       await screen.findByRole('heading', { level: 1, name: 'ILIAS: Hochschule Heilbronn' }),
     ).toBeInTheDocument();
-    expect(sidebar()).not.toBeInTheDocument();
-    expect(useUiStore.getState().immersive).toBe(true);
+    expect(sidebar()).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'ILIAS' })).toBeInTheDocument();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.getByRole('main').closest('.workspace')).toBeNull();
+    expect(useUiStore.getState().iliasMode).toBe(true);
   });
 
-  it('brings them back when the student leaves', async () => {
+  /** The rail is the way back: there is no "Uni Pilot" button any more. */
+  it('brings the header and the card back when the student leaves by the rail', async () => {
     pretendDesktop();
     renderApp('/ilias');
-    await screen.findByRole('button', { name: 'Uni Pilot' });
+    await screen.findByRole('complementary', { name: 'ILIAS' });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Uni Pilot' }));
+    await userEvent.click(
+      within(sidebar() as HTMLElement).getByRole('link', { name: 'Dashboard' }),
+    );
 
-    await waitFor(() => expect(useUiStore.getState().immersive).toBe(false));
+    await waitFor(() => expect(useUiStore.getState().iliasMode).toBe(false));
     expect(sidebar()).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith('leave_ilias_mode', {});
+    expect(screen.queryByRole('complementary', { name: 'ILIAS' })).not.toBeInTheDocument();
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('main').closest('.workspace')).not.toBeNull();
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('leave_ilias_mode', {}));
+  });
+
+  /**
+   * The panel holds ILIAS's only controls and there is no header to bring it
+   * back from, so ILIAS mode keeps it open. What the student chose is theirs
+   * and applies again afterwards.
+   */
+  it('keeps the panel open when the student had hidden panels, and keeps their choice', async () => {
+    useUiStore.setState({ panelOpen: false });
+    pretendDesktop();
+    renderApp('/ilias');
+
+    expect(await screen.findByRole('complementary', { name: 'ILIAS' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Show sidebar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hide sidebar' })).not.toBeInTheDocument();
+    expect(useUiStore.getState().panelOpen).toBe(false);
+  });
+
+  /** The page takes its panel's width from the stylesheet's fixed one, never from the window. */
+  it('marks the shell, so the stylesheet can fix the column’s width', async () => {
+    pretendDesktop();
+    const { container } = renderApp('/ilias');
+    await screen.findByRole('complementary', { name: 'ILIAS' });
+
+    expect(container.querySelector('.app-shell')).toHaveAttribute('data-ilias-mode', 'true');
   });
 
   /**
@@ -79,7 +119,7 @@ describe('ILIAS mode', () => {
   it('enters once, not in a loop', async () => {
     pretendDesktop();
     renderApp('/ilias');
-    await screen.findByRole('button', { name: 'Uni Pilot' });
+    await screen.findByRole('complementary', { name: 'ILIAS' });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const entered = invoke.mock.calls.filter(([command]) => command === 'enter_ilias_mode');
@@ -91,7 +131,8 @@ describe('ILIAS mode', () => {
     renderApp('/ilias');
     expect(await screen.findByRole('heading', { level: 1, name: 'ILIAS' })).toBeInTheDocument();
     expect(sidebar()).toBeInTheDocument();
-    expect(useUiStore.getState().immersive).toBe(false);
+    expect(screen.queryByRole('complementary', { name: 'ILIAS' })).not.toBeInTheDocument();
+    expect(useUiStore.getState().iliasMode).toBe(false);
     expect(invoke).not.toHaveBeenCalled();
   });
 });

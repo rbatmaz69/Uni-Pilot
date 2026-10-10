@@ -1,33 +1,45 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import {
   ChevronDown,
   ChevronRight,
-  Ellipsis,
+  ChevronsDownUp,
   File,
-  Folder,
-  FolderOpen,
-  GraduationCap,
+  FileText,
+  FolderPlus,
   House,
-  Plus,
-  School,
   Search,
+  SquarePen,
   Trash2,
   X,
 } from 'lucide-react';
 import { NewBadge } from './NewBadge';
+import { FolderIcon } from './FolderIcon';
+import { FolderAppearanceButton } from './FolderAppearanceButton';
+import { SidebarFavorites } from './SidebarFavorites';
+import { SpaceSwitcher } from './SpaceSwitcher';
+import {
+  PanelAction,
+  PanelBody,
+  PanelFooter,
+  PanelHeader,
+  PanelItem,
+} from '@/components/layout/Panel';
 import {
   documentRequest,
   editable,
-  type DirectoryListing,
   type DocumentEntry,
   type IliasCourse,
   type SearchHit,
 } from '@/features/documents/lib/files';
 import { COURSE_DRAG, courseCards, inIliasSpace } from '@/features/documents/lib/iliasSpace';
-import { useCourseStore } from '@/features/courses/store/courseStore';
 import {
-  COURSES_SPACE,
-  DOCUMENTS,
+  closeAll,
+  isFolderOpen,
+  openFolders,
+  reveal,
+  type OpenFolders,
+} from '@/features/documents/lib/sidebarTree';
+import {
   ILIAS,
   ILIAS_SPACE,
   looseFiles,
@@ -36,11 +48,19 @@ import {
   spaceTones,
   type Space,
 } from '@/features/documents/lib/spaces';
+import { useFavoritesDrop } from '@/features/documents/lib/useFavoritesDrop';
+import { useFolderListings } from '@/features/documents/lib/useFolderListings';
+import { useCourseStore } from '@/features/courses/store/courseStore';
+import { useDocumentsLayoutStore } from '@/features/documents/store/documentsLayoutStore';
 import { useSpaceStore } from '@/features/documents/store/spaceStore';
 import { IliasBadge } from '@/features/integrations';
-import { toFavorite, writeDocumentDrag } from '@/lib/sidebar';
+import { hasDragType, toFavorite, writeDocumentDrag } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
+import { panelMotionRef } from '@/components/layout/panelMotion';
 import { useSidebarStore } from '@/store/sidebarStore';
+
+/** How far each level of the tree steps in. */
+const INDENT = 14;
 
 type Props = {
   desktop: boolean;
@@ -52,6 +72,8 @@ type Props = {
   onFile: (entry: DocumentEntry) => void;
   /** Starts a note in the folder of the open space. */
   onNewNote: (folder: string) => void;
+  /** Starts a folder in the folder of the open space. */
+  onNewFolder: (folder: string) => void;
   onNewSpace: () => void;
   onEditSpace: (space: Space) => void;
   /** The courses the ILIAS sync keeps; `null` while they are read. */
@@ -65,17 +87,6 @@ type Props = {
   onAddCourse?: (courseId: string) => void;
 };
 
-function SpaceIcon({ id, space, size }: { id: string; space?: Space | undefined; size: number }) {
-  if (id === DOCUMENTS) return <House size={size} aria-hidden />;
-  if (id === ILIAS) return <School size={size} aria-hidden />;
-  if (space?.folder === COURSES_SPACE) return <GraduationCap size={size} aria-hidden />;
-  return (
-    <span className="space-monogram" aria-hidden>
-      {(space?.name ?? '').charAt(0).toLocaleUpperCase()}
-    </span>
-  );
-}
-
 /** How many new files lie in a listed folder: its folders count what is below them. */
 function unseenIn(entries: DocumentEntry[] | undefined): number {
   return (entries ?? []).reduce((sum, entry) => sum + (entry.unseen ?? 0), 0);
@@ -84,8 +95,8 @@ function unseenIn(entries: DocumentEntry[] | undefined): number {
 /**
  * The documents sidebar, one space at a time. Documents shows the whole
  * workspace, ILIAS the synced courses, and every space the student added one
- * folder. A space shows its folders one level deep and the notes lying loose
- * in it; deeper structure is the explorer's. The only number anywhere is how
+ * folder; the name at the top switches between them. Below sit the Files and
+ * Favorites views and the tree: folders open to any depth, each read when it is first opened. The only number anywhere is how
  * many files are new.
  */
 export function SpaceSidebar({
@@ -96,6 +107,7 @@ export function SpaceSidebar({
   onFolder,
   onFile,
   onNewNote,
+  onNewFolder,
   onNewSpace,
   onEditSpace,
   iliasCourses,
@@ -107,63 +119,60 @@ export function SpaceSidebar({
   const listedCourses = useCourseStore((state) => state.courses);
   const [dropping, setDropping] = useState(false);
   const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
+  const documentDrag = useSidebarStore((state) => state.documentDrag);
+  const pointerOver = useSidebarStore((state) => state.documentDragOver);
   const spaces = useSpaceStore((state) => state.spaces);
   const picked = useSpaceStore((state) => state.picked);
   const setPicked = useSpaceStore((state) => state.pick);
   const removeSpace = useSpaceStore((state) => state.removeSpace);
-  const [lists, setLists] = useState<Record<string, DocumentEntry[]>>({});
-  const [failed, setFailed] = useState<Record<string, string>>({});
-  // Folders the student closed; every folder of a space starts open.
-  const [closed, setClosed] = useState<Set<string>>(() => new Set());
+  const view = useDocumentsLayoutStore((state) => state.sidebarView);
+  const setView = useDocumentsLayoutStore((state) => state.setSidebarView);
+  const favoritesDrop = useFavoritesDrop();
+  const panelId = useId();
+  const filesTabId = useId();
+  const favoritesTabId = useId();
+  const filesTab = useRef<HTMLButtonElement>(null);
+  const favoritesTab = useRef<HTMLButtonElement>(null);
+  const searchToggle = useRef<HTMLButtonElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  const current = activeFile ?? activePath;
+  // The student's own openings and closings. Walking to a note or folder opens
+  // the folders above it, once; after that the student decides.
+  const [openState, setOpenState] = useState<OpenFolders>(() => reveal({}, current));
+  const [revealed, setRevealed] = useState(current);
+  if (revealed !== current) {
+    setRevealed(current);
+    setOpenState(reveal(openState, current));
+  }
+  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ query: string; hits: SearchHit[] } | null>(null);
   const [searchError, setSearchError] = useState('');
-  const [menu, setMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const requested = useRef(new Map<string, number>());
 
   const courses = iliasCourses ?? [];
-  const current = activeFile ?? activePath;
   const spaceId = resolveSpace(current, spaces, picked, (path) => inIliasSpace(path, courses));
   const ilias = spaceId === ILIAS;
   const added = spaces.find((space) => space.id === spaceId);
   const folder = added?.folder ?? '';
   const name = ilias ? 'ILIAS' : (added?.name ?? 'Documents');
+  // The open space, its open folders at any depth, and every added space for its badge.
+  const { lists, failed } = useFolderListings(desktop, revision, (known) => [
+    ...new Set([
+      ...(ilias ? [] : [folder, ...openFolders(folder, known, openState)]),
+      ...spaces.map((space) => space.folder),
+    ]),
+  ]);
   const entries = ilias ? [] : (lists[folder] ?? []);
-  const folders = spaceFolders(entries);
-  const files = looseFiles(entries);
   const iliasUnseen = courses.reduce((sum, course) => sum + course.unseen, 0);
   const iliasRows = courseCards(listedCourses?.items ?? [], courses);
-  const isOpen = (path: string) => !closed.has(path) || current.startsWith(`${path}/`);
-  const open = folders.filter((item) => isOpen(item.path)).map((item) => item.path);
-  // The open space, its open folders, and every added space for its dock badge.
-  const wanted = [
-    ...new Set([...(ilias ? [] : [folder, ...open]), ...spaces.map((space) => space.folder)]),
-  ];
-  // JSON, since `''` (the whole workspace) is a folder to list too.
-  const wantedKey = JSON.stringify(wanted);
-
-  useEffect(() => {
-    if (!desktop) return;
-    for (const path of JSON.parse(wantedKey) as string[]) {
-      if (requested.current.get(path) === revision) continue;
-      requested.current.set(path, revision);
-      void documentRequest<DirectoryListing>({ action: 'list', path })
-        .then((listing) => {
-          setLists((existing) => ({ ...existing, [path]: listing.entries }));
-          setFailed((existing) => {
-            if (!(path in existing)) return existing;
-            const next = { ...existing };
-            delete next[path];
-            return next;
-          });
-        })
-        .catch((cause: unknown) => {
-          requested.current.delete(path);
-          setFailed((existing) => ({ ...existing, [path]: String(cause) }));
-        });
-    }
-  }, [desktop, revision, wantedKey]);
+  const unseen: Record<string, number> = {
+    [ILIAS]: iliasUnseen,
+    ...Object.fromEntries(spaces.map((space) => [space.id, unseenIn(lists[space.folder])])),
+  };
+  const receiving = Boolean(documentDrag);
+  const over = favoritesDrop.over || pointerOver;
+  const showingFavorites = view === 'favorites';
 
   useEffect(() => {
     const search = query.trim();
@@ -191,46 +200,65 @@ export function SpaceSidebar({
     if (picked === null && iliasCourses !== null) setPicked(spaceId);
   }, [picked, iliasCourses, spaceId, setPicked]);
 
+  // The field takes the keyboard as it opens.
   useEffect(() => {
-    if (!menu) return;
-    const dismiss = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenu(false);
-    };
-    document.addEventListener('pointerdown', dismiss);
-    return () => document.removeEventListener('pointerdown', dismiss);
-  }, [menu]);
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
 
-  function toggle(path: string) {
-    setClosed((existing) => {
-      const next = new Set(existing);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
+  function setFolderOpen(path: string, open: boolean) {
+    setOpenState((existing) => ({ ...existing, [path]: open }));
+  }
+
+  function closeSearch(restoreFocus = false) {
+    setQuery('');
+    setSearchOpen(false);
+    if (restoreFocus) searchToggle.current?.focus();
   }
 
   function select(entry: DocumentEntry) {
-    setQuery('');
+    closeSearch();
     if (entry.folder) onFolder(entry.path);
     else onFile(entry);
   }
 
   function pick(id: string) {
     setPicked(id);
-    setMenu(false);
     if (id === ILIAS) onIlias(ILIAS_SPACE);
     else onFolder(spaces.find((space) => space.id === id)?.folder ?? '');
   }
 
-  function row(entry: DocumentEntry, depth: number, disclosure: boolean) {
-    const expanded = disclosure && isOpen(entry.path);
-    const Icon = entry.folder ? (expanded ? FolderOpen : Folder) : File;
+  function switchView(next: 'files' | 'favorites', focus = false) {
+    setView(next);
+    if (focus) (next === 'files' ? filesTab : favoritesTab).current?.focus();
+  }
+
+  function onTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const next =
+      event.key === 'Home'
+        ? 'files'
+        : event.key === 'End'
+          ? 'favorites'
+          : showingFavorites
+            ? 'files'
+            : 'favorites';
+    switchView(next, true);
+  }
+
+  function row(entry: DocumentEntry, depth: number, tree: boolean) {
+    const disclosure = tree && entry.folder;
+    const expanded = disclosure && isFolderOpen(openState, entry.path, depth);
+    const Icon = editable(entry) ? FileText : File;
     const active = activeFile === entry.path || (!activeFile && activePath === entry.path);
+    const children = lists[entry.path];
+    const indent = depth * INDENT;
     return (
       <div key={entry.path}>
         <div
-          className={cn('document-tree-row', active && 'is-active')}
-          style={{ paddingLeft: `${8 + depth * 18}px` }}
+          className={cn('document-tree-row panel-row', active && 'is-active')}
+          style={tree ? { paddingLeft: `${indent}px` } : undefined}
           draggable={desktop}
           onDragStart={(event) => {
             writeDocumentDrag(event.dataTransfer, entry);
@@ -244,34 +272,54 @@ export function SpaceSidebar({
               className="document-tree-disclosure"
               aria-label={`${expanded ? 'Collapse' : 'Expand'} ${entry.name}`}
               aria-expanded={expanded}
-              onClick={() => toggle(entry.path)}
+              onClick={() => setFolderOpen(entry.path, !expanded)}
             >
               {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
+          ) : tree ? (
+            <span className="document-tree-disclosure" aria-hidden />
           ) : null}
           <button
             type="button"
             className="document-tree-name"
             title={entry.name}
             aria-current={active ? 'page' : undefined}
-            onClick={() => select(entry)}
+            onClick={() => {
+              // A folder opened from the tree shows what is in it.
+              if (disclosure && !expanded) setFolderOpen(entry.path, true);
+              select(entry);
+            }}
           >
-            {/* Notes go without an icon, as in the concept; folders and other files keep theirs. */}
-            {entry.folder || !editable(entry) ? (
+            {entry.folder ? (
+              <FolderIcon path={entry.path} open={expanded} />
+            ) : (
               <Icon size={16} strokeWidth={1.8} aria-hidden />
-            ) : null}
+            )}
             <span>{entry.name.replace(/\.(md|markdown)$/i, '')}</span>
             {entry.ilias === 'root' && <IliasBadge size="sm" showLabel={false} />}
             {/* Keeps the badge a word of its own in the name; flex layout drops the space. */}
             {entry.unseen ? ' ' : null}
             <NewBadge count={entry.unseen} file={!entry.folder} className="ml-auto" />
           </button>
+          {entry.folder && <FolderAppearanceButton path={entry.path} name={entry.name} />}
         </div>
         {expanded && (
           <div role="group" aria-label={entry.name}>
-            {!lists[entry.path] ? <p className="document-tree-hint">Loading…</p> : null}
-            {spaceFolders(lists[entry.path] ?? []).map((child) => row(child, depth + 1, false))}
-            {looseFiles(lists[entry.path] ?? []).map((child) => row(child, depth + 1, false))}
+            {children ? (
+              <>
+                {spaceFolders(children).map((child) => row(child, depth + 1, true))}
+                {looseFiles(children).map((child) => row(child, depth + 1, true))}
+                {!children.length ? (
+                  <p className="document-tree-hint" style={{ paddingLeft: `${indent + 28}px` }}>
+                    Empty folder
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="document-tree-hint" style={{ paddingLeft: `${indent + 28}px` }}>
+                {failed[entry.path] ? 'This folder could not be read.' : 'Loading…'}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -281,76 +329,84 @@ export function SpaceSidebar({
   const search = ilias ? '' : query.trim();
   const hits = !search ? [] : results?.query === search ? results.hits : null;
   const missing = !ilias ? failed[folder] : undefined;
+  const overview = !activeFile && activePath === (ilias ? ILIAS_SPACE : folder);
 
-  // A course dragged out of the ILIAS space lands in Documents.
-  const takesCourses = (id: string) => id === DOCUMENTS && !!onAddCourse;
-  function dockButton(id: string, label: string, unseen: number, space?: Space) {
-    const drops = takesCourses(id);
-    const carries = (event: DragEvent) => event.dataTransfer.types.includes(COURSE_DRAG);
-    return (
-      <button
-        key={id}
-        type="button"
-        className={cn('space-dock-button', drops && dropping && 'is-drop-target')}
-        aria-label={unseen ? `${label}, ${unseen} new` : label}
-        aria-pressed={spaceId === id}
-        title={drops && dropping ? 'Drop to add the course to Documents' : (space?.name ?? label)}
-        onClick={() => pick(id)}
-        onDragOver={
-          drops
-            ? (event) => {
-                if (!carries(event)) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'copy';
-                setDropping(true);
-              }
-            : undefined
-        }
-        onDragLeave={drops ? () => setDropping(false) : undefined}
-        onDrop={
-          drops
-            ? (event) => {
-                setDropping(false);
-                const courseId = event.dataTransfer.getData(COURSE_DRAG);
-                if (!courseId) return;
-                event.preventDefault();
-                onAddCourse?.(courseId);
-              }
-            : undefined
-        }
-      >
-        <SpaceIcon id={id} space={space} size={17} />
-        <NewBadge count={unseen} className="space-dock-badge" />
-      </button>
-    );
-  }
+  // A course dragged out of the ILIAS space lands in Documents: anywhere on the sidebar.
+  const takesCourses = !!onAddCourse;
+  const carriesCourse = (event: DragEvent) => hasDragType(event.dataTransfer, COURSE_DRAG);
 
-  return (
-    <aside
-      className="document-tree space-sidebar"
-      data-tone={added ? spaceTones(spaces.map((space) => space.name)).get(added.name) : undefined}
-      aria-label="Document spaces"
-    >
+  const filesPanel = (
+    <div role="tabpanel" id={panelId} aria-labelledby={filesTabId} className="space-panel">
       {!ilias && (
-        <div className="document-tree-search">
-          <Search size={16} aria-hidden />
-          <input
-            aria-label="Search all documents"
-            placeholder="Search files"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          {query && (
-            <button type="button" aria-label="Clear search" onClick={() => setQuery('')}>
-              <X size={14} />
+        <>
+          <div role="group" aria-label="Tree tools" className="space-toolbar">
+            <button
+              ref={searchToggle}
+              type="button"
+              className="space-tool"
+              aria-label="Search all documents"
+              title="Search all documents"
+              aria-expanded={searchOpen}
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+            >
+              <Search size={15} aria-hidden />
             </button>
+            <button
+              type="button"
+              className="space-tool"
+              aria-label="Collapse all folders"
+              title="Collapse all folders"
+              onClick={() => setOpenState(closeAll(lists))}
+            >
+              <ChevronsDownUp size={15} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="space-tool"
+              aria-label="New folder"
+              title="New folder"
+              disabled={!desktop}
+              onClick={() => onNewFolder(folder)}
+            >
+              <FolderPlus size={15} aria-hidden />
+            </button>
+          </div>
+          {searchOpen && (
+            <div className="document-tree-search">
+              <Search size={14} aria-hidden />
+              <input
+                ref={searchInput}
+                aria-label="Search all documents"
+                placeholder="Search files"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  closeSearch(true);
+                }}
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setQuery('');
+                    searchInput.current?.focus();
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
-      <div className="document-tree-scroll scroll-area">
+      <PanelBody>
         {search ? (
           <>
-            <p className="document-tree-heading">Search results</p>
+            <p className="panel-heading">Search results</p>
             {search.length < 2 ? (
               <p className="document-tree-hint">Type one more letter</p>
             ) : hits === null ? (
@@ -366,145 +422,195 @@ export function SpaceSidebar({
               </p>
             )}
           </>
+        ) : ilias ? (
+          <>
+            {iliasRows.map((course) => {
+              const synced = course.synced;
+              const active =
+                iliasCourseId === course.refId ||
+                (!!synced && (current === synced.root || current.startsWith(`${synced.root}/`)));
+              return (
+                <div
+                  key={course.refId}
+                  className={cn('document-tree-row panel-row', active && 'is-active')}
+                >
+                  <button
+                    type="button"
+                    className={cn('document-tree-name', !synced && 'is-remote')}
+                    title={course.title}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() =>
+                      onIliasCourse ? onIliasCourse(course.refId) : synced && onIlias(synced.root)
+                    }
+                  >
+                    <FolderIcon path={`:ilias-course/${course.refId}`} name={course.name} />
+                    <span>{course.name}</span>
+                    {synced?.unseen ? ' ' : null}
+                    <NewBadge count={synced?.unseen} className="ml-auto" />
+                  </button>
+                  <FolderAppearanceButton
+                    path={`:ilias-course/${course.refId}`}
+                    name={course.name}
+                  />
+                </div>
+              );
+            })}
+            {iliasCourses !== null && !iliasRows.length ? (
+              <p className="document-tree-hint">No courses from ILIAS yet.</p>
+            ) : null}
+          </>
+        ) : missing ? (
+          <div className="document-tree-hint">
+            <p role="alert">This space’s folder is missing: {folder}</p>
+            {added ? (
+              <button type="button" className="mt-1 text-accent" onClick={() => onEditSpace(added)}>
+                Choose another folder
+              </button>
+            ) : null}
+          </div>
         ) : (
           <>
-            <div className="space-title-row" ref={menuRef}>
-              <h2 className="space-title">
-                <button
-                  type="button"
-                  aria-current={
-                    !activeFile && activePath === (ilias ? ILIAS_SPACE : folder)
-                      ? 'page'
-                      : undefined
-                  }
-                  onClick={() => (ilias ? onIlias(ILIAS_SPACE) : onFolder(folder))}
-                >
-                  <SpaceIcon id={spaceId} space={added} size={17} />
-                  <span>{name}</span>
-                </button>
-              </h2>
-              {added ? (
-                <>
-                  <button
-                    type="button"
-                    className="space-options"
-                    aria-label="Space options"
-                    aria-expanded={menu}
-                    onClick={() => setMenu(!menu)}
-                  >
-                    <Ellipsis size={16} />
-                  </button>
-                  {menu ? (
-                    <div className="space-menu" role="menu" aria-label={`${added.name} space`}>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setMenu(false);
-                          onEditSpace(added);
-                        }}
-                      >
-                        Edit space
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setMenu(false);
-                          removeSpace(added.id);
-                        }}
-                      >
-                        Remove from the dock
-                        <span>The folder and its files stay.</span>
-                      </button>
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-            {ilias ? (
-              <>
-                {iliasRows.map((row) => {
-                  const synced = row.synced;
-                  const active =
-                    iliasCourseId === row.refId ||
-                    (!!synced &&
-                      (current === synced.root || current.startsWith(`${synced.root}/`)));
-                  return (
-                    <div key={row.refId} className={cn('document-tree-row', active && 'is-active')}>
-                      <button
-                        type="button"
-                        className={cn('document-tree-name', !synced && 'is-remote')}
-                        title={row.title}
-                        aria-current={active ? 'page' : undefined}
-                        onClick={() =>
-                          onIliasCourse ? onIliasCourse(row.refId) : synced && onIlias(synced.root)
-                        }
-                      >
-                        <Folder size={16} strokeWidth={1.8} aria-hidden />
-                        <span>{row.name}</span>
-                        {synced?.unseen ? ' ' : null}
-                        <NewBadge count={synced?.unseen} className="ml-auto" />
-                      </button>
-                    </div>
-                  );
-                })}
-                {iliasCourses !== null && !iliasRows.length ? (
-                  <p className="document-tree-hint">No courses from ILIAS yet.</p>
-                ) : null}
-              </>
-            ) : missing ? (
-              <div className="document-tree-hint">
-                <p role="alert">This space’s folder is missing: {folder}</p>
-                {added ? (
-                  <button
-                    type="button"
-                    className="mt-1 text-accent"
-                    onClick={() => onEditSpace(added)}
-                  >
-                    Choose another folder
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <>
-                {folders.map((item) => row(item, 0, true))}
-                <div className="space-divider" />
-                <button type="button" className="space-new-note" onClick={() => onNewNote(folder)}>
-                  <Plus size={15} aria-hidden />
-                  New note
-                </button>
-                {files.map((file) => row(file, 0, false))}
-              </>
-            )}
+            {spaceFolders(entries).map((item) => row(item, 0, true))}
+            {looseFiles(entries).map((item) => row(item, 0, true))}
           </>
         )}
-      </div>
-      <div className={cn('document-tree-row space-trash', activePath === '.trash' && 'is-active')}>
-        <button type="button" className="document-tree-name" onClick={() => onFolder('.trash')}>
-          <Trash2 size={15} aria-hidden />
-          <span>Recently deleted</span>
-        </button>
-      </div>
-      <nav className="space-dock" aria-label="Spaces">
-        <div className="space-dock-spaces">
-          {dockButton(DOCUMENTS, 'Documents', 0)}
-          {dockButton(ILIAS, 'ILIAS', iliasUnseen)}
-          {spaces.length ? <span className="space-dock-divider" aria-hidden /> : null}
-          {spaces.map((space) =>
-            dockButton(space.id, `${space.name} space`, unseenIn(lists[space.folder]), space),
-          )}
-        </div>
+      </PanelBody>
+    </div>
+  );
+
+  return (
+    <aside
+      // Slides in and out like every section's panel (panelMotion).
+      ref={panelMotionRef}
+      className={cn('document-tree section-panel space-sidebar', dropping && 'is-drop-target')}
+      data-tone={added ? spaceTones(spaces.map((space) => space.name)).get(added.name) : undefined}
+      aria-label="Document spaces"
+      onDragOver={
+        takesCourses
+          ? (event) => {
+              if (!carriesCourse(event)) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'copy';
+              setDropping(true);
+            }
+          : undefined
+      }
+      onDragLeave={
+        takesCourses
+          ? (event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                setDropping(false);
+            }
+          : undefined
+      }
+      onDrop={
+        takesCourses
+          ? (event) => {
+              setDropping(false);
+              const courseId = event.dataTransfer.getData(COURSE_DRAG);
+              if (!courseId) return;
+              event.preventDefault();
+              onAddCourse(courseId);
+            }
+          : undefined
+      }
+    >
+      <PanelHeader
+        switcher={
+          <SpaceSwitcher
+            spaceId={spaceId}
+            name={name}
+            added={added}
+            spaces={spaces}
+            unseen={unseen}
+            onPick={pick}
+            onNewSpace={onNewSpace}
+            onEditSpace={onEditSpace}
+            onRemoveSpace={(space) => removeSpace(space.id)}
+          />
+        }
+        actions={
+          <>
+            <PanelAction
+              label="Space overview"
+              aria-current={overview ? 'page' : undefined}
+              onClick={() => (ilias ? onIlias(ILIAS_SPACE) : onFolder(folder))}
+            >
+              <House size={16} strokeWidth={1.8} aria-hidden />
+            </PanelAction>
+            {!ilias && (
+              <PanelAction label="New note" disabled={!desktop} onClick={() => onNewNote(folder)}>
+                <SquarePen size={16} strokeWidth={1.8} aria-hidden />
+              </PanelAction>
+            )}
+          </>
+        }
+      />
+      {dropping && (
+        <p role="status" className="space-drop-hint">
+          Drop to add the course to Documents
+        </p>
+      )}
+      <div
+        role="tablist"
+        aria-label="Sidebar view"
+        className="space-views"
+        onKeyDown={onTabKeyDown}
+      >
         <button
+          ref={filesTab}
+          id={filesTabId}
           type="button"
-          className="space-dock-button"
-          aria-label="New space"
-          title="New space"
-          onClick={onNewSpace}
+          role="tab"
+          aria-selected={!showingFavorites}
+          aria-controls={panelId}
+          tabIndex={showingFavorites ? -1 : 0}
+          className="space-view"
+          onClick={() => switchView('files')}
         >
-          <Plus size={17} />
+          Files
         </button>
-      </nav>
+        <button
+          ref={favoritesTab}
+          id={favoritesTabId}
+          type="button"
+          role="tab"
+          aria-selected={showingFavorites}
+          aria-controls={panelId}
+          tabIndex={showingFavorites ? 0 : -1}
+          className={cn('space-view', receiving && 'is-receiving', over && 'is-over')}
+          data-receiving={receiving || undefined}
+          data-over={over || undefined}
+          onClick={() => switchView('favorites')}
+          {...favoritesDrop.props}
+        >
+          Favorites
+        </button>
+      </div>
+      {showingFavorites ? (
+        <SidebarFavorites
+          id={panelId}
+          role="tabpanel"
+          aria-labelledby={favoritesTabId}
+          activePath={activePath}
+          activeFile={activeFile}
+          onFolder={onFolder}
+          onFile={onFile}
+          receiving={receiving}
+          over={over}
+          {...favoritesDrop.props}
+        />
+      ) : (
+        filesPanel
+      )}
+      <PanelFooter>
+        <PanelItem
+          icon={Trash2}
+          label="Recently deleted"
+          active={activePath === '.trash'}
+          onClick={() => onFolder('.trash')}
+        />
+      </PanelFooter>
     </aside>
   );
 }

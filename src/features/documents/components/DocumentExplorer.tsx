@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { studyDocument, openStudyDocument } from '@/features/documents/lib/studyImport';
 import {
   ArrowLeft,
+  ChevronRight,
   PanelsTopLeft,
   Plus,
   X,
-  ChevronRight,
   File,
   FileText,
   Folder,
@@ -35,9 +35,13 @@ import { Button, IconButton, Modal } from '@/components/ui';
 import { IliasBadge } from '@/features/integrations';
 import { formatTimeAgo } from '@/lib/date';
 import { isDesktopRuntime } from '@/lib/icsFetch';
-import { toFavorite, writeDocumentDrag } from '@/lib/sidebar';
+import { tabActions } from '@/lib/tabActions';
+import { documentsHref, toFavorite, writeDocumentDrag } from '@/lib/sidebar';
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/store/sidebarStore';
+import { useFolderAppearanceStore } from '../store/folderAppearanceStore';
+import { useTabStore } from '@/store/tabStore';
+import { useUiStore } from '@/store/uiStore';
 import {
   documentRequest,
   editable,
@@ -63,12 +67,14 @@ import {
 import { addAllCoursesToDocuments, addCourseToDocuments } from '@/features/documents/lib/addCourse';
 import { iliasSpaceLink } from '@/features/courses/lib/courses';
 import { useCourseFilesStore } from '@/features/courses/store/courseFilesStore';
+import { noteTitle } from '@/features/documents/lib/noteTitle';
 import { ILIAS_SPACE, type Space } from '@/features/documents/lib/spaces';
 import { useSpaceStore } from '@/features/documents/store/spaceStore';
 import { useIliasCourses } from '@/features/documents/lib/useIliasCourses';
 
 type Dialog =
-  | { type: 'folder' }
+  /** `folder` when the new folder goes somewhere other than the open folder, e.g. a space. */
+  | { type: 'folder'; folder?: string }
   /** Adds a space to the dock, or edits the one given. */
   | { type: 'space'; space?: Space }
   /** `folder` when the note goes somewhere other than the open folder, e.g. a space. */
@@ -76,10 +82,9 @@ type Dialog =
   | { type: 'rename' | 'move' | 'trash'; entry: DocumentEntry };
 type OpenNote = { entry: DocumentEntry; content: string };
 type SearchResult = { query: string; hits: SearchHit[] };
-type DocumentTab = { path: string; name: string; folder: boolean; entry?: DocumentEntry };
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-primary';
 
-/** The tab name of a folder, of the ILIAS space, or of a course's synced folder. */
+/** The name of a folder, of the ILIAS space, or of a course's synced folder, for its tab. */
 function folderName(path: string, courses: IliasCourse[] | null = null) {
   if (path === '.trash') return 'Recently deleted';
   if (path === ILIAS_SPACE) return 'ILIAS';
@@ -91,11 +96,6 @@ const EMPTY_ENTRIES: DocumentEntry[] = [];
 
 function joinPath(folder: string, name: string) {
   return folder ? `${folder}/${name}` : name;
-}
-
-/** A note a link points at; the explorer opens it over its folder. */
-function fileEntry(path: string): DocumentEntry {
-  return { path, name: path.split('/').at(-1) ?? path, folder: false, size: 0, modified: 0 };
 }
 
 interface DocumentExplorerProps {
@@ -110,8 +110,9 @@ interface DocumentExplorerProps {
   /** A course to open in the ILIAS space. */
   initialCourse?: IliasCourseView | null;
   /**
-   * Changes with every link followed to Documents. The open explorer then goes
-   * to `initialPath`, `initialCourse` and `initialFile`, keeping its view and tabs.
+   * Changes with every link followed to Documents, and with every step Back,
+   * Forward or to another tab that lands in Documents. The open explorer then
+   * goes to `initialPath`, `initialCourse` and `initialFile`, keeping its view.
    */
   request?: string;
 }
@@ -147,10 +148,6 @@ export function DocumentExplorer({
   const [spaceFolder, setSpaceFolder] = useState<string | null>(null);
   const [spaceChoices, setSpaceChoices] = useState<DocumentEntry[]>([]);
   const [note, setNote] = useState<OpenNote | null>(null);
-  const [tabs, setTabs] = useState<DocumentTab[]>(() => [
-    { path: '', name: 'Documents', folder: true },
-    ...(initialPath ? [{ path: initialPath, name: folderName(initialPath), folder: true }] : []),
-  ]);
   const [leaveRequest, setLeaveRequest] = useState(0);
   const afterLeave = useRef<(() => void) | null>(null);
   const [treeRevision, setTreeRevision] = useState(0);
@@ -176,6 +173,9 @@ export function DocumentExplorer({
   const searching = desktop && searchQuery.length >= 2;
   const searchHits = search?.query === searchQuery ? search.hits : null;
   const shownPath = note?.entry.path ?? path;
+  // The sidebar shows or hides with every section's sidebar: one preference for the app,
+  // toggled from the title bar.
+  const sidebarOpen = useUiStore((state) => state.panelOpen);
   const favorite = useSidebarStore((state) =>
     state.favorites.some((item) => item.path === selected),
   );
@@ -186,13 +186,26 @@ export function DocumentExplorer({
   const setActiveDocument = useSidebarStore((state) => state.setActiveDocument);
   const setDocumentDrag = useSidebarStore((state) => state.setDocumentDrag);
 
-  function rememberTab(tab: DocumentTab) {
-    setTabs((current) =>
-      current.some((item) => item.path === tab.path)
-        ? current.map((item) => (item.path === tab.path ? tab : item))
-        : [...current, tab],
-    );
-  }
+  /** Set while a click with ⌘ (Ctrl elsewhere) is on its way through the explorer. */
+  const newTabClick = useRef(false);
+  // Where the explorer is, as an address: the open tab remembers it, Back comes back to it.
+  const shownCourse = inIlias ? iliasCourse : null;
+  const placeLocation = note
+    ? documentsHref(note.entry.path, true)
+    : shownCourse
+      ? `${documentsHref(ILIAS_SPACE)}&${new URLSearchParams({
+          course: shownCourse.courseId,
+          ...(shownCourse.trail.length ? { trail: shownCourse.trail.join(',') } : {}),
+          ...(shownCourse.exerciseId ? { exercise: shownCourse.exerciseId } : {}),
+        })}`
+      : documentsHref(path);
+  const placeCourse =
+    shownCourse && iliasCourses?.find((item) => item.courseRefId === shownCourse.courseId);
+  const placeName = note
+    ? noteTitle(note.entry.name)
+    : placeCourse
+      ? courseName(placeCourse)
+      : folderName(path, iliasCourses);
 
   function leaveThen(action: () => void) {
     if (!note) action();
@@ -202,22 +215,15 @@ export function DocumentExplorer({
     }
   }
 
-  function openTab(tab: DocumentTab) {
-    if (tab.path === (note?.entry.path ?? path)) return;
-    leaveThen(() => {
-      if (tab.folder) navigate(tab.path);
-      else if (tab.entry) activate(tab.entry);
-    });
-  }
-
-  function closeTab(tab: DocumentTab) {
-    if (!tab.path) return;
-    const remove = () => {
-      setTabs((current) => current.filter((item) => item.path !== tab.path));
-      if (tab.path === (note?.entry.path ?? path)) navigate('');
-    };
-    if (tab.path === note?.entry.path) leaveThen(remove);
-    else remove();
+  /**
+   * ⌘-click: the place opens in a tab of its own and this one stays as it is,
+   * open note and all. `true` when it did.
+   */
+  function inNewTab(location: string) {
+    if (!newTabClick.current) return false;
+    newTabClick.current = false;
+    tabActions.openInNewTab(location);
+    return true;
   }
 
   // Beyond the file names in this folder, look through every note's text.
@@ -361,7 +367,6 @@ export function DocumentExplorer({
     }
   }
   function navigate(next: string) {
-    rememberTab({ path: next, name: folderName(next, iliasCourses), folder: true });
     if (next === path) {
       void refresh();
       return;
@@ -436,12 +441,6 @@ export function DocumentExplorer({
     const opened = editable(item)
       ? { entry: item, content: await documentRequest<string>({ action: 'read', path: item.path }) }
       : await openStudyDocument(item);
-    rememberTab({
-      path: opened.entry.path,
-      name: opened.entry.name,
-      folder: false,
-      entry: opened.entry,
-    });
     setNote(opened);
   }
   function activate(item: DocumentEntry) {
@@ -459,12 +458,6 @@ export function DocumentExplorer({
           setPreview(item);
           return;
         }
-        rememberTab({
-          path: opened.entry.path,
-          name: opened.entry.name,
-          folder: false,
-          entry: opened.entry,
-        });
         setNote(opened);
       });
       return;
@@ -476,12 +469,24 @@ export function DocumentExplorer({
     void run(async () => {
       if (editable(item) && !item.path.startsWith('.trash/')) {
         const content = await documentRequest<string>({ action: 'read', path: item.path });
-        rememberTab({ path: item.path, name: item.name, folder: false, entry: item });
         setNote({ entry: item, content });
       } else await documentRequest({ action: 'open', path: item.path });
     });
   }
-  // A link followed while Documents is open: go where it points.
+  // Every place shown goes into the open tab, except while a note loads (its folder shows
+  // for a moment then, and Back should skip it) and while a link is still to be followed
+  // (the place on screen is the one being left). Declared before the effect that follows
+  // links, so on arrival it sees the link not yet followed.
+  useEffect(() => {
+    if (busy || followed.current !== request) return;
+    useTabStore.getState().visit({
+      location: placeLocation,
+      title: placeName,
+      kind: note ? 'file' : 'folder',
+    });
+  }, [busy, request, placeLocation, placeName, note]);
+
+  // A link followed while Documents is open (or Back, Forward, another tab): go where it points.
   useEffect(() => {
     if (request === followed.current) return;
     followed.current = request;
@@ -532,7 +537,7 @@ export function DocumentExplorer({
       if (dialog.type === 'folder' || dialog.type === 'document') {
         await documentRequest({
           action: 'create',
-          path: dialog.type === 'document' && dialog.folder !== undefined ? dialog.folder : path,
+          path: dialog.folder !== undefined ? dialog.folder : path,
           name: name.trim(),
           folder: dialog.type === 'folder',
         });
@@ -540,6 +545,7 @@ export function DocumentExplorer({
       } else if (dialog.type === 'trash') {
         await documentRequest({ action: 'trash', path: dialog.entry.path });
         forgetFavorites(dialog.entry.path);
+        useFolderAppearanceStore.getState().forget(dialog.entry.path);
         setNotice('Moved to Recently deleted. You can restore it at any time.');
       } else {
         const target = dialog.type === 'move' ? destination : path;
@@ -550,6 +556,9 @@ export function DocumentExplorer({
           name: name.trim(),
         });
         relocateFavorites(dialog.entry.path, joinPath(target, name.trim()));
+        useFolderAppearanceStore
+          .getState()
+          .relocate(dialog.entry.path, joinPath(target, name.trim()));
         setNotice('Changes saved on your computer.');
       }
       setDialog(null);
@@ -605,34 +614,16 @@ export function DocumentExplorer({
       setBusy(false);
     }
   }
-  // A link followed while Documents is open: go where it points.
-  useEffect(() => {
-    if (request === followed.current) return;
-    followed.current = request;
-    const target = initialPath;
-    const course = initialCourse;
-    const file = initialFile;
-    leaveThen(() => {
-      setIliasCourse(course);
-      navigate(target);
-      if (file) activate(fileEntry(file));
-    });
-  });
-  // The first link opens its folder through the initial state; a note it names opens here.
-  const openInitialFile = useEffectEvent(() => {
-    if (initialFile) activate(fileEntry(initialFile));
-  });
-  useEffect(() => openInitialFile(), []);
-
   const breadcrumbs = path ? path.split('/') : [];
 
   return (
     <section
       aria-label="Document explorer"
       className={cn(
-        'document-explorer flex min-h-0 flex-1 flex-col overflow-hidden bg-surface',
+        'document-explorer flex min-h-0 flex-1 flex-col overflow-hidden',
         note && 'has-open-note',
-        canvas ? 'is-canvas' : 'rounded-xl border border-line shadow-soft',
+        canvas && 'is-canvas',
+        !sidebarOpen && 'is-sidebar-hidden',
       )}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && menu) {
@@ -640,53 +631,39 @@ export function DocumentExplorer({
           event.stopPropagation();
         }
       }}
+      // A click with ⌘ (Ctrl elsewhere) opens a folder or a note in a new tab: noted on the
+      // way in, read by whatever the click opens, and forgotten once it has passed.
+      onClickCapture={(event) => {
+        newTabClick.current = event.metaKey || event.ctrlKey;
+      }}
+      onClick={() => {
+        newTabClick.current = false;
+      }}
     >
-      <div className="document-tabs" role="tablist" aria-label="Open documents">
-        {tabs.map((tab) => {
-          const active = tab.path === (note?.entry.path ?? path);
-          return (
-            <div key={tab.path || 'root'} className={cn('document-tab', active && 'is-active')}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={tab.name}
-                onClick={() => openTab(tab)}
-              >
-                {tab.folder ? <Folder size={14} aria-hidden /> : <FileText size={14} aria-hidden />}
-                <span>{tab.name}</span>
-              </button>
-              {tab.path && (
-                <button
-                  type="button"
-                  className="document-tab-close"
-                  aria-label={`Close ${tab.name} tab`}
-                  onClick={() => closeTab(tab)}
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="document-body">
-        <SpaceSidebar
-          desktop={desktop}
-          activePath={path}
-          activeFile={note?.entry.path ?? null}
-          revision={treeRevision}
-          onFolder={(next) => leaveThen(() => navigate(next))}
-          onFile={(item) => leaveThen(() => activate(item))}
-          onNewNote={(folder) => showDialog({ type: 'document', folder })}
-          onNewSpace={() => showDialog({ type: 'space' })}
-          onEditSpace={(space) => showDialog({ type: 'space', space })}
-          iliasCourses={iliasCourses}
-          onIlias={openIlias}
-          iliasCourseId={inIlias ? (iliasCourse?.courseId ?? null) : null}
-          onIliasCourse={openIliasCourse}
-          onAddCourse={(courseId) => void addCourseToDocuments(courseId)}
-        />
+      <div className="document-body panel-stage">
+        {sidebarOpen ? (
+          <SpaceSidebar
+            desktop={desktop}
+            activePath={path}
+            activeFile={note?.entry.path ?? null}
+            revision={treeRevision}
+            onFolder={(next) => {
+              if (!inNewTab(documentsHref(next))) leaveThen(() => navigate(next));
+            }}
+            onFile={(item) => {
+              if (!inNewTab(documentsHref(item.path, true))) leaveThen(() => activate(item));
+            }}
+            onNewNote={(folder) => showDialog({ type: 'document', folder })}
+            onNewFolder={(folder) => showDialog({ type: 'folder', folder })}
+            onNewSpace={() => showDialog({ type: 'space' })}
+            onEditSpace={(space) => showDialog({ type: 'space', space })}
+            iliasCourses={iliasCourses}
+            onIlias={openIlias}
+            iliasCourseId={inIlias ? (iliasCourse?.courseId ?? null) : null}
+            onIliasCourse={openIliasCourse}
+            onAddCourse={(courseId) => void addCourseToDocuments(courseId)}
+          />
+        ) : null}
         <div className={cn('document-content', note && 'has-open-note', inIlias && 'is-ilias')}>
           {inIlias && (
             <IliasOverview
@@ -1058,6 +1035,9 @@ export function DocumentExplorer({
                         name: item.name,
                       });
                       relocateFavorites(item.path, joinPath(target, item.name));
+                      useFolderAppearanceStore
+                        .getState()
+                        .relocate(item.path, joinPath(target, item.name));
                       moved = true;
                       setSelected(null);
                       setNotice(
@@ -1315,12 +1295,6 @@ export function DocumentExplorer({
               onClose={() => setPreview(null)}
               onEdit={async () => {
                 const opened = await openStudyDocument(preview);
-                rememberTab({
-                  path: opened.entry.path,
-                  name: opened.entry.name,
-                  folder: false,
-                  entry: opened.entry,
-                });
                 setPreview(null);
                 setNote(opened);
               }}
@@ -1485,13 +1459,14 @@ export function DocumentExplorer({
                 next?.();
               }}
               onRenamed={(entry, content) => {
-                setTabs((current) =>
-                  current.map((tab) =>
-                    tab.path === note.entry.path
-                      ? { path: entry.path, name: entry.name, folder: false, entry }
-                      : tab,
-                  ),
-                );
+                // Every tab that showed the note follows it, so Back finds it again.
+                useTabStore
+                  .getState()
+                  .relocate(
+                    documentsHref(note.entry.path, true),
+                    documentsHref(entry.path, true),
+                    noteTitle(entry.name),
+                  );
                 setNote({ entry, content });
                 void refresh();
               }}

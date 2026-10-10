@@ -21,6 +21,54 @@
   align-items: center;
   gap: 12px;
 }
+/* Only while the Mail panel is hidden: the account, Refresh and "New message" move into the card. */
+.mail-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mail-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.mail-tool:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.mail-tool:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.mail-tool--icon {
+  width: 34px;
+  padding: 0;
+}
+.mail-tool--primary,
+.mail-tool--primary:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--accent-primary-foreground);
+}
+.mail-tool--primary:hover:not(:disabled) {
+  border-color: var(--accent-primary-hover);
+  background: var(--accent-primary-hover);
+}
 .mail-heading-icon {
   display: grid;
   place-items: center;
@@ -52,11 +100,6 @@
 .mail-view-toggle button {
   border-radius: var(--radius-xs);
 }
-.mail-compose-button {
-  min-height: 36px;
-  padding-inline: 14px;
-  box-shadow: var(--shadow-soft);
-}
 .mail-panes {
   display: grid;
   grid-template-columns: minmax(285px, 33%) minmax(0, 1fr);
@@ -75,9 +118,7 @@
   background: color-mix(in srgb, var(--surface-secondary) 42%, var(--surface));
 }
 .mail-list-controls {
-  position: relative;
-  z-index: 20;
-  padding: 18px 16px 0;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-soft);
 }
 .mail-search {
@@ -112,106 +153,151 @@
   display: grid;
   place-items: center;
 }
-.mail-filters {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 48px;
-}
-.mail-filters > button {
-  display: flex;
-  align-items: center;
-  align-self: stretch;
-  gap: 5px;
-  position: relative;
-  white-space: nowrap;
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 550;
-}
-.mail-filters > button[aria-pressed='true'] {
-  color: var(--accent-primary);
-}
-.mail-filters > button[aria-pressed='true']::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent-primary);
-  border-radius: var(--radius-xs);
-}
-.mail-filters > button > span {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-}
-.mail-filter-menu {
-  margin-left: auto;
-}
-.mail-filter-menu summary {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  list-style: none;
-  cursor: pointer;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.mail-filter-menu summary::-webkit-details-marker {
-  display: none;
-}
-.mail-filter-options {
-  position: absolute;
-  top: calc(100% - 5px);
-  right: 12px;
-  width: min(280px, 90%);
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-raised);
-}
-.mail-filter-options p {
-  padding: 6px 8px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-}
-.mail-filter-options button {
-  display: flex;
-  width: 100%;
-  gap: 10px;
-  padding: 8px;
-  text-align: left;
-  border-radius: var(--radius-xs);
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.mail-filter-options button span {
-  margin-left: auto;
-  color: var(--text-muted);
-}
-.mail-filter-options button:hover,
-.mail-filter-options button[aria-pressed='true'] {
-  color: var(--accent-primary);
-  background: var(--accent-primary-soft);
-}
-.mail-active-filter {
+.mail-search-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 100%;
-  margin: 0 0 10px;
-  padding: 4px 8px;
+}
+.mail-search-row .mail-search {
+  flex: 1;
+  min-width: 0;
+}
+/* All, unread, to answer: what the student switches between all day, always in sight. */
+.mail-views {
+  display: flex;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-secondary);
+}
+.mail-views button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 8px;
   border-radius: var(--radius-xs);
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.mail-views button:hover {
+  color: var(--text-primary);
+}
+.mail-views button[aria-current='true'] {
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+}
+.mail-view-count {
+  min-width: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
   background: var(--accent-primary-soft);
   color: var(--accent-primary);
+  font-size: 10.5px;
+  line-height: 16px;
+  text-align: center;
+}
+/* Who wrote and which course: behind one button beside the search. */
+.mail-filter {
+  position: relative;
+  flex: none;
+}
+.mail-filter-button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--text-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.mail-filter-button:hover,
+.mail-filter-button[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+.mail-filter-button.is-active {
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+}
+.mail-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 240px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+.mail-filter-heading {
+  margin: 6px 8px 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mail-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  text-align: left;
+}
+.mail-filter-item:hover,
+.mail-filter-item:focus-visible {
+  background: var(--surface-hover);
+  outline: none;
+}
+.mail-filter-item.is-current {
+  color: var(--accent-primary);
+}
+.mail-filter-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mail-filter-count {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+/* The way the list is narrowed, said where the list is: it stays when the Mail panel is hidden. */
+.mail-active-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 3px 8px 3px 7px;
+  border-radius: 999px;
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.5;
+}
+.mail-active-filter:hover {
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--surface));
 }
 .mail-list-scroll {
   flex: 1;
@@ -563,14 +649,15 @@
 .mail-workspace[data-view='board'] .mail-panes {
   grid-template-columns: minmax(0, 1fr);
 }
+/* Beside the Mail panel the card is the open message alone. */
+.mail-panes--reader {
+  grid-template-columns: minmax(0, 1fr);
+}
+.mail-panes--reader .mail-reading-pane {
+  border-left: 0;
+}
 .mail-workspace[data-view='board'] .mail-panes--board-open {
   grid-template-columns: minmax(0, 1fr) minmax(340px, 42%);
-}
-.mail-workspace[data-view='board'] .mail-filters {
-  justify-content: flex-start;
-}
-.mail-workspace[data-view='board'] .mail-filter-menu {
-  margin-left: 8px;
 }
 @container mailbox (min-width: 1160px) {
   .mail-sender {
@@ -596,9 +683,6 @@
   .mail-letter {
     max-width: 760px;
   }
-  .mail-filters {
-    gap: 22px;
-  }
 }
 @container mailbox (max-width: 620px) {
   .mail-workspace-header {
@@ -613,7 +697,18 @@
     font-size: 21px;
   }
   .mail-header-actions {
+    flex-wrap: wrap;
     gap: 5px;
+  }
+  .mail-header-tools {
+    gap: 5px;
+  }
+  .mail-tool {
+    padding-inline: 10px;
+  }
+  .mail-tool--icon {
+    width: 34px;
+    padding-inline: 0;
   }
   .mail-view-toggle button {
     padding-inline: 8px;
@@ -650,24 +745,15 @@
   }
 }
 @media (max-width: 1023px) {
-  .mail-workspace[data-selected='true'] .mail-list-pane {
+  .mail-workspace[data-selected='true'] .mail-panes .mail-list-pane {
     display: none;
   }
-  .mail-workspace[data-selected='false'] .mail-reading-pane {
+  .mail-workspace[data-list='card'][data-selected='false'] .mail-reading-pane {
     display: none;
   }
 }
 
 @container mailbox (max-width: 360px) {
-  .mail-header-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  .mail-compose-button {
-    padding-inline: 9px;
-    font-size: 11px;
-    white-space: nowrap;
-  }
   .mail-view-toggle button {
     padding-inline: 6px;
     font-size: 10px;
@@ -753,4 +839,167 @@
 }
 .mail-more-files {
   flex: 0 0 auto;
+}
+
+/*
+ * The Mail panel (a section panel: surface, header, rows and footer come from
+ * globals.css). What is Mail's own is the account switcher that takes the
+ * title's place when Apple Mail has more than one account.
+ */
+.mail-account-title {
+  margin: 0;
+}
+.mail-account-title button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 32px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border-radius: var(--radius-xs);
+  color: var(--panel-text);
+  font-size: 15px;
+  font-weight: 650;
+  text-align: left;
+}
+.mail-account-title button:hover,
+.mail-account-title button[aria-expanded='true'] {
+  background: var(--panel-hover);
+}
+.mail-account-title button > svg {
+  flex: none;
+  color: var(--panel-muted);
+}
+/* In the card (panel hidden): the account being read as a button like the others, its menu under it. */
+.mail-account--card {
+  position: relative;
+}
+.mail-account--card .mail-account-title button {
+  height: 34px;
+  max-width: 220px;
+  margin: 0;
+  padding: 0 10px 0 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+}
+.mail-account--card .mail-account-title button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mail-account--card .mail-account-title button:hover,
+.mail-account--card .mail-account-title button[aria-expanded='true'] {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.mail-account--card .mail-account-title button > svg {
+  color: var(--text-muted);
+}
+.mail-account--card .mail-account-menu {
+  top: calc(100% + 4px);
+  right: auto;
+  left: 0;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+}
+/* The accounts: a menu under the header, as wide as the panel allows. */
+.mail-account-menu {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: 8px;
+  left: 8px;
+  z-index: 30;
+  display: grid;
+  gap: 1px;
+  max-height: min(70vh, 320px);
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-raised);
+}
+.mail-account-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+.mail-account-item:hover,
+.mail-account-item:focus-visible {
+  background: var(--surface-hover);
+}
+.mail-account-item.is-current {
+  font-weight: 600;
+}
+.mail-account-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mail-account-address {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+.mail-account-check {
+  flex: none;
+  color: var(--accent-primary);
+}
+
+/* The Mail panel is the inbox: the list sits on the panel itself, its rows and day headings
+   on the panel's surface, the search and the views just under the panel's header. */
+.mail-panel .mail-list-pane {
+  flex: 1;
+  background: transparent;
+}
+.mail-panel .mail-list-controls {
+  padding: 2px 12px 12px;
+}
+.mail-panel .mail-search,
+.mail-panel .mail-views,
+.mail-panel .mail-filter-button {
+  background: color-mix(in srgb, var(--panel-hover) 70%, transparent);
+}
+.mail-panel .mail-search:focus-within {
+  background: var(--surface);
+}
+.mail-panel .mail-filter-button.is-active {
+  background: var(--accent-primary-soft);
+}
+.mail-panel .mail-day-heading {
+  padding-inline: 18px;
+  background: var(--panel);
+}
+.mail-panel .mail-message-group {
+  padding: 0 6px;
+}
+.mail-panel .mail-message-row:hover {
+  background: var(--panel-hover);
+}
+.mail-panel .mail-message-row--selected,
+.mail-panel .mail-message-row--selected:hover {
+  background: var(--panel-active);
+  border-color: transparent;
+}
+.mail-panel .mail-list-count {
+  padding-inline: 16px;
 }

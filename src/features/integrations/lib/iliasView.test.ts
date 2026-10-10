@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IliasConnection } from '@/features/integrations/lib/ilias/connection';
+import type { IliasMetrics } from './iliasFrame';
 import {
   closeIliasView,
   enterIliasMode,
   leaveIliasMode,
   navigateIlias,
   overlayIsOpen,
+  setIliasLayout,
 } from './iliasView';
 
 const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>();
@@ -23,6 +25,9 @@ const HEILBRONN: IliasConnection = {
   soap: 'blocked',
   checkedAt: '2026-09-23T10:00:00.000Z',
 };
+
+/** The rail and the panel, the frame's gutter and its colour. */
+const METRICS: IliasMetrics = { column: 312, gutter: 8, frame: [227, 239, 249] };
 
 const commands = () => invoke.mock.calls.map(([command]) => command);
 
@@ -59,24 +64,35 @@ describe('overlayIsOpen', () => {
 
 describe('entering ILIAS mode', () => {
   /**
-   * Rust cannot see how tall the strip is, nor how tall the page was before
-   * it shrank — the second is what the title bar is read from. So both travel.
+   * Rust cannot see how wide the column is, how wide the frame's gutter is or
+   * what colour, nor how tall the page was before it shrank — the last is what
+   * the title bar is read from. So all of them travel.
    */
-  it('hands Rust the strip and the page height', async () => {
-    await enterIliasMode(HEILBRONN, 48);
+  it('hands Rust the column, the frame and the page height', async () => {
+    await enterIliasMode(HEILBRONN, METRICS);
 
     expect(invoke).toHaveBeenCalledWith('enter_ilias_mode', {
       baseUrl: 'https://ilias.hs-heilbronn.de',
       clientId: 'iliashhn',
       target: null,
-      strip: 48,
+      column: 312,
+      gutter: 8,
+      frame: [227, 239, 249],
       pageHeight: window.innerHeight,
     });
   });
 
+  it('says so when the frame’s colour is not known', async () => {
+    await enterIliasMode(HEILBRONN, { ...METRICS, frame: null });
+    expect(invoke).toHaveBeenCalledWith(
+      'enter_ilias_mode',
+      expect.objectContaining({ frame: null }),
+    );
+  });
+
   it('passes a deep link to arrive at', async () => {
     const link = 'https://ilias.hs-heilbronn.de/goto.php?target=exc_4711';
-    await enterIliasMode(HEILBRONN, 48, link);
+    await enterIliasMode(HEILBRONN, METRICS, link);
     expect(invoke).toHaveBeenCalledWith(
       'enter_ilias_mode',
       expect.objectContaining({ target: link }),
@@ -84,7 +100,7 @@ describe('entering ILIAS mode', () => {
   });
 
   it('never crosses into Rust with a link from somewhere else', async () => {
-    await expect(enterIliasMode(HEILBRONN, 48, 'https://evil.example/')).rejects.toThrowError(
+    await expect(enterIliasMode(HEILBRONN, METRICS, 'https://evil.example/')).rejects.toThrowError(
       /does not belong to your ILIAS/,
     );
     expect(invoke).not.toHaveBeenCalled();
@@ -92,6 +108,17 @@ describe('entering ILIAS mode', () => {
 });
 
 describe('the other commands', () => {
+  it('passes on a new layout — the theme changed, say — without entering again', async () => {
+    await setIliasLayout({ column: 312, gutter: 8, frame: [14, 16, 21] });
+
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith('set_ilias_layout', {
+      column: 312,
+      gutter: 8,
+      frame: [14, 16, 21],
+    });
+  });
+
   it('leaves, giving Uni Pilot the window back', async () => {
     await leaveIliasMode();
     expect(invoke).toHaveBeenCalledWith('leave_ilias_mode', {});
@@ -120,7 +147,7 @@ describe('the other commands', () => {
 describe('the order calls reach Rust in', () => {
   /**
    * React mounts effects twice in development: enter, leave, enter. If the
-   * leave landed last, the ILIAS page would be a strip over an empty window.
+   * leave landed last, the ILIAS page would be the column beside an empty window.
    */
   it('keeps enter, leave, enter in that order even when the first is slow', async () => {
     let finishFirst: () => void = () => undefined;
@@ -131,9 +158,9 @@ describe('the order calls reach Rust in', () => {
         }),
     );
 
-    const first = enterIliasMode(HEILBRONN, 48);
+    const first = enterIliasMode(HEILBRONN, METRICS);
     const leave = leaveIliasMode();
-    const second = enterIliasMode(HEILBRONN, 48);
+    const second = enterIliasMode(HEILBRONN, METRICS);
 
     try {
       await vi.waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
@@ -150,13 +177,38 @@ describe('the order calls reach Rust in', () => {
     expect(commands()).toEqual(['enter_ilias_mode', 'leave_ilias_mode', 'enter_ilias_mode']);
   });
 
+  /** A layout update that overtook "enter" would reach Rust while ILIAS mode was still off, and be lost. */
+  it('keeps a layout update behind the enter it follows', async () => {
+    let finishFirst: () => void = () => undefined;
+    invoke.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finishFirst = () => resolve(undefined);
+        }),
+    );
+
+    const enter = enterIliasMode(HEILBRONN, METRICS);
+    const update = setIliasLayout({ ...METRICS, frame: [14, 16, 21] });
+
+    try {
+      await vi.waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(commands()).toEqual(['enter_ilias_mode']);
+    } finally {
+      finishFirst();
+    }
+    await Promise.all([enter, update]);
+
+    expect(commands()).toEqual(['enter_ilias_mode', 'set_ilias_layout']);
+  });
+
   /** Without the limit, one call that never returns would jam the page for good. */
   it('lets later calls through when one never returns', async () => {
     vi.useFakeTimers();
     try {
       invoke.mockImplementationOnce(() => new Promise<undefined>(() => undefined));
 
-      const stuck = enterIliasMode(HEILBRONN, 48);
+      const stuck = enterIliasMode(HEILBRONN, METRICS);
       stuck.catch(() => undefined);
       await vi.advanceTimersByTimeAsync(0);
       const after = leaveIliasMode();
@@ -174,7 +226,9 @@ describe('the order calls reach Rust in', () => {
   it('carries on after a call fails', async () => {
     invoke.mockRejectedValueOnce('ILIAS could not be opened: gone');
 
-    await expect(enterIliasMode(HEILBRONN, 48)).rejects.toBe('ILIAS could not be opened: gone');
+    await expect(enterIliasMode(HEILBRONN, METRICS)).rejects.toBe(
+      'ILIAS could not be opened: gone',
+    );
     await leaveIliasMode();
 
     expect(invoke).toHaveBeenLastCalledWith('leave_ilias_mode', {});

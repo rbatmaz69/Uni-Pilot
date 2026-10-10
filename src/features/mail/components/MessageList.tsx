@@ -130,7 +130,7 @@ function AttachmentBadges({ count, names }: { count: number; names: string[] }) 
       })}
       {remaining > 0 ? (
         <span className="mail-more-files">
-          {remaining === count ? `${count} files` : `+${remaining}`}
+          {remaining === count ? `${count} ${count === 1 ? 'file' : 'files'}` : `+${remaining}`}
         </span>
       ) : null}
       {files.length === 0 && remaining === 0 ? (

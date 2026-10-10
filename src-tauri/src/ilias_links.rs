@@ -8,7 +8,7 @@
 //!
 //! - **ILIAS itself** (same origin): Uni Pilot asks for it once, with the ILIAS
 //!   webview's own cookies. A file is saved to Downloads like any other
-//!   download, with the strip showing it; a page opens in the ILIAS view.
+//!   download, with the ILIAS panel showing it; a page opens in the ILIAS view.
 //! - **Anywhere else** (`http`, `https`, `mailto`): the default browser or mail
 //!   app, as a new tab would have been.
 //! - **Anything else**: refused.

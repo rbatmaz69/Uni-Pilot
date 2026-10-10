@@ -1,29 +1,33 @@
 # ILIAS in Uni Pilot
 
-Open **ILIAS** in the sidebar and choose **Connect Hochschule Heilbronn** (or enter another ILIAS address). In the desktop app the window then switches to **ILIAS mode**: ILIAS fills it, full width, under a slim strip of Uni Pilot's own. The sidebar steps aside while you are there; **Uni Pilot** at the left of the strip takes you back. Sign in exactly as on the website. The sign-in lasts as long as Uni Pilot runs — on a Mac, closing the window only hides the app — but not past quitting it: ILIAS keeps its session in a session cookie, and after a restart the university's sign-in asks for the password and the authenticator code again (measured 25.09.2026).
+Open **ILIAS** in the sidebar and choose **Connect Hochschule Heilbronn** (or enter another ILIAS address). In the desktop app the window then switches to **ILIAS mode**: ILIAS takes the place of the page's card, to the right of Uni Pilot's icon rail and an **ILIAS panel** that carries the controls below. The rail stays where it is, so any item on it takes you back into Uni Pilot. Sign in exactly as on the website. The sign-in lasts as long as Uni Pilot runs — on a Mac, closing the window only hides the app — but not past quitting it: ILIAS keeps its session in a session cookie, and after a restart the university's sign-in asks for the password and the authenticator code again (measured 25.09.2026).
 
 Why ILIAS itself rather than native screens: at Heilbronn, ILIAS gives Uni Pilot one data channel — the calendar feed — and nothing for courses, materials, submissions, forums or tests. The research behind this is in [`integrations/ilias-integration-research.md`](integrations/ilias-integration-research.md). Rather than leave all of that out of reach, the app shows ILIAS.
 
 ## What the page does
 
-| Control                          | What happens                                                                                                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Connect**                      | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved.                                 |
-| **Uni Pilot** (back)             | Leaves ILIAS mode for the page you came from; the sidebar and header return.                                                                                 |
-| **‹ ›** (back, forward)          | Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too.                                 |
-| **ILIAS dashboard** (house)      | Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.                                    |
-| **Open in your browser** (globe) | The page ILIAS is on, in your default browser. For signing in with Touch ID — see below.                                                                     |
-| **Open in a separate window**    | The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                                                        |
-| **Sign out of ILIAS**            | Signs out the way ILIAS's own menu does, then makes this computer forget the university sign-on, so the next sign-in asks for the password again. See below. |
-| **Disconnect**                   | Makes Uni Pilot forget the address. It does not sign you out of ILIAS — do that first if you want to.                                                        |
+| Control                          | What happens                                                                                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Connect**                      | Uni Pilot asks the address what it is — release, client, how people sign in — and keeps the answer. No password is involved.                                                      |
+| **The icon rail**                | The way back to Uni Pilot: any item on it leaves ILIAS mode for that page, and the header and the card return. There is no "back to Uni Pilot" button of its own.                 |
+| **‹ ›** (back, forward)          | In the panel's header. Back and forward within ILIAS, like a browser. Greyed out when there is nowhere to go. On a Mac, two-finger swipe works too.                               |
+| **ILIAS dashboard** (house)      | In the panel's header. Back to the ILIAS dashboard. Signed in, that is your own start page; signed out, ILIAS sends you through its login first.                                  |
+| **Courses**                      | The panel's list of your courses, as Uni Pilot last read them (below). A click opens that course in ILIAS; the course ILIAS is showing is marked.                                 |
+| **Open in your browser** (globe) | In the panel's foot. The page ILIAS is on, in your default browser. For signing in with Touch ID — see below.                                                                     |
+| **Open in a separate window**    | In the panel's foot. The same ILIAS in a window of its own — the fallback if the embedded view misbehaves.                                                                        |
+| **Sign out of ILIAS**            | In the panel's foot. Signs out the way ILIAS's own menu does, then makes this computer forget the university sign-on, so the next sign-in asks for the password again. See below. |
+| **Disconnect**                   | In the panel's foot. Makes Uni Pilot forget the address. It does not sign you out of ILIAS — do that first if you want to.                                                        |
 
+**Courses in the panel** come from the course list Uni Pilot keeps (`courseStore`, the same one the Courses page reads): online courses and groups of this installation, in ILIAS's order, by name without the module number. The panel does not read ILIAS itself; `CourseSync` refreshes the list every 15 minutes while Uni Pilot runs, and once more on leaving ILIAS mode if the sign-in was missing. A first sign-in made in ILIAS mode therefore shows its courses after the next refresh, not at once. A click goes through the same rule as every other "open in ILIAS" (`resolveIliasTarget`, `crs_717`). **Which course is marked** comes from Rust: every finished page in ILIAS reports the `ref_id` (or `target=crs_717`) of its own address, and only that number reaches the page (`ilias-location`, `ref_id_of` in `ilias_browser.rs`). Inside a folder of the course the id is the folder's, so no course is marked there.
+
+**The panel stays open in ILIAS mode**, whatever the student chose for panels (`selectPanelShown` in `uiStore.ts`): it holds ILIAS's only controls and ILIAS mode has no header to bring a hidden panel back from. The preference itself is not touched and applies again afterwards.
 In the calendar, an entry that came from an ILIAS feed shows **Open in ILIAS**. ILIAS writes a link to the course or exercise into every entry it exports, so this goes to the ILIAS page and opens the exercise itself rather than the start page. Timetable entries from splan carry no link and show nothing.
 
 Leaving the ILIAS page and coming back finds ILIAS where you left it.
 
 ## Downloads
 
-A file ILIAS offers for download — slides, exercise sheets, a submission you uploaded — is saved to your **Downloads** folder. The strip says so while it runs (**Downloading Blatt 3.pdf…**) and when it is done (**Blatt 3.pdf saved to Downloads**), or that it failed. A saved file can be opened from there, or shown in its folder.
+A file ILIAS offers for download — slides, exercise sheets, a submission you uploaded — is saved to your **Downloads** folder. The panel's foot says so while it runs (**Downloading Blatt 3.pdf…**) and when it is done (**Blatt 3.pdf saved to Downloads**), or that it failed. A saved file can be opened from there, or shown in its folder.
 
 Before this, downloads did not work at all, for two reasons. A webview without a download handler cancels every download, silently. And ILIAS opens every file it shows inline — PDFs above all — in a new window (`target="_blank"`, see `ilObjFileListGUI::getCommandFrame` in ILIAS 9), which a webview without a handler for new windows simply refuses. Clicking a PDF did nothing, and nothing said so.
 
@@ -38,41 +42,45 @@ Links that ask for a new window now go where a browser's new tab would (`src-tau
 How it is kept safe (`src-tauri/src/ilias_browser.rs`):
 
 - **The file name is ours to check.** The server suggests one; Uni Pilot keeps only the last part — no folders, so nothing can land outside Downloads — replaces what file systems refuse, drops leading dots so nothing is hidden, and shortens endless names. An existing file is never overwritten: the new one becomes `Blatt 3 (1).pdf`.
-- **The page never names a path.** Rust hands out an id per download and opens or shows only files it saved itself, looked up by that id. The strip only ever learns the file name.
+- **The page never names a path.** Rust hands out an id per download and opens or shows only files it saved itself, looked up by that id. The panel only ever learns the file name.
 - **Only documents and media are opened** — PDF, Office and OpenDocument files, text, images, audio, video, zip. Anything else, a program above all, is only ever shown in its folder; opening it stays your own, deliberate step.
 
-Opening a PDF from the strip hands it to Preview (or whatever opens PDFs on your computer).
+Opening a PDF from the panel hands it to Preview (or whatever opens PDFs on your computer).
 
 ## ILIAS mode: side by side, not on top
 
-ILIAS forbids being framed (`x-frame-options: SAMEORIGIN`), so this is not an `<iframe>`. It is a second native webview attached to the Uni Pilot window (`Window::add_child`), which Tauri keeps behind its `unstable` feature and describes as unfinished. The separate window in the strip is there in case that shows.
+ILIAS forbids being framed (`x-frame-options: SAMEORIGIN`), so this is not an `<iframe>`. It is a second native webview attached to the Uni Pilot window (`Window::add_child`), which Tauri keeps behind its `unstable` feature and describes as unfinished. The separate window in the panel is there in case that shows.
 
 ```text
-┌──────────────────────────────────────────────┐
-│ (title bar, macOS, windowed only)            │
-├──────────────────────────────────────────────┤
-│ Uni Pilot: the strip — back, home, sign out  │  Uni Pilot's webview
-├──────────────────────────────────────────────┤
-│ ILIAS, full width                            │  ILIAS's webview
-└──────────────────────────────────────────────┘
+┌──────┬──────────────┬─────────────────────────────┐
+│ rail │ ILIAS panel  │                             │ ← title bar (macOS,
+│      │ ‹ › ⌂        │  ILIAS, as the card         │   windowed only) and
+│      │ courses…     │  (rounded on the right,     │   the frame's gutter
+│      │ footer: …    │   gutter top/right/bottom)  │
+└──────┴──────────────┴─────────────────────────────┘
+   Uni Pilot's webview =         ILIAS's webview
+   the left column, full height
 ```
 
-The two webviews sit **side by side and never overlap**. A first version laid ILIAS _over_ the page instead, and that could not be made to work: macOS sends pointer movement to every webview under the pointer, covered or not, so the page underneath and ILIAS kept resetting the cursor over each other and it flickered between the hand and the arrow. Webviews that do not overlap have nothing to fight over.
+The two webviews sit **side by side and never overlap**. A first version laid ILIAS _over_ the page instead, and that could not be made to work: macOS sends pointer movement to every webview under the pointer, covered or not, so the page underneath and ILIAS kept resetting the cursor over each other and it flickered between the hand and the arrow. Webviews that do not overlap have nothing to fight over. (A second version put Uni Pilot in a strip across the top; this one gives it a column at the left instead, which is the same layout every other section has: rail, panel, card.)
 
 What follows from that:
 
-- **Rust lays out the window.** Once Uni Pilot is only the strip, the page can no longer see the window, so `src-tauri/src/ilias_view.rs` places both webviews — on entering, and again on every resize and on going full screen and back.
-- **The title bar is accounted for.** On macOS the window's content runs up under the title bar and the page starts below it, 28 points down when windowed and 0 in full screen. Measured once on entering, from the gap between the window and the page. Without this the strip landed 28 points too high, under the title bar, which is exactly how it disappeared outside full screen.
-- **Linux lays out differently.** There Tauri packs all webviews of a window into one vertical GTK box and ignores the positions and sizes set on them. A box shares its height by what each child would like, and a WebKit view would like the height of its page — so first ILIAS got half the window, and after a first fix Uni Pilot kept all of it. On Linux both webviews are therefore moved into a vertical `GtkPaned`, whose divider stays where it is put: at the strip's height, with ILIAS below (`stack` in `ilias_view.rs`). A paned gives all of itself to the one child still visible, so hiding ILIAS is all leaving takes.
-- **Dialogs get the window back.** Uni Pilot is only the strip in ILIAS mode, so a dialog would be cut off at its edge. While one is open, Uni Pilot takes the window back; afterwards ILIAS returns on the page it was on. Not for tooltips or reminders, which would make ILIAS jump out of the way on hover or mid-sentence. On macOS reminders come from a native overlay above everything; on other platforms an in-app reminder shown in ILIAS mode is cut off at the strip.
+- **Rust lays out the window.** Once Uni Pilot is only the left column, the page can no longer see the window, so `src-tauri/src/ilias_view.rs` places both webviews — on entering, and again on every resize and on going full screen and back. The column runs the full height of the window; ILIAS starts at the column's right edge, under the title bar and the frame's gutter, and ends a gutter short of the right and bottom edges (`arrange`, pure and tested: no overlap, never negative, the column clamped to 96 to 640 points and to the window).
+- **The page says how wide the column is.** `enter_ilias_mode` takes `column` (rail plus panel, in logical pixels), `gutter` (`--frame-gutter`), `frame` (the frame's colour as `[r, g, b]`) and `page_height`; `set_ilias_layout` takes the first three again when they change while ILIAS mode is on (the theme was switched) and does nothing when it is off. The page measures rather than assuming: `column` is the right edge of the ILIAS panel (`measureColumn`), `gutter` and `frame` are read from the stylesheet (`readGutter`, `readFrameColour` in `lib/iliasFrame.ts`). Calls to Rust stay strictly ordered, so a layout update can never overtake the enter it follows.
+- **The column's width must not depend on the window.** The main webview's own viewport _is_ the column, so a width taken from `vw` would feed back into the column it measures. In ILIAS mode the shell is marked `data-ilias-mode`, and `ilias.css` gives the panel a fixed 240px and the rail its 72px (which the narrow-window rule would otherwise cut to 62px, since the column is always narrower than 700px).
+- **The gutter is the window's own colour.** Where no webview covers the window — above, right of and below ILIAS — the window background shows. The page sends the frame's colour (`--frame-to`, converted from hex or `oklch()` to RGB in TypeScript, no canvas) and Rust sets it as the window background (`Window::set_background_color`); the page sends it again when `data-theme` changes. Leaving ILIAS mode puts the default background back. The column's own frame is that one colour too (`ilias.css`) so the two meet without a seam. On macOS ILIAS's right-hand corners are rounded through its layer (`round_card`: `cornerRadius`, `maskedCorners` for the two corners on the far side of x, `masksToBounds`), not through the page; the left edge joins the panel and stays square.
+- **The title bar is accounted for.** On macOS the window's content runs up under the title bar and the page starts below it, 28 points down when windowed and 0 in full screen. The column is placed at y = 0 like the page always is, so it keeps itself clear of the bar; ILIAS is not a page of ours and starts below the bar and the gutter, which is why the bar's height is measured, once on entering, from the gap between the window and the page (`page_height`). Without this ILIAS would sit under the title bar.
+- **Linux lays out differently.** There Tauri packs all webviews of a window into one vertical GTK box and ignores the positions and sizes set on them. A box shares its height by what each child would like, and a WebKit view would like the height of its page. On Linux both webviews are therefore moved into a horizontal `GtkPaned`, whose divider stays where it is put: at the column's width, with ILIAS to its right (`stack` in `ilias_view.rs`). A paned gives all of itself to the one child still visible, so hiding ILIAS is all leaving takes. There are no gutters there.
+- **Dialogs get the window back.** Uni Pilot is only the column in ILIAS mode, so a dialog would be cut off at its edge. While one is open, Uni Pilot takes the window back; afterwards ILIAS returns on the page it was on. Not for tooltips or reminders, which would make ILIAS jump out of the way on hover or mid-sentence. On macOS reminders come from a native overlay above everything; on other platforms an in-app reminder shown in ILIAS mode is cut off at the column.
 - **Leaving hides ILIAS; only Disconnect closes it.** That is what keeps your place.
-- **Calls to Rust go strictly in order**, each with a time limit. They are async and could overtake each other — React mounts effects twice in development — and a "leave" that landed after the student's last "enter" would show a strip over an empty window, or the other way round. The limit keeps a call that never returns from holding up every later one.
+- **Calls to Rust go strictly in order**, each with a time limit. They are async and could overtake each other — React mounts effects twice in development — and a "leave" that landed after the student's last "enter" would show the column beside an empty window, or the other way round. The limit keeps a call that never returns from holding up every later one.
 
 ## Signing out
 
 ILIAS 9 signs out only through the link in its own user menu. `doLogout` is one of the commands ILIAS runs only with the token that link carries (`rtoken`); a bare `logout.php` is dropped without a word, and ILIAS sends you straight back to the dashboard. That is why the button first did nothing but flicker.
 
-**Sign out of ILIAS** now asks ILIAS for the dashboard once, finds that link in it and opens it in the ILIAS view, so ILIAS ends the session on its side (`src-tauri/src/ilias_sign_out.rs`). A few seconds later the view forgets every cookie that is not ILIAS's own, the university sign-on's among them — otherwise the next sign-in would pass straight through without a password. If ILIAS offers no sign-out link, nobody was signed in; the view then forgets ILIAS's cookies too, and the strip says so.
+**Sign out of ILIAS** now asks ILIAS for the dashboard once, finds that link in it and opens it in the ILIAS view, so ILIAS ends the session on its side (`src-tauri/src/ilias_sign_out.rs`). A few seconds later the view forgets every cookie that is not ILIAS's own, the university sign-on's among them — otherwise the next sign-in would pass straight through without a password. If ILIAS offers no sign-out link, nobody was signed in; the view then forgets ILIAS's cookies too, and the panel says so.
 
 In a browser tab Uni Pilot cannot sign ILIAS out, so the page there has no such button and points to ILIAS's own menu instead.
 
@@ -83,7 +91,7 @@ The university sign-in offers **passkeys**: in Safari, Touch ID or your Mac's pa
 What works instead:
 
 - **Your HHN user name, password and authenticator code** in Uni Pilot, once each time Uni Pilot starts.
-- **Open in your browser** (globe) in the strip, which opens the page ILIAS is on in your default browser, where Touch ID works. That signs in the browser, not Uni Pilot — the two keep their sign-ins apart.
+- **Open in your browser** (globe) in the panel, which opens the page ILIAS is on in your default browser, where Touch ID works. That signs in the browser, not Uni Pilot — the two keep their sign-ins apart.
 
 ## What is stored, and what is not
 
@@ -120,22 +128,22 @@ Once open, ILIAS navigates freely — it has to, or the university's single sign
 
 ## Implementation and validation
 
-- `src-tauri/src/ilias_view.rs` — ILIAS mode: entering, leaving, laying out the window on every resize, with Rust tests for the layout and the title bar.
+- `src-tauri/src/ilias_view.rs` — ILIAS mode: entering, leaving, laying out the window on every resize, the frame colour and rounded corners, with Rust tests for the layout, the title bar and what the page may report.
 - `src-tauri/src/ilias_window.rs` — the separate window, and `resolve_target`, with Rust tests.
 - `src-tauri/src/ilias_sign_out.rs` — **Sign out of ILIAS**, with Rust tests for finding ILIAS's own link and for whose cookie is whose.
 - `src-tauri/src/ilias_links.rs` — links ILIAS opens in a new window, and **Open in your browser**, with Rust tests for where a link goes, telling a file from a page, and file names from headers.
-- `src-tauri/src/ilias_browser.rs` — back, forward and downloads for both, with Rust tests for file names and the download list.
+- `src-tauri/src/ilias_browser.rs` — back, forward and downloads for both, and which object ILIAS is showing, with Rust tests for file names, the download list and `ref_id_of`.
 - `src-tauri/src/ilias_sync/` — reading courses, folders and exercises with your session: the pages it may ask for, telling signed out from empty, and readers tested against recorded HHN pages in `fixtures/`. `src/features/integrations/lib/iliasSync.ts` is its TypeScript side. Background: [`integrations/ilias-sync-research.md`](integrations/ilias-sync-research.md).
 - `src/features/courses/` — the **Courses** page built on the sync: courses by study area, a course's folders, files (size, version, date) and exercises (deadline, hand-in, grade), kept in `store/courseStore.ts` so the last read survives a signed-out start. **Download** on a file saves it to Downloads through the same code as downloads in ILIAS mode, then offers **Open** (documents and media only) and **Show in folder**. `CourseSync` reads the course list every 15 minutes while Uni Pilot runs, which keeps the ILIAS sign-in alive, and stops once ILIAS says it has ended.
-- `src/features/integrations/lib/iliasBrowser.ts` and `store/iliasBrowserStore.ts` — the commands and events, and what the strip shows. Listening starts once and lasts as long as the app, so a download that ends while you are elsewhere is still heard.
+- `src/features/integrations/lib/iliasBrowser.ts` and `store/iliasBrowserStore.ts` — the commands and events, and what the panel shows. Listening starts once and lasts as long as the app, so a download that ends while you are elsewhere is still heard.
 - `src/features/integrations/lib/ilias/endpoints.ts` — `resolveIliasTarget`, `dashboardUrl`; the TypeScript mirror of the rule.
 - `src/features/integrations/lib/ilias/connection.ts` — `discoverInstallation`, which also reads the sign-in options, and `toConnection`.
 - `src/features/integrations/lib/ilias/knownInstallations.ts` — Heilbronn, as configuration rather than a special case.
-- `src/features/integrations/lib/iliasView.ts` — when to switch, the ordered queue, what counts as a dialog.
+- `src/features/integrations/lib/iliasView.ts` — when to switch, the ordered queue, what counts as a dialog. `lib/iliasFrame.ts` — what the page reports of its layout (column, gutter, frame colour) and how it reads it, with the colour conversion.
 - `src/features/integrations/lib/iliasWindow.ts` — `openIlias`, choosing between the separate window and a tab.
 - `src/features/integrations/store/iliasStore.ts` — the connected installation.
-- `src/features/integrations/components/` — the page, the strip (`IliasStrip`), and the calendar's **Open in ILIAS** button.
-- `src/components/layout/AppLayout.tsx`, `MainContent.tsx` and `immersive` in `src/store/uiStore.ts` — the sidebar and header stepping aside. `immersive` is never persisted, so a crash in ILIAS mode cannot start the app without its sidebar.
+- `src/features/integrations/components/` — the page, the ILIAS panel (`IliasPanel`, which also switches the shell into ILIAS mode and drives the window), and the calendar's **Open in ILIAS** button. `src/features/integrations/ilias.css` — the fixed column width and the stand-in for ILIAS.
+- `src/components/layout/AppLayout.tsx`, `MainContent.tsx` and `iliasMode` and `selectPanelShown` in `src/store/uiStore.ts` — the header, the card and the face-unlock bar stepping aside while the rail and the panel stay. `iliasMode` is never persisted, so a crash in ILIAS mode cannot start the app showing only the column.
 
 `resolve_target` in Rust and `resolveIliasTarget` in TypeScript are tested against the same cases. Change both or neither.
 
@@ -144,7 +152,7 @@ Run `npm run check`, then `cargo test --manifest-path src-tauri/Cargo.toml` for 
 ## Confirmed, and still open
 
 - ✅ **Heilbronn's sign-in works inside an embedded webview.** Confirmed on 23.09.2026 by signing in to the dashboard with a real HHN account. Heilbronn signs in through Keycloak (`login.hs-heilbronn.de`), which — unlike Google or Microsoft — does not refuse embedded browsers.
-- 🔴 **ILIAS mode on every platform.** Rust computes the layout and handles the title bar, but Tauri has open issues about child webviews, and resizing the main webview goes further into its unfinished API than laying one over it did. Check it by eye after a Tauri update, on each platform you ship to — windowed, full screen, and resizing between the two.
+- 🔴 **ILIAS mode on every platform.** Rust computes the layout and handles the title bar, but Tauri has open issues about child webviews, and resizing the main webview goes further into its unfinished API than laying one over it did. Check it by eye after a Tauri update, on each platform you ship to — windowed, full screen, and resizing between the two. In particular, on macOS: ILIAS sits level with the panel's top and bottom, the gutter above, right of and below it is the frame's colour in every theme (and after switching theme while ILIAS is open), ILIAS's right corners are rounded and the left edge square against the panel, and the rail's traffic lights are not cut off. 🔴 The rounded corners and the window colour are untried on Windows and Linux (no rounding there; Linux has no gutters).
 - 🔴 **Back, forward and downloads on Windows and Linux.** Written against each platform's webview and type-checked for Windows, but only tried on macOS. On macOS the webview does not report where a download went, so Uni Pilot chooses the path itself; check the file lands in Downloads on the others.
 - 🔴 **Links ILIAS opens in a new window** are fetched once by Rust to tell a file from a page, and a page is then loaded a second time by the ILIAS view. Harmless for ILIAS's links, which only read; watch for anything that behaves differently when opened twice.
 - ✅ **The sync reads the session without ILIAS mode open (macOS).** Uni Pilot's own page shares the ILIAS view's cookie store: on 25.09.2026 it saw the cookies the sign-in had set for `login.hs-heilbronn.de`. With a valid session the course list loaded, all 11 courses. 🔴 Still to confirm on Windows and Linux.

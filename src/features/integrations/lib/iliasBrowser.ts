@@ -1,8 +1,9 @@
 /**
  * The browser parts of ILIAS mode — the TypeScript side of
- * `src-tauri/src/ilias_browser.rs`: back and forward, and downloads.
+ * `src-tauri/src/ilias_browser.rs`: back and forward, downloads, and where
+ * ILIAS is.
  *
- * Rust does the work natively and reports back with two events. Nothing here
+ * Rust does the work natively and reports back with three events. Nothing here
  * touches the ILIAS page itself; it only asks Rust and listens.
  *
  * Downloads are named by the id Rust handed out, never by a path — the page
@@ -28,6 +29,14 @@ export interface IliasHistory {
 }
 
 export const NO_HISTORY: IliasHistory = { canGoBack: false, canGoForward: false };
+
+/** Where ILIAS is: the repository object the page it shows belongs to. */
+export interface IliasLocation {
+  /** The `ref_id` of a course, folder or file; null on the dashboard and other pages about none. */
+  refId: string | null;
+}
+
+export const NO_LOCATION: IliasLocation = { refId: null };
 
 async function call<T = void>(command: string, args: Record<string, unknown> = {}): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -94,6 +103,7 @@ export function signOutOfIlias(connection: IliasConnection): Promise<IliasSignOu
 export interface IliasBrowserListeners {
   onDownload: (download: IliasDownload) => void;
   onHistory: (history: IliasHistory) => void;
+  onLocation: (location: IliasLocation) => void;
 }
 
 /** Listens to what Rust reports. Resolves to a function that stops listening. */
@@ -102,6 +112,9 @@ export async function listenToIlias(listeners: IliasBrowserListeners): Promise<(
   const stops = await Promise.all([
     listen<IliasDownload>('ilias-download', (event) => listeners.onDownload(event.payload)),
     listen<IliasHistory>('ilias-history', (event) => listeners.onHistory(event.payload)),
+    listen<IliasLocation>('ilias-location', (event) =>
+      listeners.onLocation({ refId: event.payload?.refId ?? null }),
+    ),
   ]);
   return () => stops.forEach((stop) => stop());
 }

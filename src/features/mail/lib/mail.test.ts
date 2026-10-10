@@ -4,6 +4,8 @@ import {
   categoryOf,
   courseFor,
   courseRefs,
+  filterGroups,
+  filterLabel,
   formatBytes,
   formatReceived,
   groupByDay,
@@ -163,5 +165,74 @@ describe('sorting the inbox', () => {
     expect(toneFor('Anna')).toBe(toneFor('anna'));
     expect(formatBytes(81234)).toBe('79 KB');
     expect(formatBytes(null)).toBeNull();
+  });
+});
+
+describe('the ways to narrow the inbox', () => {
+  const domain = 'hs-heilbronn.de';
+  const mails = [
+    message({ id: 'a', read: false, subject: 'Datenbanken 1: Blatt 4' }),
+    message({
+      id: 'b',
+      sender: 'ILIAS HHN <noreply-ilias@hs-heilbronn.de>',
+      subject: '[ILIAS] Neue Datei',
+    }),
+    message({
+      id: 'c',
+      sender: 'Mia <mia@stud.hs-heilbronn.de>',
+      subject: 'Lerngruppe: Datenbanken 1',
+    }),
+    message({ id: 'd', sender: 'Amazon <shop@amazon.de>', read: false, subject: 'Paket' }),
+  ];
+  const triage = { a: 'reply' as const, c: 'done' as const };
+
+  it('counts all mail, unread and to answer, and keeps those views at zero', () => {
+    const { views } = filterGroups(mails, { domain, refs: REFS, triage });
+    expect(views).toEqual([
+      { id: 'all', label: 'All mail', count: 4 },
+      { id: 'unread', label: 'Unread', count: 2 },
+      { id: 'reply', label: 'To answer', count: 1 },
+    ]);
+    expect(filterGroups([], { domain, refs: REFS, triage: {} }).views.map((v) => v.count)).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
+  it('lists the senders that wrote, the university first, and not those that did not', () => {
+    const { senders } = filterGroups(mails, { domain, refs: REFS, triage });
+    expect(senders).toEqual([
+      { id: 'university', label: 'University', count: 1 },
+      { id: 'ilias', label: 'ILIAS', count: 1 },
+      { id: 'students', label: 'Students', count: 1 },
+    ]);
+    expect(
+      filterGroups([mails[1]!], { domain, refs: REFS, triage }).senders.map((s) => s.id),
+    ).toEqual(['ilias']);
+  });
+
+  it('lists the courses mail is about, the most written about first', () => {
+    const { courses } = filterGroups(mails, { domain, refs: REFS, triage });
+    expect(courses).toEqual([{ id: 'course:967849', label: 'Datenbanken 1', count: 2 }]);
+  });
+
+  it('caps the courses at the most written about', () => {
+    const refs = courseRefs(
+      Array.from({ length: 12 }, (_, n) => ({
+        refId: String(n),
+        title: `Kurs Nummer${n + 10} - WS25`,
+      })),
+    );
+    const many = refs.map((ref, n) => message({ id: `m${n}`, subject: `Frage zu ${ref.key}` }));
+    const { courses } = filterGroups(many, { domain, refs, triage: {} });
+    expect(courses).toHaveLength(8);
+  });
+
+  it('names a filter for the pill that says it is on', () => {
+    expect(filterLabel('all', REFS)).toBe('All mail');
+    expect(filterLabel('unread', REFS)).toBe('Unread');
+    expect(filterLabel('reply', REFS)).toBe('To answer');
+    expect(filterLabel('ilias', REFS)).toBe('ILIAS');
+    expect(filterLabel('course:967849', REFS)).toBe('Datenbanken 1');
+    expect(filterLabel('course:gone', REFS)).toBe('Course');
   });
 });

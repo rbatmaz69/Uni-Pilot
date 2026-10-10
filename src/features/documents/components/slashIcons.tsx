@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  FileText,
   Heading1,
   Heading2,
   Heading3,
@@ -48,6 +49,7 @@ export const SLASH_ICONS: Record<SlashCommand['id'], ReactNode> = {
   divider: <Minus size={15} />,
   table: <Table size={15} />,
   image: <ImagePlus size={15} />,
+  pdf: <FileText size={15} />,
   'sticky-yellow': <StickyNote size={15} />,
   'sticky-peach': <StickyNote size={15} />,
   'sticky-mint': <StickyNote size={15} />,

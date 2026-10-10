@@ -194,7 +194,7 @@ export const NoteStudyPage = Node.create({
   priority: 900,
   group: 'block',
   content:
-    '(paragraph | heading | bulletList | orderedList | taskList | blockquote | codeBlock | horizontalRule | image | table | blockMath | noteCard | noteLayout | details | footnoteDefinition)+',
+    '(paragraph | heading | bulletList | orderedList | taskList | blockquote | codeBlock | horizontalRule | image | notePdf | table | blockMath | noteCard | noteLayout | details | footnoteDefinition)+',
   addAttributes: () => ({
     ink: { default: '[]', parseHTML: (element) => element.getAttribute('data-study-ink') ?? '[]' },
   }),

@@ -6,8 +6,8 @@
 //!
 //! **Downloads.** Without a download handler, the webview silently cancels
 //! every download — a PDF from a course simply never arrived. Here each one is
-//! saved to the Downloads folder under a name we check ourselves, and the strip
-//! is told when it starts and when it ends. The strip can then open the file or
+//! saved to the Downloads folder under a name we check ourselves, and the ILIAS
+//! panel is told when it starts and when it ends. The panel can then open the file or
 //! show it in its folder, but only files this module saved, looked up by an id
 //! it handed out — the page never names a path. Opening is further limited to
 //! documents and media; anything that could run is only ever shown in its
@@ -15,6 +15,11 @@
 //!
 //! **History.** Tauri has no back or forward, so they go straight to the
 //! webview: `WKWebView` on macOS, WebView2 on Windows, WebKitGTK on Linux.
+//!
+//! **Location.** Each finished page's address says which repository object it
+//! is about (`ref_id=717`). The ILIAS panel uses that to mark the course the
+//! student is in. Only that number leaves, read from the address Tauri already
+//! reports — never from the page.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -23,7 +28,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::webview::{DownloadEvent, PageLoadEvent, PageLoadPayload, PlatformWebview};
-use tauri::{Emitter, Manager, Runtime, Webview};
+use tauri::{Emitter, Manager, Runtime, Url, Webview};
 
 use crate::ilias_view::ILIAS;
 
@@ -31,9 +36,10 @@ use crate::ilias_view::ILIAS;
 const MAIN: &str = "main";
 const DOWNLOAD_EVENT: &str = "ilias-download";
 const HISTORY_EVENT: &str = "ilias-history";
+const LOCATION_EVENT: &str = "ilias-location";
 
 /// How many downloads are remembered for opening. Older ones stay on disk,
-/// they just can no longer be opened from the strip.
+/// they just can no longer be opened from the panel.
 const KEEP: usize = 20;
 
 /// Used when the server suggests no usable name at all.
@@ -68,7 +74,7 @@ struct Entry {
     state: State,
 }
 
-/// What the strip is told. The file name only — never the path.
+/// What the panel is told. The file name only — never the path.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Report {
@@ -239,6 +245,40 @@ fn tell<R: Runtime, T: Serialize + Clone + Send + 'static>(
     });
 }
 
+/// Where ILIAS is, as far as the ILIAS panel needs to know.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Location {
+    /// The repository object the page belongs to: a course, a folder, a file.
+    ref_id: Option<String>,
+}
+
+/// An ILIAS id: digits, and not absurdly many of them.
+fn is_ref_id(text: &str) -> bool {
+    (1..=12).contains(&text.len()) && text.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+/// The repository object an ILIAS address is about — its `ref_id`, or the id
+/// in the `target=crs_717` of a `goto.php` link — and nothing else of it.
+fn ref_id_of(url: &Url) -> Option<String> {
+    let pairs: Vec<_> = url.query_pairs().collect();
+    let value = |wanted: &str| {
+        pairs
+            .iter()
+            .find(|(key, _)| key == wanted)
+            .map(|(_, value)| value.as_ref())
+    };
+    value("ref_id")
+        .filter(|id| is_ref_id(id))
+        .or_else(|| {
+            // `crs_717`, or `file_967852_download`: the id is the second part.
+            value("target")
+                .and_then(|target| target.split('_').nth(1))
+                .filter(|id| is_ref_id(id))
+        })
+        .map(str::to_owned)
+}
+
 /// The download hook for every ILIAS webview. Returning `true` lets the
 /// download go ahead — without this hook, the webview cancels it.
 pub fn on_download<R: Runtime>(view: Webview<R>, event: DownloadEvent<'_>) -> bool {
@@ -266,7 +306,7 @@ pub fn on_download<R: Runtime>(view: Webview<R>, event: DownloadEvent<'_>) -> bo
 }
 
 /// Picks where a download goes — in Downloads, under a checked name, never
-/// over an existing file — and tells the strip it has started. Returns the
+/// over an existing file — and tells the panel it has started. Returns the
 /// path and the id the download is opened by later; `None` when there is
 /// nowhere to put it.
 pub(crate) fn begin_download<R: Runtime>(
@@ -291,7 +331,7 @@ pub(crate) fn begin_download<R: Runtime>(
     Some((path, id))
 }
 
-/// Marks the download from `url` as ended and tells the strip.
+/// Marks the download from `url` as ended and tells the panel.
 pub(crate) fn end_download<R: Runtime>(app: &tauri::AppHandle<R>, url: &str, success: bool) {
     let downloads = app.state::<Downloads>();
     let report = downloads
@@ -616,7 +656,7 @@ pub fn prepare<R: Runtime>(view: &Webview<R>) {
     }
 }
 
-/// Takes a step (or none) and tells the strip where ILIAS now stands.
+/// Takes a step (or none) and tells the panel where ILIAS now stands.
 fn act_and_tell<R: Runtime>(view: &Webview<R>, step: Option<Step>) -> tauri::Result<()> {
     let app = view.app_handle().clone();
     view.with_webview(move |platform| {
@@ -627,9 +667,16 @@ fn act_and_tell<R: Runtime>(view: &Webview<R>, step: Option<Step>) -> tauri::Res
 }
 
 /// Page-load hook for the ILIAS webview: each finished page may have changed
-/// what back and forward can do.
+/// what back and forward can do, and which course the student is in.
 pub fn on_page_load<R: Runtime>(view: Webview<R>, payload: PageLoadPayload<'_>) {
     if payload.event() == PageLoadEvent::Finished {
+        tell(
+            view.app_handle(),
+            LOCATION_EVENT,
+            Location {
+                ref_id: ref_id_of(payload.url()),
+            },
+        );
         // From a task: this hook runs inside a webview callback, and reaching
         // into the webview again from there would re-enter it.
         tauri::async_runtime::spawn(async move {
@@ -647,7 +694,7 @@ pub async fn travel_ilias(app: tauri::AppHandle, step: Step) -> Result<(), Strin
     act_and_tell(&view, Some(step)).map_err(|error| format!("ILIAS could not go there: {error}"))
 }
 
-/// Where ILIAS stands now — for a strip that has just appeared and missed the
+/// Where ILIAS stands now — for a panel that has just appeared and missed the
 /// last page load. Nothing to go back to while ILIAS is not open.
 #[tauri::command]
 pub async fn ilias_history(app: tauri::AppHandle) -> Result<History, String> {
@@ -670,7 +717,9 @@ pub async fn ilias_history(app: tauri::AppHandle) -> Result<History, String> {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{free_path, is_attachment, is_openable, safe_file_name, Book, State};
+    use tauri::Url;
+
+    use super::{free_path, is_attachment, is_openable, ref_id_of, safe_file_name, Book, State};
 
     #[test]
     fn keeps_an_ordinary_name() {
@@ -815,5 +864,52 @@ mod tests {
             book.finish("https://x/running", true).unwrap().id,
             running.id
         );
+    }
+
+    fn ref_id(address: &str) -> Option<String> {
+        ref_id_of(&Url::parse(address).expect("a test address"))
+    }
+
+    /// What a course looks like once ILIAS has resolved a `goto.php` link.
+    #[test]
+    fn reads_the_object_an_ilias_page_is_about() {
+        assert_eq!(
+            ref_id("https://ilias.hs-heilbronn.de/ilias.php?baseClass=ilrepositorygui&cmd=frameset&ref_id=717").as_deref(),
+            Some("717")
+        );
+        assert_eq!(
+            ref_id("https://ilias.hs-heilbronn.de/goto.php?target=crs_717&client_id=iliashhn")
+                .as_deref(),
+            Some("717")
+        );
+        assert_eq!(
+            ref_id("https://ilias.hs-heilbronn.de/goto.php?target=file_967852_download").as_deref(),
+            Some("967852")
+        );
+    }
+
+    #[test]
+    fn prefers_the_ref_id_over_a_target() {
+        assert_eq!(
+            ref_id("https://ilias.example/ilias.php?target=crs_1&ref_id=2").as_deref(),
+            Some("2")
+        );
+    }
+
+    /// The panel compares it with course ids; nothing else may pass for one.
+    #[test]
+    fn reports_no_object_for_pages_that_are_about_none() {
+        assert_eq!(
+            ref_id("https://ilias.example/ilias.php?baseClass=ilDashboardGUI"),
+            None
+        );
+        assert_eq!(ref_id("https://ilias.example/ilias.php?ref_id=abc"), None);
+        assert_eq!(ref_id("https://ilias.example/ilias.php?ref_id="), None);
+        assert_eq!(
+            ref_id("https://ilias.example/ilias.php?ref_id=1234567890123"),
+            None
+        );
+        assert_eq!(ref_id("https://ilias.example/goto.php?target=crs_x"), None);
+        assert_eq!(ref_id("https://ilias.example/goto.php?target=crs"), None);
     }
 }

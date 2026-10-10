@@ -48,6 +48,8 @@ interface NoteStyleState {
   zoom: number;
   /** The outline / tasks / links / search panel beside a standard page. */
   sidebar: boolean;
+  /** The read-only properties block (last update, location, count) below a standard note. */
+  properties: boolean;
   /** Dims everything but the block being written and steps the chrome back. */
   focus: boolean;
   /** Colours each sentence by its role, like a set of highlighters; never saved into the note. */
@@ -70,6 +72,7 @@ interface NoteStyleState {
   setBoldColor: (boldColor: BoldTextColor) => void;
   setZoom: (zoom: number) => void;
   toggleSidebar: () => void;
+  toggleProperties: () => void;
   toggleFocus: () => void;
   toggleMarkers: () => void;
   setMarkerOnly: (kind: SentenceKind | null) => void;
@@ -95,6 +98,7 @@ export const useNoteStyleStore = create<NoteStyleState>()(
       boldColor: 'default',
       zoom: 1,
       sidebar: true,
+      properties: true,
       focus: false,
       markers: false,
       markerOnly: null,
@@ -113,6 +117,7 @@ export const useNoteStyleStore = create<NoteStyleState>()(
       setBoldColor: (boldColor) => set({ boldColor }),
       setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
       toggleSidebar: () => set((state) => ({ sidebar: !state.sidebar })),
+      toggleProperties: () => set((state) => ({ properties: !state.properties })),
       toggleFocus: () => set((state) => ({ focus: !state.focus })),
       // Turning the Textmarker off or on again starts without a spotlight.
       toggleMarkers: () => set((state) => ({ markers: !state.markers, markerOnly: null })),
@@ -136,7 +141,8 @@ export const useNoteStyleStore = create<NoteStyleState>()(
     {
       name: 'uni-pilot.note-style',
       version: 2,
-      // A spotlight is a look at one note, not a preference.
+      // A spotlight is a look at one note, not a preference. Settings added later, like
+      // `properties`, keep their default for settings saved before them: no migration needed.
       partialize: (state) => ({ ...state, markerOnly: null }),
       migrate: (persisted, version) => {
         let state = persisted as Partial<NoteStyleState>;

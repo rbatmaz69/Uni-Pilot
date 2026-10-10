@@ -1,20 +1,22 @@
 /**
- * What the ILIAS strip shows about the browser underneath it: whether back and
- * forward can go anywhere, and the latest downloads.
+ * What the ILIAS panel shows about the browser beside it: whether back and
+ * forward can go anywhere, the latest downloads, and which course ILIAS is in.
  *
- * Not persisted — both describe this session's ILIAS webview. Listening starts
- * once and lasts as long as the app: a download keeps running when the student
- * leaves the ILIAS page, and its end must still be heard, so it cannot hang on
- * the strip being mounted.
+ * Not persisted — all of it describes this session's ILIAS webview. Listening
+ * starts once and lasts as long as the app: a download keeps running when the
+ * student leaves the ILIAS page, and its end must still be heard, so it cannot
+ * hang on the panel being mounted.
  */
 
 import { create } from 'zustand';
 import {
   listenToIlias,
   NO_HISTORY,
+  NO_LOCATION,
   readIliasHistory,
   type IliasDownload,
   type IliasHistory,
+  type IliasLocation,
 } from '@/features/integrations/lib/iliasBrowser';
 
 /** Enough to see what just happened; older files are in the Downloads folder. */
@@ -22,15 +24,19 @@ const KEEP = 5;
 
 interface IliasBrowserState {
   history: IliasHistory;
+  /** The page ILIAS last finished loading. */
+  location: IliasLocation;
   /** Newest first. */
   downloads: IliasDownload[];
   record: (download: IliasDownload) => void;
   setHistory: (history: IliasHistory) => void;
+  setLocation: (location: IliasLocation) => void;
   dismiss: (id: number) => void;
 }
 
 export const useIliasBrowserStore = create<IliasBrowserState>((set) => ({
   history: NO_HISTORY,
+  location: NO_LOCATION,
   downloads: [],
   record: (download) =>
     set(({ downloads }) => {
@@ -42,6 +48,7 @@ export const useIliasBrowserStore = create<IliasBrowserState>((set) => ({
       return { downloads: [download, ...rest].slice(0, KEEP) };
     }),
   setHistory: (history) => set({ history }),
+  setLocation: (location) => set({ location }),
   dismiss: (id) => set(({ downloads }) => ({ downloads: downloads.filter((d) => d.id !== id) })),
 }));
 
@@ -52,6 +59,7 @@ export function listenToIliasBrowser(): Promise<void> {
   listening ??= listenToIlias({
     onDownload: (download) => useIliasBrowserStore.getState().record(download),
     onHistory: (history) => useIliasBrowserStore.getState().setHistory(history),
+    onLocation: (location) => useIliasBrowserStore.getState().setLocation(location),
   }).then(
     () => undefined,
     (cause: unknown) => {
@@ -63,7 +71,7 @@ export function listenToIliasBrowser(): Promise<void> {
   return listening;
 }
 
-/** Asks where ILIAS stands — for a strip that missed the last page load. */
+/** Asks where ILIAS stands — for a panel that missed the last page load. */
 export async function refreshIliasHistory(): Promise<void> {
   useIliasBrowserStore.getState().setHistory(await readIliasHistory());
 }

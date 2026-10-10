@@ -54,7 +54,7 @@ beforeEach(() => {
   useCourseStore.setState({ failure: { ...SIGNED_OUT }, loading: {} });
   useAutoSignInStore.setState({ byHost: { [HOST]: READY }, autoUnlock: true, faceBar: null });
   useNotchStore.setState({ camera: null, signedInAt: null, available: null });
-  useUiStore.setState({ immersive: false });
+  useUiStore.setState({ iliasMode: false });
 });
 
 afterEach(() => {
@@ -97,7 +97,7 @@ describe('face unlock in the notch', () => {
   });
 
   it('shows nothing in ILIAS mode, while the session holds, or before it is allowed', async () => {
-    useUiStore.setState({ immersive: true });
+    useUiStore.setState({ iliasMode: true });
     renderSync();
     await waitFor(() => expect(hides()).toHaveLength(1));
     expect(shows()).toHaveLength(0);

@@ -34,7 +34,7 @@ function useShown(): NotchShown | null {
   const faceBar = useAutoSignInStore((state) => state.faceBar);
   const camera = useNotchStore((state) => state.camera);
   const signedInAt = useNotchStore((state) => state.signedInAt);
-  const immersive = useUiStore((state) => state.immersive);
+  const iliasMode = useUiStore((state) => state.iliasMode);
 
   return useMemo(() => {
     const shown = (phase: NotchPhase, text: string, extra: Partial<NotchShown> = {}) => ({
@@ -47,7 +47,7 @@ function useShown(): NotchShown | null {
     if (faceBar?.state === 'signingIn') return shown('signingIn', 'Recognised. Signing in…');
     if (signedInAt !== null) return shown('signedIn', 'Signed in to ILIAS.');
     // In ILIAS mode the bar, and with it the camera, is gone: so is the island.
-    if (immersive || !showing) return null;
+    if (iliasMode || !showing) return null;
     if (bar?.state === 'stopped') {
       return shown('stopped', bar.text ?? 'Face unlock stopped.', { again: Boolean(bar.again) });
     }
@@ -58,7 +58,7 @@ function useShown(): NotchShown | null {
       return shown('looking', 'Look at the camera to sign in to ILIAS again.', { camera: true });
     }
     return shown('starting', 'ILIAS signed you out. Getting the camera ready…');
-  }, [bar, camera, faceBar?.state, immersive, showing, signedInAt]);
+  }, [bar, camera, faceBar?.state, iliasMode, showing, signedInAt]);
 }
 
 /**

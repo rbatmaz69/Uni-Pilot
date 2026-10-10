@@ -12,7 +12,7 @@ import {
 
 export type { SidebarFavorite } from '@/lib/sidebar';
 
-/** The favorites list folds like a section, under this id. */
+/** Names the favorites list: its drag type and its heading for screen readers. */
 export const FAVORITES_SECTION = 'favorites';
 
 interface SidebarState {
@@ -20,7 +20,6 @@ interface SidebarState {
   /** Section id → nav paths in the student's order. Sections they never reordered are absent. */
   order: Record<string, string[]>;
   hidden: string[];
-  collapsedSections: string[];
   /** A document being dragged anywhere in the app, so the sidebar can offer itself. */
   documentDrag: SidebarFavorite | null;
   /** Set by pointer-driven drags, which the sidebar cannot hit-test itself. */
@@ -36,7 +35,6 @@ interface SidebarState {
   forgetFavorites: (path: string) => void;
   moveNavItem: (sectionId: string, path: string, before: string | null) => void;
   setNavItemHidden: (path: string, hidden: boolean) => void;
-  toggleSection: (id: string) => void;
   /** Restores the configured order and visibility. Favorites stay. */
   resetLayout: () => void;
   setDocumentDrag: (favorite: SidebarFavorite | null, over?: boolean) => void;
@@ -49,7 +47,6 @@ export const useSidebarStore = create<SidebarState>()(
       favorites: [],
       order: {},
       hidden: [],
-      collapsedSections: [],
       documentDrag: null,
       documentDragOver: false,
       activeDocument: null,
@@ -109,13 +106,7 @@ export const useSidebarStore = create<SidebarState>()(
             ? [...new Set([...state.hidden, path])]
             : state.hidden.filter((item) => item !== path),
         })),
-      toggleSection: (id) =>
-        set((state) => ({
-          collapsedSections: state.collapsedSections.includes(id)
-            ? state.collapsedSections.filter((item) => item !== id)
-            : [...state.collapsedSections, id],
-        })),
-      resetLayout: () => set({ order: {}, hidden: [], collapsedSections: [] }),
+      resetLayout: () => set({ order: {}, hidden: [] }),
       setDocumentDrag: (favorite, over = false) =>
         set((state) =>
           state.documentDrag?.path === favorite?.path && state.documentDragOver === over
@@ -126,12 +117,7 @@ export const useSidebarStore = create<SidebarState>()(
     }),
     {
       name: 'uni-pilot.sidebar',
-      partialize: ({ favorites, order, hidden, collapsedSections }) => ({
-        favorites,
-        order,
-        hidden,
-        collapsedSections,
-      }),
+      partialize: ({ favorites, order, hidden }) => ({ favorites, order, hidden }),
     },
   ),
 );

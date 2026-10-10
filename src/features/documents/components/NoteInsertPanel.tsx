@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Editor, JSONContent } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import {
+  FileText,
   Image,
   ListCollapse,
   Minus,
@@ -88,6 +89,7 @@ export function NoteInsertPanel({
   disabled,
   tab,
   onImage,
+  onPdf,
   onCanvas,
   onClose,
 }: {
@@ -95,6 +97,7 @@ export function NoteInsertPanel({
   disabled: boolean;
   tab: InsertTab;
   onImage: () => void;
+  onPdf?: (() => void) | undefined;
   onCanvas: () => void;
   onClose: () => void;
 }) {
@@ -122,6 +125,13 @@ export function NoteInsertPanel({
         Icon: Image,
         keywords: 'picture',
         run: onImage,
+      },
+      {
+        label: 'PDF',
+        detail: 'Embed or file card',
+        Icon: FileText,
+        keywords: 'document attachment file upload',
+        run: onPdf ?? (() => undefined),
       },
       {
         label: 'Formula',

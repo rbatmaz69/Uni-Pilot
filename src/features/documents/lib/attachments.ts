@@ -19,18 +19,22 @@ export function isImageFile(file: { name: string; type: string }) {
   return imageExtension(file) !== null;
 }
 
+export function isPdfFile(file: { name: string; type: string }): boolean {
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+}
+
 function stamp(date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
 /**
- * A file name for an image pasted into a note. It only uses characters that
+ * A file name for an image or PDF attached to a note. It only uses characters that
  * need no escaping in a Markdown link, so the note stays readable in any app.
  * Clipboard images are all called "image.png" and get a timestamp instead.
  */
 export function attachmentName(file: { name: string; type: string }, now = new Date()): string {
-  const extension = imageExtension(file) ?? 'png';
+  const extension = isPdfFile(file) ? 'pdf' : (imageExtension(file) ?? 'png');
   const stem = file.name
     .replace(/\.[^.]+$/, '')
     .toLowerCase()
@@ -41,7 +45,7 @@ export function attachmentName(file: { name: string; type: string }, now = new D
     .replace(/^-+|-+$/g, '')
     .slice(0, 48)
     .replace(/-+$/, '');
-  return `${!stem || stem === 'image' ? `image-${stamp(now)}` : stem}.${extension}`;
+  return `${!stem || stem === 'image' ? `${extension === 'pdf' ? 'pdf' : 'image'}-${stamp(now)}` : stem}.${extension}`;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { NotePdf } from './notePdf';
 import { NotePdfPage, NoteStudyPage } from '@/features/documents/lib/studyPages';
 import { generateHTML, type AnyExtension, type JSONContent } from '@tiptap/core';
 import { NoteHighlight, NoteTextColor } from '@/features/documents/lib/noteColors';
@@ -132,8 +133,8 @@ function characterAfter(node: JSONContent, parentNode?: JSONContent): string {
 function escapeLineStart(line: string, first: boolean): string {
   const indent = /^ {0,3}/.exec(line)?.[0] ?? '';
   const rest = line.slice(indent.length);
-  if (/^:{3,}(?:note(?:Card|Layout)|pdfPage|studyPage)(?:[ \t]|$)/.test(rest))
-    return `${indent}${rest.replace(/:(?=(?:note(?:Card|Layout)|pdfPage|studyPage))/, '\\:')}`;
+  if (/^:{3,}(?:note(?:Card|Layout)|notePdf|pdfPage|studyPage)(?:[ \t]|$)/.test(rest))
+    return `${indent}${rest.replace(/:(?=(?:note(?:Card|Layout)|notePdf|pdfPage|studyPage))/, '\\:')}`;
   // Text writes `\[`, so this is a footnote reference that starts the line; a
   // colon after it would turn the paragraph into the footnote's definition.
   const reference = /^\[\^[^\]\s^]+\]:/.exec(rest);
@@ -352,6 +353,7 @@ interface NoteExtensionOptions {
   /** Replaces the plain image node, e.g. with one that resolves attachments. */
   image?: AnyExtension;
   placeholder?: string;
+  pdf?: AnyExtension;
   pdfPage?: AnyExtension;
   studyPage?: AnyExtension;
   card?: AnyExtension;
@@ -375,6 +377,7 @@ export function noteExtensions({
   codeBlock,
   inlineMath,
   blockMath,
+  pdf,
   pdfPage,
   studyPage,
 }: NoteExtensionOptions = {}): AnyExtension[] {
@@ -392,6 +395,7 @@ export function noteExtensions({
     StyledTableCell,
     StyledTableHeader,
     image ?? Image.configure({ allowBase64: true }),
+    pdf ?? NotePdf,
     pdfPage ?? NotePdfPage,
     studyPage ?? NoteStudyPage,
     card ?? NoteCard,

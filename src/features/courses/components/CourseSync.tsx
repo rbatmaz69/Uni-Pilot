@@ -90,7 +90,7 @@ export function CourseSync() {
     });
 
     const stopLeaving = useUiStore.subscribe((state, before) => {
-      if (state.immersive || !before.immersive) return;
+      if (state.iliasMode || !before.iliasMode) return;
       const connection = useIliasStore.getState().connection;
       const { failure, loadCourses } = useCourseStore.getState();
       if (connection && failure?.kind === 'session-expired') void loadCourses(connection);

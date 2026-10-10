@@ -46,10 +46,10 @@ describe('keeping the ILIAS sign-in alive', () => {
       failure: { kind: 'session-expired', message: 'Sign in to ILIAS again.' },
     });
     render(<CourseSync />);
-    act(() => useUiStore.getState().setImmersive(true));
+    act(() => useUiStore.getState().setIliasMode(true));
     expect(courseReads()).toHaveLength(0);
 
-    act(() => useUiStore.getState().setImmersive(false));
+    act(() => useUiStore.getState().setIliasMode(false));
     expect(useCourseStore.getState().loading['courses']).toBe(true);
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(courseReads()).toHaveLength(1);
@@ -59,8 +59,8 @@ describe('keeping the ILIAS sign-in alive', () => {
   it('does not ask on leaving ILIAS mode while the sign-in holds', async () => {
     render(<CourseSync />);
     await act(() => vi.advanceTimersByTimeAsync(0));
-    act(() => useUiStore.getState().setImmersive(true));
-    act(() => useUiStore.getState().setImmersive(false));
+    act(() => useUiStore.getState().setIliasMode(true));
+    act(() => useUiStore.getState().setIliasMode(false));
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(courseReads()).toHaveLength(1);
   });

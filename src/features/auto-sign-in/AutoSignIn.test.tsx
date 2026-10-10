@@ -79,7 +79,7 @@ function section() {
 describe('signing in automatically, in Settings', () => {
   it('sets it up, shows the code HHN asks for, and never shows the password again', async () => {
     const user = userEvent.setup();
-    renderApp('/settings');
+    renderApp('/settings?section=sign-in');
 
     expect(await within(section()).findByText('Not set up.')).toBeInTheDocument();
     expect(called('auto_sign_in_status')).toEqual([
@@ -129,7 +129,7 @@ describe('signing in automatically, in Settings', () => {
   it('tests the sign-in, and stops offering it once HHN refuses the password', async () => {
     useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
     const user = userEvent.setup();
-    renderApp('/settings');
+    renderApp('/settings?section=sign-in');
 
     await user.click(within(section()).getByRole('button', { name: 'Test sign-in' }));
     expect(await within(section()).findByRole('status')).toHaveTextContent('Signed in to ILIAS.');
@@ -149,7 +149,7 @@ describe('signing in automatically, in Settings', () => {
 
   it('offers face unlock once a sign-in is stored, and says when it is set up', () => {
     useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
-    const { unmount } = renderApp('/settings');
+    const { unmount } = renderApp('/settings?section=sign-in');
     expect(
       within(section()).getByRole('button', { name: 'Set up face unlock' }),
     ).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('signing in automatically, in Settings', () => {
     useAutoSignInStore.setState({
       byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP, face: true } },
     });
-    renderApp('/settings');
+    renderApp('/settings?section=sign-in');
     expect(within(section()).getByText(/a look into the camera will do/)).toBeInTheDocument();
     expect(
       within(section()).getByRole('button', { name: 'Set up face unlock again' }),
@@ -169,7 +169,7 @@ describe('signing in automatically, in Settings', () => {
   it('lets the camera turn on by itself only once allowed, and only with a face', async () => {
     useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
     const user = userEvent.setup();
-    const { unmount } = renderApp('/settings');
+    const { unmount } = renderApp('/settings?section=sign-in');
     const off = within(section()).getByRole('switch', {
       name: 'Unlock as soon as ILIAS signs you out',
     });
@@ -180,7 +180,7 @@ describe('signing in automatically, in Settings', () => {
     useAutoSignInStore.setState({
       byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP, face: true } },
     });
-    renderApp('/settings');
+    renderApp('/settings?section=sign-in');
     const toggle = within(section()).getByRole('switch', {
       name: 'Unlock as soon as ILIAS signs you out',
     });
@@ -193,7 +193,7 @@ describe('signing in automatically, in Settings', () => {
   it('forgets the sign-in', async () => {
     useAutoSignInStore.setState({ byHost: { 'ilias.hs-heilbronn.de': { ...SET_UP } } });
     const user = userEvent.setup();
-    renderApp('/settings');
+    renderApp('/settings?section=sign-in');
 
     await user.click(within(section()).getByRole('button', { name: 'Forget' }));
     expect(called('auto_sign_in_forget')).toEqual([
@@ -206,7 +206,7 @@ describe('signing in automatically, in Settings', () => {
 
   it('asks to connect ILIAS first', () => {
     useIliasStore.setState({ connection: null });
-    renderApp('/settings');
+    renderApp('/settings?section=sign-in');
     expect(within(section()).getByRole('link', { name: 'Connect ILIAS' })).toBeInTheDocument();
     expect(within(section()).queryByRole('button', { name: 'Set up' })).not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith('auto_sign_in_status', expect.anything());

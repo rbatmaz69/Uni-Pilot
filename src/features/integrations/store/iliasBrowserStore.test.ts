@@ -65,11 +65,15 @@ describe('recording downloads', () => {
 });
 
 describe('listening to Rust', () => {
-  /** The strip mounts on every visit; the listener must not multiply. */
+  /** The panel mounts on every visit; the listener must not multiply. */
   it('starts listening only once', async () => {
     await listenToIliasBrowser();
     await listenToIliasBrowser();
-    expect(listen.mock.calls.map(([name]) => name)).toEqual(['ilias-download', 'ilias-history']);
+    expect(listen.mock.calls.map(([name]) => name)).toEqual([
+      'ilias-download',
+      'ilias-history',
+      'ilias-location',
+    ]);
   });
 
   it('tries again next time when listening failed', async () => {
@@ -77,7 +81,20 @@ describe('listening to Rust', () => {
     await expect(listenToIliasBrowser()).rejects.toThrowError('not ready');
 
     await listenToIliasBrowser();
-    expect(listen).toHaveBeenCalledTimes(4);
+    expect(listen).toHaveBeenCalledTimes(6);
+  });
+
+  it('follows which course ILIAS is in', async () => {
+    await listenToIliasBrowser();
+    const handler = listen.mock.calls.find(([name]) => name === 'ilias-location')?.[1] as (event: {
+      payload: unknown;
+    }) => void;
+
+    handler({ payload: { refId: '717' } });
+    expect(useIliasBrowserStore.getState().location).toEqual({ refId: '717' });
+
+    handler({ payload: { refId: null } });
+    expect(useIliasBrowserStore.getState().location).toEqual({ refId: null });
   });
 
   it('reads where ILIAS stands', async () => {

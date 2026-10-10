@@ -81,7 +81,15 @@ export {
   leaveIliasMode,
   navigateIlias,
   overlayIsOpen,
+  setIliasLayout,
 } from './lib/iliasView';
+export {
+  FALLBACK_COLUMN,
+  measureColumn,
+  parseCssColour,
+  type FrameColour,
+  type IliasMetrics,
+} from './lib/iliasFrame';
 export {
   configureCourseFolder,
   listCourseFolders,
@@ -106,7 +114,7 @@ export {
 } from './lib/iliasSync';
 export { useIliasStore } from './store/iliasStore';
 export { IliasBadge } from './components/IliasBadge';
-export { IliasStrip } from './components/IliasStrip';
+export { IliasPanel } from './components/IliasPanel';
 export { IliasWorkspace } from './components/IliasWorkspace';
 export { OpenInIliasButton } from './components/OpenInIliasButton';
 

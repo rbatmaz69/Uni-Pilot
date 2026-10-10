@@ -27,6 +27,7 @@ pub fn run() {
             preview_cache::preview_cache_write,
             ilias_window::open_ilias,
             ilias_view::enter_ilias_mode,
+            ilias_view::set_ilias_layout,
             ilias_view::leave_ilias_mode,
             ilias_view::navigate_ilias,
             ilias_view::close_ilias_view,
@@ -86,8 +87,8 @@ pub fn run() {
     let builder = builder.manage(reminders::Runtime::default());
     builder
         .on_window_event(|window, event| {
-            // In ILIAS mode the page is only the strip and cannot see the
-            // window, so the layout follows the window from here.
+            // In ILIAS mode the page is only the left column and cannot see
+            // the window, so the layout follows the window from here.
             if window.label() == "main"
                 && matches!(
                     event,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachmentName, isImageFile, resolveNoteLink } from './attachments';
+import { attachmentName, isImageFile, isPdfFile, resolveNoteLink } from './attachments';
 
 const at = new Date(2026, 8, 22, 9, 5, 7);
 
@@ -54,5 +54,22 @@ describe('resolveNoteLink', () => {
       '',
     ])
       expect(resolveNoteLink('Notes.md', src)).toBeNull();
+  });
+});
+
+describe('PDF attachments', () => {
+  it('recognizes PDFs and preserves their extension in safe attachment names', () => {
+    expect(isPdfFile({ name: 'Lecture.PDF', type: '' })).toBe(true);
+    expect(isPdfFile({ name: 'download', type: 'application/pdf' })).toBe(true);
+    expect(isPdfFile({ name: 'photo.png', type: 'image/png' })).toBe(false);
+    expect(attachmentName({ name: 'Übung Größen (1).PDF', type: '' }, at)).toBe(
+      'uebung-groessen-1.pdf',
+    );
+    expect(attachmentName({ name: '', type: 'application/pdf' }, at)).toBe(
+      'pdf-20260922-090507.pdf',
+    );
+    expect(resolveNoteLink('Course/Notes.md', 'attachments/uebung.pdf')).toBe(
+      'Course/attachments/uebung.pdf',
+    );
   });
 });

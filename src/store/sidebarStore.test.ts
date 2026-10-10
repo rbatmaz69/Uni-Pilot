@@ -65,7 +65,6 @@ describe('sidebar favorites', () => {
       favorites: [biology],
       order: {},
       hidden: [],
-      collapsedSections: [],
     });
   });
 });
@@ -86,18 +85,21 @@ describe('sidebar layout', () => {
     expect(store().order).toEqual({});
   });
 
-  it('hides, shows and folds, and restores defaults without losing favorites', () => {
+  it('hides and shows entries, and restores defaults without losing favorites', () => {
     store().addFavorite(biology);
+    store().moveNavItem('planning', NAV_ITEMS.focus.path, NAV_ITEMS.calendar.path);
     store().setNavItemHidden(NAV_ITEMS.grades.path, true);
     store().setNavItemHidden(NAV_ITEMS.grades.path, true);
-    store().toggleSection('academics');
     expect(store().hidden).toEqual([NAV_ITEMS.grades.path]);
-    expect(store().collapsedSections).toEqual(['academics']);
 
+    store().setNavItemHidden(NAV_ITEMS.grades.path, false);
+    expect(store().hidden).toEqual([]);
+
+    store().setNavItemHidden(NAV_ITEMS.exams.path, true);
     store().resetLayout();
 
     expect(store().hidden).toEqual([]);
-    expect(store().collapsedSections).toEqual([]);
+    expect(store().order).toEqual({});
     expect(store().favorites).toEqual([biology]);
   });
 });

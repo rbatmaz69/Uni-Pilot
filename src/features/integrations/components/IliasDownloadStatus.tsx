@@ -47,9 +47,12 @@ interface IliasDownloadStatusProps {
 }
 
 /**
- * The latest ILIAS download, in the strip: running, saved or failed — so a
- * click on a file is never met with silence. A saved file can be opened
- * (documents and media only; Rust decides) or shown in its folder.
+ * The latest ILIAS download, in the ILIAS panel's footer: running, saved or
+ * failed — so a click on a file is never met with silence. A saved file can be
+ * opened (documents and media only; Rust decides) or shown in its folder.
+ *
+ * The panel is narrow, so the file's name wraps over two lines and the buttons
+ * sit under it.
  */
 export function IliasDownloadStatus({ onError }: IliasDownloadStatusProps) {
   const latest = useIliasBrowserStore((state) => state.downloads[0]);
@@ -60,41 +63,48 @@ export function IliasDownloadStatus({ onError }: IliasDownloadStatusProps) {
 
   return (
     <div
-      className={cn(
-        'flex min-w-0 max-w-[22rem] shrink items-center gap-1 rounded-md py-0.5 pr-0.5 pl-2',
-        TONE[latest.state],
-      )}
+      className={cn('mb-1 flex flex-col gap-0.5 rounded-md py-1.5 pr-1 pl-2', TONE[latest.state])}
     >
-      <StateIcon state={latest.state} />
-      <span role="status" title={text} className="min-w-0 truncate text-[12px]">
-        {text}
-      </span>
-      {latest.state === 'finished' && latest.openable ? (
-        <IconButton
-          label={`Open ${latest.fileName}`}
-          size="sm"
-          onClick={() => {
-            openIliasDownload(latest.id).catch(onError);
-          }}
+      <div className="flex items-start gap-1.5">
+        <span className="mt-[3px] flex-none">
+          <StateIcon state={latest.state} />
+        </span>
+        <span
+          role="status"
+          title={text}
+          className="line-clamp-2 min-w-0 flex-1 break-words text-[12px] leading-snug"
         >
-          <SquareArrowOutUpRight size={13} />
-        </IconButton>
-      ) : null}
-      {latest.state === 'finished' ? (
-        <IconButton
-          label={`Show ${latest.fileName} in its folder`}
-          size="sm"
-          onClick={() => {
-            revealIliasDownload(latest.id).catch(onError);
-          }}
-        >
-          <FolderOpen size={13} />
-        </IconButton>
-      ) : null}
+          {text}
+        </span>
+      </div>
       {latest.state === 'started' ? null : (
-        <IconButton label="Dismiss" size="sm" onClick={() => dismiss(latest.id)}>
-          <X size={13} />
-        </IconButton>
+        <div className="flex items-center justify-end gap-0.5">
+          {latest.state === 'finished' && latest.openable ? (
+            <IconButton
+              label={`Open ${latest.fileName}`}
+              size="sm"
+              onClick={() => {
+                openIliasDownload(latest.id).catch(onError);
+              }}
+            >
+              <SquareArrowOutUpRight size={13} />
+            </IconButton>
+          ) : null}
+          {latest.state === 'finished' ? (
+            <IconButton
+              label={`Show ${latest.fileName} in its folder`}
+              size="sm"
+              onClick={() => {
+                revealIliasDownload(latest.id).catch(onError);
+              }}
+            >
+              <FolderOpen size={13} />
+            </IconButton>
+          ) : null}
+          <IconButton label="Dismiss" size="sm" onClick={() => dismiss(latest.id)}>
+            <X size={13} />
+          </IconButton>
+        </div>
       )}
     </div>
   );

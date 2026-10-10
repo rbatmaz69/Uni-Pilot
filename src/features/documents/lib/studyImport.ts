@@ -9,6 +9,7 @@ import {
 } from '@/features/documents/lib/files';
 import { imagesPdf, uniqueOutputName } from '@/features/documents/lib/documentTools';
 import { noteExtensions, composeNote } from '@/features/documents/lib/markdown';
+import { documentsHref } from '@/lib/sidebar';
 
 export function studyDocument(entry: DocumentEntry) {
   return (
@@ -122,5 +123,5 @@ export async function openStudyDocument(
 }
 
 export function studyEditorLink(path: string): string {
-  return `/documents?${new URLSearchParams({ path: path.split('/').slice(0, -1).join('/'), file: path })}`;
+  return documentsHref(path, true);
 }
