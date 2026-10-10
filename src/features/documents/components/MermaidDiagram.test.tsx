@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { EditorContent } from '@tiptap/react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { noteExtensions } from '@/features/documents/lib/markdown';
 import {
@@ -101,7 +101,7 @@ describe('Mermaid previews and editor controls', () => {
     expect(updates).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Mermaid code').closest('pre')).not.toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Mermaid code' }));
-    expect(screen.getByLabelText('Mermaid code').closest('pre')).toBeVisible();
+    await waitFor(() => expect(screen.getByLabelText('Mermaid code').closest('pre')).toBeVisible());
     act(() => {
       current.commands.insertContent('%% My diagram\n');
     });

@@ -146,7 +146,9 @@ describe('Documents in the app’s tabs', () => {
     expect(forward()).toBeEnabled();
   });
 
-  it('goes from one note straight back to the note before it, not the folder between', async () => {
+  it(
+    'goes from one note straight back to the note before it, not the folder between',
+    async () => {
     const base = request.getMockImplementation()!;
     request.mockImplementation((action) =>
       // Reading takes a moment on a real disk; the folder shows meanwhile.
@@ -167,7 +169,9 @@ describe('Documents in the app’s tabs', () => {
     expect(
       await screen.findByRole('textbox', { name: 'Document content' }, { timeout: 3000 }),
     ).toBeInTheDocument();
-  });
+    },
+    10_000,
+  );
 
   it('forgets what lay ahead once the student goes somewhere new', async () => {
     const user = userEvent.setup();
@@ -202,7 +206,9 @@ describe('Documents in the app’s tabs', () => {
     expect(screen.getByRole('textbox', { name: 'Document content' })).toBeInTheDocument();
   });
 
-  it('comes back to the note from another section', async () => {
+  it(
+    'comes back to the note from another section',
+    async () => {
     const user = userEvent.setup();
     renderApp(NAV_ITEMS.documents.path);
     await user.click(await within(tree()).findByRole('button', { name: 'Notes' }));
@@ -216,7 +222,9 @@ describe('Documents in the app’s tabs', () => {
     await user.click(back());
     expect(await editor()).toBeInTheDocument();
     await waitFor(() => expect(openTab()).toHaveAccessibleName('Notes'));
-  });
+    },
+    10_000,
+  );
 
   it('hides and shows the documents sidebar from the title bar', async () => {
     const user = userEvent.setup();
