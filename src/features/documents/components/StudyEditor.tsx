@@ -2,6 +2,7 @@ import { EditablePdfPage, EditableStudyPage } from '@/features/documents/compone
 import { StudyAnnotationToolbar } from '@/features/documents/components/StudyAnnotationToolbar';
 import { StudyDocumentControls } from '@/features/documents/components/StudyDocumentControls';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useId,
@@ -13,13 +14,11 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
-import { TextSelection } from '@tiptap/pm/state';
-import type { EditorView } from '@tiptap/pm/view';
 import { Focus } from '@tiptap/extensions';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { ChevronLeft, FileWarning, NotebookPen, PanelLeft, PenLine, X } from 'lucide-react';
 import { Button, IconButton, Modal } from '@/components/ui';
-import { attachmentName, isImageFile } from '@/features/documents/lib/attachments';
+import { isPdfFile, isImageFile } from '@/features/documents/lib/attachments';
 import {
   createAutosaver,
   type Autosaver,
@@ -28,8 +27,6 @@ import {
 } from '@/features/documents/lib/autosave';
 import {
   documentRequest,
-  MAX_UPLOAD_BYTES,
-  uploadDocument,
   type DirectoryListing,
   type DocumentEntry,
 } from '@/features/documents/lib/files';
@@ -39,7 +36,7 @@ import {
   noteExtensions,
   splitFrontMatter,
 } from '@/features/documents/lib/markdown';
-import { countWords, noteStats, readingMinutes } from '@/features/documents/lib/noteOutline';
+import { noteStats, plainStats } from '@/features/documents/lib/noteOutline';
 import { NoteBlockKeys } from '@/features/documents/lib/blockActions';
 import { NoteSearch } from '@/features/documents/lib/noteSearch';
 import { NotePageBreaks, setPageBreaks } from '@/features/documents/lib/pageBreaks';
@@ -48,6 +45,7 @@ import { sheetStackStyle, stackHeight, stepZoom } from '@/features/documents/lib
 import { setTextMarker, TextMarker } from '@/features/documents/lib/textMarker';
 import {
   registerImagePicker,
+  registerPdfPicker,
   SlashCommandExtension,
   type SlashMenuState,
 } from '@/features/documents/lib/slashCommand';
@@ -59,14 +57,17 @@ import { useSidebarStore } from '@/store/sidebarStore';
 import { cn } from '@/lib/utils';
 import { BlockHandle } from './BlockHandle';
 import { DrawingBoard, type DrawingHandle } from './DrawingBoard';
-import { EditorDock } from './EditorDock';
 import { NoteImage } from './NoteImage';
+import { EditableNotePdf } from './NotePdf';
+import { attachmentTarget, insertAttachments } from '@/features/documents/lib/noteAttachments';
 import { EditableNoteCodeBlock } from './NoteCodeBlock';
 import { EditableNoteBlockMath, EditableNoteInlineMath } from './NoteMath';
+import { NoteProperties } from './NoteProperties';
 import { NoteSidebar } from './NoteSidebar';
 import { NoteToolbar } from './NoteToolbar';
 import { EditableNoteCard, EditableNoteLayout } from './NoteVisual';
 import { NoteTitle } from './NoteTitle';
+import { NoteTools } from './NoteTools';
 import { NotebookView } from './NotebookView';
 import { PageSheets } from './PageSheets';
 import { PageZoom } from './PageZoom';
@@ -87,7 +88,7 @@ type StudyEditorProps = {
 type Notice = { tone: 'error' | 'info'; text: string };
 type Mode = 'text' | 'drawing';
 
-function imageFiles(transfer: DataTransfer | null): File[] {
+function attachmentFiles(transfer: DataTransfer | null): File[] {
   const files = Array.from(transfer?.files ?? []);
   const candidates = files.length
     ? files
@@ -95,65 +96,7 @@ function imageFiles(transfer: DataTransfer | null): File[] {
         .filter((item) => item.kind === 'file')
         .map((item) => item.getAsFile())
         .filter((file): file is File => file !== null);
-  return candidates.filter(isImageFile);
-}
-
-/**
- * Copies images into the note's `attachments` folder and links them where
- * they were pasted or dropped. Inlining them as base64 would bloat the note
- * past the 2 MB editor limit with a single screenshot.
- */
-async function insertImages(
-  view: EditorView,
-  files: File[],
-  notePath: string,
-  report: (notice: Notice) => void,
-  position?: number,
-) {
-  let at = position;
-  for (const file of files) {
-    if (file.size > MAX_UPLOAD_BYTES) {
-      report({ tone: 'error', text: `“${file.name}” is larger than 25 MB and was not added.` });
-      continue;
-    }
-    try {
-      const { src } = await uploadDocument<{ src: string }>(
-        { kind: 'attachment', note: notePath, name: attachmentName(file) },
-        new Uint8Array(await file.arrayBuffer()),
-      );
-      if (view.isDestroyed) return;
-      const image = view.state.schema.nodes.image?.create({
-        src,
-        alt: file.name.replace(/\.[^.]+$/, ''),
-      });
-      if (!image) return;
-      const { state } = view;
-      const transaction =
-        at === undefined
-          ? state.tr
-          : state.tr.setSelection(
-              TextSelection.near(state.doc.resolve(Math.min(at, state.doc.content.size))),
-            );
-      view.dispatch(transaction.replaceSelectionWith(image).scrollIntoView());
-      // Further images follow the one just placed.
-      at = undefined;
-    } catch (cause) {
-      report({ tone: 'error', text: `“${file.name}” could not be added. ${String(cause)}` });
-    }
-  }
-}
-
-function plainStats(text: string) {
-  const words = countWords(text);
-  return {
-    words,
-    characters: text.replace(/\s/g, '').length,
-    headings: 0,
-    images: 0,
-    tasks: 0,
-    openTasks: 0,
-    readingMinutes: readingMinutes(words),
-  };
+  return candidates.filter((file) => isImageFile(file) || isPdfFile(file));
 }
 
 export function StudyEditor({
@@ -177,6 +120,9 @@ export function StudyEditor({
   const notebook = settings.style === 'notebook' && !study;
   const [drawingOpened, setDrawingOpened] = useState(false);
   const [status, setStatus] = useState<AutosaveState>({ kind: 'saved' });
+  // When this session last wrote the note, for the properties below it.
+  const [saved, setSaved] = useState<{ path: string; at: number } | null>(null);
+  const lastKind = useRef<AutosaveState['kind']>('saved');
   const [notice, setNotice] = useState<Notice | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -186,6 +132,8 @@ export function StudyEditor({
   const [plainText, setPlainText] = useState(initialContent);
   const [slash, setSlash] = useState<SlashMenuState | null>(null);
   const [searchRequest, setSearchRequest] = useState(0);
+  // The note's popovers open over the whole workspace, below its top bar.
+  const [workspace, setWorkspace] = useState<HTMLElement | null>(null);
   // The page's scroll container: the sidebar follows it and the menus reposition with it.
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
   // The sheet stack and the text layer that flows across its sheets.
@@ -197,11 +145,14 @@ export function StudyEditor({
   const autosaver = useRef<Autosaver | null>(null);
   const drawing = useRef<DrawingHandle>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const pdfInput = useRef<HTMLInputElement>(null);
+  const pickerTarget = useRef<ReturnType<typeof attachmentTarget> | null>(null);
 
   const extensions = useMemo(
     () => [
       ...noteExtensions({
         image: NoteImage.configure({ allowBase64: true, notePath: path }),
+        pdf: EditableNotePdf.configure({ notePath: path }),
         placeholder: 'Write, or type / for blocks…',
         pdfPage: EditablePdfPage.configure({ notePath: path }),
         studyPage: EditableStudyPage,
@@ -231,17 +182,23 @@ export function StudyEditor({
     editorProps: {
       attributes: { role: 'textbox', 'aria-label': 'Document content', 'aria-multiline': 'true' },
       handlePaste: (view, event) => {
-        const files = imageFiles(event.clipboardData);
+        const files = attachmentFiles(event.clipboardData);
         if (!files.length || !view.editable) return false;
-        void insertImages(view, files, path, setNotice);
+        void insertAttachments(editor!, files, path, setNotice);
         return true;
       },
       handleDrop: (view, event, _slice, moved) => {
-        const files = moved || !view.editable ? [] : imageFiles(event.dataTransfer);
+        const files = moved || !view.editable ? [] : attachmentFiles(event.dataTransfer);
         if (!files.length) return false;
         event.preventDefault();
         const position = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
-        void insertImages(view, files, path, setNotice, position);
+        void insertAttachments(
+          editor!,
+          files,
+          path,
+          setNotice,
+          attachmentTarget(editor!, position),
+        );
         return true;
       },
     },
@@ -268,11 +225,44 @@ export function StudyEditor({
     source?.setEditable(!readOnly && !renaming, false);
   }, [readOnly, renaming, source]);
 
-  // The / menu's Image command opens the same picker as pasting would use.
+  const pickAttachment = useCallback(
+    (kind: 'image' | 'pdf') => {
+      if (!source?.isEditable) return;
+      pickerTarget.current?.dispose();
+      pickerTarget.current = attachmentTarget(source);
+      (kind === 'pdf' ? pdfInput : imageInput).current?.click();
+    },
+    [source],
+  );
+  const pickedAttachment = (files: File[]) => {
+    const target = pickerTarget.current;
+    pickerTarget.current = null;
+    if (!source?.isEditable || !files.length) {
+      target?.dispose();
+      return;
+    }
+    void insertAttachments(source, files, path, setNotice, target ?? attachmentTarget(source));
+  };
+
+  // Slash commands and the insert panel share the same native pickers.
   useEffect(() => {
     if (!source) return;
-    return registerImagePicker(source, () => imageInput.current?.click());
-  }, [source]);
+    const cancel = () => {
+      pickerTarget.current?.dispose();
+      pickerTarget.current = null;
+    };
+    const inputs = [imageInput.current, pdfInput.current];
+    inputs.forEach((input) => input?.addEventListener('cancel', cancel));
+    const image = registerImagePicker(source, () => pickAttachment('image'));
+    const pdf = registerPdfPicker(source, () => pickAttachment('pdf'));
+    return () => {
+      image();
+      pdf();
+      inputs.forEach((input) => input?.removeEventListener('cancel', cancel));
+      pickerTarget.current?.dispose();
+      pickerTarget.current = null;
+    };
+  }, [source, pickAttachment]);
 
   useEffect(() => {
     if (!source?.isEditable) return;
@@ -295,9 +285,16 @@ export function StudyEditor({
       read,
       write: (content, expected) =>
         documentRequest<SaveOutcome>({ action: 'save', path, content, expected }),
-      onState: setStatus,
+      onState: (state) => {
+        setStatus(state);
+        // Only a save that just finished counts, not the opening state or a file adopted from disk.
+        if (state.kind === 'saved' && lastKind.current === 'saving')
+          setSaved({ path, at: Date.now() });
+        lastKind.current = state.kind;
+      },
     });
     autosaver.current = saver;
+    lastKind.current = 'saved';
     const flush = () => void saver.flush();
     const flushWhenHidden = () => {
       if (document.visibilityState === 'hidden') flush();
@@ -476,18 +473,23 @@ export function StudyEditor({
       settings.toggleMarkers();
     } else if (mod && !event.shiftKey && key === 'f' && source && !notebook && mode === 'text') {
       event.preventDefault();
-      if (!settings.sidebar) settings.toggleSidebar();
-      setSearchRequest((count) => count + 1);
+      openSearch();
     } else if (event.altKey && event.key === 'F10') {
       // The WAI-ARIA shortcut from text to its formatting toolbar.
       const tool =
         document.querySelector<HTMLElement>('.note-bubble [role="toolbar"] [tabindex="0"]') ??
-        document.querySelector<HTMLElement>('.editor-dock [data-panel="text"]');
+        document.querySelector<HTMLElement>('.note-tools [data-panel="text"]');
       if (tool) {
         event.preventDefault();
         tool.focus();
       }
     }
+  }
+
+  /** Search lives in the note's overview, which opens for it. */
+  function openSearch() {
+    if (!settings.sidebar) settings.toggleSidebar();
+    setSearchRequest((count) => count + 1);
   }
 
   function selectMode(next: Mode) {
@@ -498,6 +500,7 @@ export function StudyEditor({
   const title = noteTitle(entry.name);
   const folders = path.split('/').slice(0, -1);
   const conflict = status.kind === 'conflict' ? status.disk : null;
+  const savedAt = saved?.path === path ? saved.at : null;
   const onPage = mode === 'text' && !notebook;
   const showSidebar = Boolean(source) && onPage && settings.sidebar;
   // A text file is one textarea, which cannot break across sheets.
@@ -521,6 +524,12 @@ export function StudyEditor({
     event.preventDefault();
     source.commands.focus('end');
   }
+  // Beside the page, never in its text layer: on sheets it follows the last sheet, on a card
+  // or the full width it closes the page itself.
+  const properties =
+    !study && (plain || source) ? (
+      <NoteProperties entry={entry} savedAt={savedAt} editor={source} text={plainText} />
+    ) : null;
   const plainEditor = (
     <textarea
       ref={plainField}
@@ -540,6 +549,7 @@ export function StudyEditor({
 
   return (
     <section
+      ref={setWorkspace}
       className={cn('note-workspace', settings.focus && 'is-focus', study && 'has-study-pages')}
       aria-label={`Edit ${entry.name}`}
       data-font={settings.font}
@@ -554,85 +564,103 @@ export function StudyEditor({
       onKeyDown={onKeyDown}
     >
       <header className="note-topbar">
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label="Back to board"
-          title="Back to board"
-          disabled={closing === 'saving'}
-          onClick={() => void close()}
-          leadingIcon={<ChevronLeft size={16} />}
-        >
-          Board
-        </Button>
-        {source && onPage ? (
+        <div className="note-topbar-group is-start">
           <IconButton
-            label={settings.sidebar ? 'Hide note overview' : 'Show note overview'}
+            label="Back to board"
             size="sm"
-            aria-pressed={settings.sidebar}
-            onClick={settings.toggleSidebar}
+            className="note-topbar-button"
+            disabled={closing === 'saving'}
+            onClick={() => void close()}
           >
-            <PanelLeft size={16} />
+            <ChevronLeft size={16} aria-hidden />
           </IconButton>
-        ) : null}
-        <nav aria-label="Location" className="note-crumbs">
-          {folders.map((folder, index) => (
-            <span key={`${index}-${folder}`} className="note-crumb">
-              {folder}
-            </span>
-          ))}
-          {/* Imported sheets keep their heading here so the first page starts below the tools. */}
-          {onPage && !study ? (
-            <span className="note-crumb is-current" aria-current="page">
-              {title}
-            </span>
-          ) : (
-            <h1 className="note-crumb is-current">{title}</h1>
-          )}
-        </nav>
-        {sheets ? <PageZoom stage={stage} layout={sheets} zoom={zoom} onZoom={zoomTo} /> : null}
-        {source && study ? (
-          <StudyDocumentControls
-            editor={source}
-            entry={entry}
-            readContent={currentText}
-            flush={flushAll}
-            report={setNotice}
-          />
-        ) : null}
-        <SaveStatus
-          state={status}
-          savedLabel="Saved on your computer"
-          onRetry={() => void autosaver.current?.flush()}
-          onResolve={() => setDismissedConflict(null)}
-        />
-        <div
-          role="tablist"
-          aria-label="Workspace"
-          className="study-editor-modes"
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-            event.preventDefault();
-            const next = mode === 'text' ? 'drawing' : 'text';
-            selectMode(next);
-            document.getElementById(`${id}-${next}-tab`)?.focus();
-          }}
-        >
-          {(['text', 'drawing'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              id={`${id}-${tab}-tab`}
-              aria-selected={mode === tab}
-              aria-controls={`${id}-${tab}`}
-              tabIndex={mode === tab ? 0 : -1}
-              onClick={() => selectMode(tab)}
+          {source && onPage ? (
+            <IconButton
+              label={settings.sidebar ? 'Hide note overview' : 'Show note overview'}
+              size="sm"
+              className="note-topbar-button"
+              aria-pressed={settings.sidebar}
+              onClick={settings.toggleSidebar}
             >
-              {tab === 'text' ? <NotebookPen size={14} /> : <PenLine size={14} />}
-              {tab === 'text' ? 'Notes' : 'Canvas'}
-            </button>
-          ))}
+              <PanelLeft size={16} aria-hidden />
+            </IconButton>
+          ) : null}
+          {mode === 'text' && !study ? (
+            <NoteTools
+              editor={source}
+              disabled={readOnly || renaming}
+              onInsertImage={() => pickAttachment('image')}
+              onInsertPdf={() => pickAttachment('pdf')}
+              onOpenCanvas={() => selectMode('drawing')}
+              onSearch={source && onPage ? openSearch : undefined}
+              readStats={() => (source ? noteStats(source.state.doc) : plainStats(plainText))}
+              fileName={entry.name}
+              keepsProperties={Boolean(initial.frontMatter)}
+              host={workspace}
+            />
+          ) : null}
+          {/* On the page its folder and title head the sheet itself, so the bar keeps to tools.
+              Imported sheets keep their heading here so the first page starts below the tools. */}
+          {onPage && !study ? null : (
+            <nav aria-label="Location" className="note-crumbs">
+              {folders.map((folder, index) => (
+                <span key={`${index}-${folder}`} className="note-crumb">
+                  {folder}
+                </span>
+              ))}
+              <h1 className="note-crumb is-current">{title}</h1>
+            </nav>
+          )}
+        </div>
+        <div className="note-topbar-group is-end">
+          {sheets ? <PageZoom stage={stage} layout={sheets} zoom={zoom} onZoom={zoomTo} /> : null}
+          {source && study ? (
+            <StudyDocumentControls
+              editor={source}
+              entry={entry}
+              readContent={currentText}
+              flush={flushAll}
+              report={setNotice}
+            />
+          ) : null}
+          <SaveStatus
+            state={status}
+            savedLabel="Saved on your computer"
+            onRetry={() => void autosaver.current?.flush()}
+            onResolve={() => setDismissedConflict(null)}
+          />
+          <div
+            role="tablist"
+            aria-label="Workspace"
+            className="study-editor-modes"
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              const next = mode === 'text' ? 'drawing' : 'text';
+              selectMode(next);
+              document.getElementById(`${id}-${next}-tab`)?.focus();
+            }}
+          >
+            {(['text', 'drawing'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                id={`${id}-${tab}-tab`}
+                aria-selected={mode === tab}
+                aria-controls={`${id}-${tab}`}
+                tabIndex={mode === tab ? 0 : -1}
+                onClick={() => selectMode(tab)}
+              >
+                {tab === 'text' ? (
+                  <NotebookPen size={14} aria-hidden />
+                ) : (
+                  <PenLine size={14} aria-hidden />
+                )}
+                {tab === 'text' ? 'Notes' : 'Canvas'}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -705,7 +733,6 @@ export function StudyEditor({
             {showSidebar && source ? (
               <NoteSidebar editor={source} scrollRoot={stage} searchRequest={searchRequest} />
             ) : null}
-            {/* The dock floats over the page or the notebook, centred on it, not on the sidebar. */}
             <div className="note-frame">
               {notebook ? (
                 plain ? (
@@ -777,21 +804,12 @@ export function StudyEditor({
                           <div className="study-editor-loading">Opening your note…</div>
                         )}
                       </div>
+                      {paged ? null : properties}
                     </article>
                   </div>
+                  {paged ? properties : null}
                 </div>
               )}
-              {!study ? (
-                <EditorDock
-                  editor={source}
-                  disabled={readOnly || renaming}
-                  onInsertImage={() => imageInput.current?.click()}
-                  onOpenCanvas={() => selectMode('drawing')}
-                  readStats={() => (source ? noteStats(source.state.doc) : plainStats(plainText))}
-                  fileName={entry.name}
-                  keepsProperties={Boolean(initial.frontMatter)}
-                />
-              ) : null}
             </div>
           </div>
           {source ? (
@@ -807,7 +825,20 @@ export function StudyEditor({
                 onChange={(event) => {
                   const files = Array.from(event.target.files ?? []).filter(isImageFile);
                   event.target.value = '';
-                  if (files.length) void insertImages(source.view, files, path, setNotice);
+                  pickedAttachment(files);
+                }}
+              />
+              <input
+                ref={pdfInput}
+                type="file"
+                accept="application/pdf,.pdf"
+                aria-label="Upload PDF"
+                multiple
+                hidden
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? []).filter(isPdfFile);
+                  event.target.value = '';
+                  pickedAttachment(files);
                 }}
               />
             </>

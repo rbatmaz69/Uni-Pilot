@@ -18,12 +18,12 @@ import { usePlatformModifier } from '@/hooks/usePlatform';
 import { OptionGroup, type Option } from './OptionGroup';
 
 /*
- * The appearance popovers of the editor dock. Each choice applies to every
+ * The appearance popovers of the note tools. Each choice applies to every
  * note and never reaches the file; a control only shows where it has an
  * effect, so no setting sits there doing nothing.
  */
 
-/** A small drawing of each layout, for its tile and for the dock button. */
+/** A small drawing of each layout, for its tile and for the Layout button. */
 export function LayoutGlyph({ layout }: { layout: LayoutChoice }) {
   return (
     <svg className="note-layout-glyph" viewBox="0 0 28 24" aria-hidden>

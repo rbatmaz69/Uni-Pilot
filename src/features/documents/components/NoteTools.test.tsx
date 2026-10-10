@@ -6,10 +6,12 @@ import { noteExtensions } from '@/features/documents/lib/markdown';
 import { noteStats } from '@/features/documents/lib/noteOutline';
 import { setTextMarker, TextMarker } from '@/features/documents/lib/textMarker';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
-import { EditorDock } from './EditorDock';
+import { NoteTools } from './NoteTools';
 
 let editor: Editor;
+let host: HTMLElement;
 beforeEach(() => {
+  host = document.body.appendChild(document.createElement('section'));
   useNoteStyleStore.setState({
     style: 'standard',
     layout: 'card',
@@ -22,7 +24,10 @@ beforeEach(() => {
     markerOnly: null,
   });
 });
-afterEach(() => editor?.destroy());
+afterEach(() => {
+  editor?.destroy();
+  host.remove();
+});
 function open(content = 'Keep my notes', disabled = false) {
   editor = new Editor({
     extensions: [...noteExtensions(), TextMarker],
@@ -31,42 +36,74 @@ function open(content = 'Keep my notes', disabled = false) {
   });
   const onImage = vi.fn();
   const onCanvas = vi.fn();
+  const onPdf = vi.fn();
+  const onSearch = vi.fn();
   render(
     <>
-      <EditorDock
+      <NoteTools
         editor={editor}
         disabled={disabled}
         onInsertImage={onImage}
+        onInsertPdf={onPdf}
         onOpenCanvas={onCanvas}
+        onSearch={onSearch}
         readStats={() => noteStats(editor.state.doc)}
         fileName="Study.md"
         keepsProperties={false}
+        host={host}
       />
       <EditorContent editor={editor} />
     </>,
   );
-  return { onImage, onCanvas };
+  return { onImage, onCanvas, onPdf, onSearch };
 }
-const dock = () => screen.getByRole('toolbar', { name: 'Page tools' });
+const tools = () => screen.getByRole('toolbar', { name: 'Page tools' });
 function openPanel(button: string, dialog: string) {
-  fireEvent.click(within(dock()).getByRole('button', { name: button }));
+  fireEvent.click(within(tools()).getByRole('button', { name: button }));
   return screen.getByRole('dialog', { name: dialog });
 }
 
-describe('editor dock', () => {
+describe('note tools', () => {
+  it('keeps to icons, names the current settings in tooltips and opens popovers in the workspace', () => {
+    useNoteStyleStore.setState({ font: 'literata', textSize: 'l' });
+    const { onSearch } = open();
+    for (const button of within(tools()).getAllByRole('button'))
+      expect(button.textContent?.replace(/A[ag]/, '')).toBe('');
+    expect(within(tools()).getByRole('button', { name: 'Typography' })).toHaveAttribute(
+      'title',
+      'Typography: Literata, Large',
+    );
+    const panel = openPanel('Layout', 'Layout');
+    expect(host).toContainElement(panel);
+    expect(tools()).not.toContainElement(panel);
+
+    fireEvent.click(within(tools()).getByRole('button', { name: 'Search in note' }));
+    expect(onSearch).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('offers a searchable PDF upload in Insert', () => {
+    const { onPdf } = open();
+    const panel = openPanel('Insert', 'Insert');
+    fireEvent.change(within(panel).getByRole('searchbox', { name: 'Search blocks' }), {
+      target: { value: 'pdf' },
+    });
+    fireEvent.click(within(panel).getByRole('button', { name: 'PDF' }));
+    expect(onPdf).toHaveBeenCalledOnce();
+  });
   it('opens one popover at a time and restores the trigger on Escape', () => {
     open();
     openPanel('Insert', 'Insert');
     const text = openPanel('Format text', 'Text');
     expect(screen.queryByRole('dialog', { name: 'Insert' })).not.toBeInTheDocument();
     expect(text).toHaveFocus();
-    expect(within(dock()).getByRole('button', { name: 'Format text' })).toHaveAttribute(
+    expect(within(tools()).getByRole('button', { name: 'Format text' })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(within(dock()).getByRole('button', { name: 'Format text' })).toHaveFocus();
+    expect(within(tools()).getByRole('button', { name: 'Format text' })).toHaveFocus();
   });
 
   it('closes on a click elsewhere and toggles from its own button', () => {
@@ -75,23 +112,23 @@ describe('editor dock', () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     openPanel('Layout', 'Layout');
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Layout' }));
+    fireEvent.click(within(tools()).getByRole('button', { name: 'Layout' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('moves between its buttons with the arrow keys', () => {
     open();
-    const insert = within(dock()).getByRole('button', { name: 'Insert' });
+    const insert = within(tools()).getByRole('button', { name: 'Insert' });
     insert.focus();
     fireEvent.keyDown(insert, { key: 'ArrowRight' });
-    expect(within(dock()).getByRole('button', { name: 'Format text' })).toHaveFocus();
+    expect(within(tools()).getByRole('button', { name: 'Format text' })).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: 'End' });
-    expect(within(dock()).getByRole('button', { name: 'Focus mode' })).toHaveFocus();
+    expect(within(tools()).getByRole('button', { name: 'Focus mode' })).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
     expect(insert).toHaveFocus();
   });
 
-  it('inserts a block after the current one without overwriting selected text, and can undo', () => {
+  it('inserts a block after the current one without overwriting selected text, in one undo step', () => {
     open();
     act(() => {
       editor.commands.setTextSelection({ from: 1, to: 5 });
@@ -101,9 +138,10 @@ describe('editor dock', () => {
     expect(editor.state.doc.child(1).type.name).toBe('horizontalRule');
     expect(editor.state.selection.$from.parent.type.name).toBe('paragraph');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Undo' }));
+    act(() => {
+      editor.commands.undo();
+    });
     expect(editor.getMarkdown()).toBe('Keep my notes');
-    expect(within(dock()).getByRole('button', { name: 'Redo' })).toBeEnabled();
   });
 
   it('inserts a table with the cursor in a cell and retains it on a Markdown round trip', () => {
@@ -170,12 +208,14 @@ describe('editor dock', () => {
     );
     fireEvent.click(within(panel).getByRole('button', { name: 'Checklist' }));
     expect(editor.isActive('taskList')).toBe(true);
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Undo' }));
+    act(() => {
+      editor.commands.undo();
+    });
     expect(editor.isActive('taskList')).toBe(false);
     expect(editor.state.doc.textContent).toBe('Study');
   });
 
-  it('disables inserts, formatting and history while a note is protected', () => {
+  it('disables inserts and formatting while a note is protected', () => {
     open('Study', true);
     const insert = openPanel('Insert', 'Insert');
     expect(within(insert).getByRole('button', { name: 'Table' })).toBeDisabled();
@@ -184,20 +224,19 @@ describe('editor dock', () => {
     const text = openPanel('Format text', 'Text');
     expect(within(text).getByRole('button', { name: 'Bold' })).toBeDisabled();
     expect(within(text).getByRole('button', { name: 'Heading 1' })).toBeDisabled();
-    expect(within(dock()).getByRole('button', { name: 'Undo' })).toBeDisabled();
   });
 
-  it('shows the current layout on its button and offers width only where it applies', () => {
+  it('names the current layout on its button and offers width only where it applies', () => {
     open();
-    const button = within(dock()).getByRole('button', { name: 'Layout' });
-    expect(button).toHaveTextContent('PagelessNormal');
+    const button = within(tools()).getByRole('button', { name: 'Layout' });
+    expect(button).toHaveAttribute('title', 'Layout: Pageless, Normal');
     const panel = openPanel('Layout', 'Layout');
     fireEvent.click(within(panel).getByRole('radio', { name: 'Wide' }));
     expect(useNoteStyleStore.getState().width).toBe('wide');
-    expect(button).toHaveTextContent('PagelessWide');
+    expect(button).toHaveAttribute('title', 'Layout: Pageless, Wide');
 
     fireEvent.click(within(panel).getByRole('radio', { name: 'Pages' }));
-    expect(button).toHaveTextContent('PagesA4');
+    expect(button).toHaveAttribute('title', 'Layout: Pages, A4');
     expect(within(panel).queryByRole('radiogroup', { name: 'Width' })).not.toBeInTheDocument();
     expect(within(panel).getByText(/A4 sheets keep their width/)).toBeInTheDocument();
   });
@@ -206,11 +245,12 @@ describe('editor dock', () => {
     open();
     fireEvent.click(within(openPanel('Layout', 'Layout')).getByRole('radio', { name: 'Notebook' }));
     expect(useNoteStyleStore.getState().style).toBe('notebook');
-    expect(within(dock()).getByRole('button', { name: 'Layout' })).toHaveTextContent(
-      'NotebookDotted paper',
+    expect(within(tools()).getByRole('button', { name: 'Layout' })).toHaveAttribute(
+      'title',
+      'Layout: Notebook, Dotted paper',
     );
-    for (const name of ['Insert', 'Format text', 'Undo', 'Page appearance'])
-      expect(within(dock()).queryByRole('button', { name })).not.toBeInTheDocument();
+    for (const name of ['Insert', 'Format text', 'Page appearance'])
+      expect(within(tools()).queryByRole('button', { name })).not.toBeInTheDocument();
     const type = openPanel('Typography', 'Typography');
     expect(within(type).queryByRole('radiogroup', { name: 'Font' })).not.toBeInTheDocument();
     expect(within(type).getByRole('radiogroup', { name: 'Bold text color' })).toBeInTheDocument();
@@ -266,7 +306,7 @@ describe('editor dock', () => {
   it('turns the Textmarker on from its popover and spotlights one role from its key', () => {
     const content = 'I think this is great. It was founded in 1998. The bus is red.';
     open(content);
-    const button = within(dock()).getByRole('button', { name: 'Textmarker' });
+    const button = within(tools()).getByRole('button', { name: 'Textmarker' });
     expect(button).toHaveAttribute('title', 'Textmarker: Off');
     const panel = openPanel('Textmarker', 'Textmarker');
     const fact = within(panel).getByRole('button', { name: 'Fact' });

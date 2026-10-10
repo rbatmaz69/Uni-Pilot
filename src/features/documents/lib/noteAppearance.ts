@@ -43,7 +43,7 @@ const labelOf = <T extends string>(options: readonly { value: T; label: string }
   options.find((option) => option.value === value)?.label ?? '';
 
 /**
- * What the dock's Layout button reads: the layout, and the one setting that
+ * What the Layout button's tooltip reads: the layout, and the one setting that
  * shapes it. A4 has a fixed width, so only the other layouts name theirs.
  */
 export function layoutSummary(layout: LayoutChoice, width: PageWidth, paper: PaperKind) {
@@ -53,7 +53,7 @@ export function layoutSummary(layout: LayoutChoice, width: PageWidth, paper: Pap
   return { name, detail: labelOf(PAGE_WIDTHS, width) };
 }
 
-/** What the dock's Typography button reads: the typeface and the text size. */
+/** What the Typography button's tooltip reads: the typeface and the text size. */
 export function typographySummary(font: PageFont, size: TextSize) {
   return { name: labelOf(NOTE_FONTS, font), detail: labelOf(TEXT_SIZES, size) };
 }

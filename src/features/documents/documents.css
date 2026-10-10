@@ -6,7 +6,7 @@
   min-width: 0;
   overflow: hidden;
   position: relative;
-  background: #f7f8f5;
+  background: var(--canvas);
   color: var(--text-primary);
 }
 .canvas-filter {
@@ -663,12 +663,6 @@
   font-size: 11px;
   color: var(--text-secondary);
 }
-[data-theme$='dark'] .document-canvas {
-  background: #191e21;
-}
-[data-theme$='dark'] .canvas-card-caption {
-  color: #e4e8e1;
-}
 
 /* Only contextual controls sit above the workspace. */
 .document-explorer.is-canvas {
@@ -676,7 +670,6 @@
 }
 .document-canvas {
   height: 100%;
-  background: #f5f6f3;
 }
 .canvas-viewport {
   background-image: none;
@@ -690,7 +683,7 @@
   position: absolute;
   z-index: 24;
   border-radius: 99px;
-  background: #33493616;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
   touch-action: none;
   cursor: pointer;
 }
@@ -710,8 +703,8 @@
   position: absolute;
   display: block;
   border-radius: 99px;
-  background: #738475b8;
-  box-shadow: inset 0 0 0 2px #ffffff55;
+  background: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--surface) 35%, transparent);
   cursor: grab;
 }
 .canvas-scrollbar.is-vertical .canvas-scrollbar-thumb {
@@ -724,7 +717,7 @@
 }
 .canvas-scrollbar:hover .canvas-scrollbar-thumb,
 .canvas-scrollbar:focus-visible .canvas-scrollbar-thumb {
-  background: #526e58;
+  background: var(--text-secondary);
 }
 .canvas-scrollbar-thumb:active {
   cursor: grabbing;
@@ -775,16 +768,16 @@
   width: 42px;
   height: 34px;
   padding: 0;
-  border: 1px solid #15251b0a;
+  border: 1px solid var(--border);
   border-radius: 99px;
-  background: #e5e8e1;
-  color: #51594e;
-  box-shadow: 0 2px 8px #1b282708;
+  background: var(--surface);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-soft);
   cursor: pointer;
 }
 .canvas-floating-button:hover {
-  background: #dce1d7;
-  color: #22291e;
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 .canvas-search-toggle {
   position: absolute;
@@ -1324,15 +1317,6 @@
 .canvas-card:hover .canvas-card-caption {
   opacity: 1;
 }
-[data-theme$='dark'] .canvas-floating-button {
-  background: #090d0d;
-  color: #b9c0bd;
-  border-color: #ffffff08;
-}
-[data-theme$='dark'] .canvas-floating-button:hover {
-  background: #2a3230;
-  color: #f0f5f2;
-}
 
 @keyframes canvas-focus-wash-in {
   from {
@@ -1426,89 +1410,27 @@
 .document-explorer.has-open-note .document-content > :not(.note-workspace) {
   display: none;
 }
+/*
+ * The explorer sits straight on the window's frame, below the app's title bar and beside
+ * its icon rail: its base is transparent, so the rail, the title bar and the gutters read
+ * as one surface. Two layers sit on it: the sidebar, a panel of its own with a hairline
+ * and a rounded top-left corner, and, flush against it, the content card every view is
+ * shown in. All colours come from the global layers (globals.css): text, hover and
+ * active from the sidebar family, the hairline from the frame, the panel, the card and
+ * the canvas from their own tokens.
+ */
 .document-explorer {
-  --document-rail: #f3f6f8;
-  --document-rail-line: #dce4e9;
-  --document-rail-text: #40515e;
-  --document-rail-muted: #788996;
-  --document-rail-hover: #e7edf1;
-  --document-rail-active: #dce7ef;
-}
-[data-theme$='dark'] .document-explorer {
-  --document-rail: #262b2e;
-  --document-rail-line: #363d40;
-  --document-rail-text: #cbd1d2;
-  --document-rail-muted: #929da1;
-  --document-rail-hover: #343b3e;
-  --document-rail-active: #3b4347;
-}
-.document-tabs {
-  display: flex;
-  flex: none;
-  align-items: end;
-  gap: 4px;
-  height: 52px;
-  min-width: 0;
-  overflow-x: auto;
-  padding: 9px 12px 0;
-  border-bottom: 1px solid var(--document-rail-line);
-  background: var(--document-rail);
-  scrollbar-width: none;
-}
-.document-tabs::-webkit-scrollbar {
-  display: none;
-}
-.document-tab {
-  display: flex;
-  flex: none;
-  align-items: center;
-  height: 35px;
-  max-width: 210px;
-  min-width: 92px;
-  border-radius: 8px 8px 0 0;
-  color: var(--document-rail-muted);
-  transition:
-    background 150ms ease,
-    color 150ms ease;
-}
-.document-tab:hover {
-  background: var(--document-rail-hover);
-  color: var(--document-rail-text);
-}
-.document-tab.is-active {
-  background: var(--surface);
-  color: var(--text-primary);
-  box-shadow: 0 -1px 5px #182b3410;
-}
-.document-tab > button:first-child {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-  height: 100%;
-  padding: 0 10px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 550;
-}
-.document-tab > button:first-child span {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.document-tab-close {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  margin-right: 4px;
-  border-radius: 5px;
-  opacity: 0.55;
-}
-.document-tab-close:hover {
-  background: var(--document-rail-hover);
-  opacity: 1;
+  --document-rail-line: var(--frame-line);
+  --document-rail-text: var(--panel-text);
+  --document-rail-muted: var(--panel-muted);
+  --document-rail-hover: var(--panel-hover);
+  --document-rail-active: var(--panel-active);
+  /* The sidebar's panel: one step up from the frame, so the layers step up. */
+  --document-panel: var(--panel);
+  /* The space around the card. */
+  --document-gutter: var(--frame-gutter);
+  /* The corners of the sidebar panel and the card, which meet in one rounded shape. */
+  --document-radius: var(--radius-md);
 }
 .document-body {
   display: flex;
@@ -1516,6 +1438,7 @@
   min-height: 0;
   min-width: 0;
 }
+/* The card: board, list, ILIAS and the open note all appear inside it. */
 .document-content {
   position: relative;
   display: flex;
@@ -1523,121 +1446,146 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  margin: 0 var(--document-gutter) var(--document-gutter) 0;
   overflow: hidden;
-}
-.document-tree {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  width: clamp(205px, 21vw, 270px);
-  min-height: 0;
-  border-right: 1px solid var(--document-rail-line);
-  background: var(--document-rail);
-  color: var(--document-rail-text);
-}
-.document-tree-search {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 9px;
-  height: 37px;
-  margin: 16px 12px 10px;
-  padding: 0 10px;
   border: 1px solid var(--document-rail-line);
-  border-radius: 8px;
-  background: var(--document-rail-hover);
-  color: var(--document-rail-muted);
+  border-left-width: 0;
+  border-radius: 0 var(--document-radius) var(--document-radius) 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
-.document-tree-search:focus-within {
-  border-color: var(--accent-primary);
+/* Without the sidebar, the card stands alone: a gutter on every side and all four corners. */
+/* While the sidebar slides in or out beneath it, the card keeps its own left edge (panelMotion). */
+.document-content[data-panel-moving] {
+  border-left-width: 1px;
+  border-radius: var(--document-radius);
 }
-.document-tree-search input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  outline: none;
-  color: var(--document-rail-text);
-  font-size: 12px;
+.document-explorer.is-sidebar-hidden .document-content {
+  margin-left: var(--document-gutter);
+  border-left-width: 1px;
+  border-radius: var(--document-radius);
 }
-.document-tree-search input::placeholder {
-  color: var(--document-rail-muted);
+/*
+ * The documents sidebar, a panel beside the app's icon rail: the space switcher and two
+ * tools above, the Files and Favorites views with their tree, and Recently deleted at the
+ * foot. It is a section panel (globals.css, "Section panel"): surface, hairline, rounded
+ * corner, header, rows and footer come from there, and the shell's other sections look the
+ * same. What is Documents' own is below: the title bar sits above it, so only its bottom
+ * lines up with the card's, and the space switcher, the views and the tree.
+ */
+.document-tree {
+  margin-bottom: var(--document-gutter);
 }
-.document-tree-search button {
-  flex: none;
+.space-title {
+  margin: 0;
 }
-.document-tree-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 0 8px 14px;
-}
-.document-tree-heading {
-  margin: 12px 12px 8px;
-  color: var(--document-rail-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.document-tree-row {
+.space-title button {
   display: flex;
   align-items: center;
+  gap: 8px;
+  max-width: 100%;
   min-width: 0;
-  min-height: 34px;
-  border-radius: 6px;
-  padding-right: 5px;
-}
-.document-tree-row:hover {
-  background: var(--document-rail-hover);
-}
-.document-tree-row.is-active {
-  background: var(--document-rail-active);
+  height: 32px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border-radius: var(--radius-xs);
   color: var(--document-rail-text);
+  font-size: 15px;
   font-weight: 650;
-}
-.document-tree-disclosure {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 19px;
-  height: 25px;
-  color: var(--document-rail-muted);
-}
-button.document-tree-disclosure:hover {
-  color: var(--document-rail-text);
-}
-.document-tree-name {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  height: 34px;
   text-align: left;
-  font-size: 12px;
 }
-.document-tree-name svg {
+.space-title button:hover,
+.space-title button[aria-expanded='true'] {
+  background: var(--document-rail-hover);
+}
+.space-title button > svg {
   flex: none;
   color: var(--document-rail-muted);
 }
-.document-tree-row.is-active .document-tree-name svg {
-  color: var(--accent-primary);
-}
-.document-tree-name span {
+.space-title-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.document-tree-hint {
-  margin: 6px 12px 10px 32px;
-  color: var(--document-rail-muted);
-  font-size: 11px;
+.space-monogram {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-xs);
+  background: var(--document-rail-active);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
-/* Spaces: the sidebar takes its space's soft hue over the rail; hover and
+/* The spaces: a menu under the header, as wide as the sidebar allows. */
+.space-menu {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: 8px;
+  left: 8px;
+  z-index: 30;
+  display: grid;
+  gap: 1px;
+  max-height: min(70vh, 420px);
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-raised);
+}
+.space-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+.space-menu-item:hover,
+.space-menu-item:focus-visible {
+  background: var(--surface-hover);
+}
+.space-menu-item.is-current {
+  font-weight: 600;
+}
+.space-menu-item > svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.space-menu-item .space-menu-check {
+  color: var(--accent-primary);
+}
+.space-menu-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.space-menu-note {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+}
+.space-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-soft);
+}
+/* A space the student added: the sidebar takes its soft hue over the panel; hover and
    active washes stay the rail's, so rows read the same in every space. */
 .space-sidebar[data-tone] {
-  background: color-mix(in oklab, var(--space-tone) 60%, var(--document-rail));
+  background: color-mix(in oklab, var(--space-tone) 60%, var(--document-panel));
 }
 .space-sidebar[data-tone='lavender'] {
   --space-tone: var(--accent-lavender-soft);
@@ -1663,173 +1611,311 @@ button.document-tree-disclosure:hover {
 .space-sidebar[data-tone='coral'] {
   --space-tone: var(--accent-coral-soft);
 }
-.space-title {
-  margin: 6px 0;
+/* A course carried over the sidebar: it can be dropped anywhere on it. */
+.space-sidebar.is-drop-target {
+  box-shadow: inset 0 0 0 2px var(--accent-primary);
 }
-.space-title button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-width: 0;
-  padding: 7px 8px;
+.space-drop-hint {
+  flex: none;
+  margin: 2px 10px 6px;
+  padding: 8px 10px;
   border-radius: var(--radius-xs);
-  color: var(--document-rail-text);
-  font-size: 14px;
-  font-weight: 650;
-  text-align: left;
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+  font-size: 12px;
+  font-weight: 600;
 }
-.space-title button:hover {
+/* Files | Favorites: a small segmented control, the open one lifted. */
+.space-views {
+  display: flex;
+  flex: none;
+  align-self: flex-start;
+  gap: 2px;
+  margin: 4px 0 6px 12px;
+  padding: 2px;
+  border-radius: 8px;
   background: var(--document-rail-hover);
 }
-.space-title span:not(.space-monogram) {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.space-view {
+  height: 24px;
+  padding: 0 11px;
+  border-radius: 6px;
+  color: var(--document-rail-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
-.space-monogram {
+.space-view:hover:not([aria-selected='true']) {
+  color: var(--document-rail-text);
+}
+.space-view[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+}
+/* While a document is on its way, Favorites shows it can take it. */
+.space-view.is-receiving {
+  color: var(--accent-primary);
+  outline: 1px dashed var(--accent-primary);
+  outline-offset: -1px;
+}
+.space-view.is-over {
+  background: var(--accent-primary-soft);
+  outline-style: solid;
+}
+/* The tree (or Favorites): takes what the pages leave, but never less than 12rem. */
+.space-panel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 12rem;
+  min-width: 0;
+}
+/* Above the tree: search, collapse and new folder, quiet and to the right. */
+.space-toolbar {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 0 8px 2px;
+}
+.space-tool {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
+  color: var(--document-rail-muted);
+}
+.space-tool:hover:not(:disabled),
+.space-tool[aria-expanded='true'] {
+  background: var(--document-rail-hover);
+  color: var(--document-rail-text);
+}
+.space-tool:disabled {
+  opacity: 0.4;
+}
+.document-tree-search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  margin: 2px 8px 6px;
+  padding: 0 8px;
+  border: 1px solid var(--document-rail-line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--document-rail-muted);
+}
+.document-tree-search:focus-within {
+  border-color: var(--accent-primary);
+}
+.document-tree-search svg {
+  flex: none;
+}
+.document-tree-search input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.document-tree-search input::placeholder {
+  color: var(--document-rail-muted);
+}
+/* A tree row is a panel row (globals.css) with a disclosure and a name button inside it. */
+.document-tree-row {
+  padding-right: 4px;
+}
+.document-tree-row.is-active .document-tree-name {
+  font-weight: 600;
+}
+/* Rows without a chevron of their own (search hits, courses) start a little in. */
+.document-tree-row > .document-tree-name:first-child {
+  padding-left: 8px;
+}
+.document-tree-disclosure {
   display: grid;
   flex: none;
   place-items: center;
   width: 18px;
-  height: 18px;
-  border-radius: var(--radius-xs);
-  background: var(--document-rail-active);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-}
-.space-divider {
-  margin: 12px 8px;
-  border-top: 1px solid var(--document-rail-line);
-}
-.space-new-note {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  min-height: 34px;
-  padding: 0 8px;
-  border-radius: var(--radius-xs);
-  color: var(--document-rail-muted);
-  font-size: 12px;
-}
-.space-new-note:hover {
-  background: var(--document-rail-hover);
-  color: var(--document-rail-text);
-}
-.space-trash {
-  flex: none;
-  margin: 0 8px 4px;
-  padding-left: 8px;
-  color: var(--document-rail-muted);
-}
-.space-dock {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px 10px;
-  border-top: 1px solid var(--document-rail-line);
-}
-.space-dock-spaces {
-  display: flex;
-  flex: 1;
-  justify-content: center;
-  gap: 4px;
-  min-width: 0;
-  /* Room above the buttons for their badges, which the scroller would clip. */
-  padding: 5px 5px 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.space-dock-button {
-  position: relative;
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--document-rail-muted);
-}
-.space-dock-button:hover {
-  background: var(--document-rail-hover);
-  color: var(--document-rail-text);
-}
-.space-dock-button[aria-pressed='true'] {
-  border-color: var(--document-rail-line);
-  background: var(--surface);
-  color: var(--document-rail-text);
-  box-shadow: var(--shadow-soft);
-}
-.space-dock-badge {
-  position: absolute;
-  top: -5px;
-  right: -6px;
-}
-/* Documents and ILIAS are always there; the spaces the student added follow. */
-.space-dock-divider {
-  flex: none;
-  align-self: center;
-  height: 18px;
-  margin: 0 3px;
-  border-left: 1px solid var(--document-rail-line);
-}
-.space-title-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.space-title-row .space-title {
-  flex: 1;
-  min-width: 0;
-}
-.space-options {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 28px;
   height: 28px;
-  border-radius: var(--radius-xs);
   color: var(--document-rail-muted);
 }
-.space-options:hover,
-.space-options[aria-expanded='true'] {
-  background: var(--document-rail-hover);
+button.document-tree-disclosure:hover {
   color: var(--document-rail-text);
 }
-.space-menu {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: 0;
-  z-index: 20;
-  display: grid;
-  min-width: 200px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-}
-.space-menu button {
-  display: grid;
-  gap: 1px;
-  padding: 7px 9px;
-  border-radius: var(--radius-xs);
-  color: var(--text-primary);
-  font-size: 12px;
+.document-tree-name {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 30px;
   text-align: left;
+  font-size: 13px;
 }
-.space-menu button:hover,
-.space-menu button:focus-visible {
+.document-tree-name svg {
+  flex: none;
+  color: var(--document-rail-muted);
+}
+.document-tree-row.is-active .document-tree-name svg {
+  color: var(--document-rail-text);
+}
+.document-tree-name span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.document-tree-hint {
+  margin: 4px 8px 8px;
+  padding-left: 20px;
+  color: var(--document-rail-muted);
+  font-size: 12px;
+}
+/* Favorites: the same rows, and a remove button that waits for the pointer. */
+.space-favorites {
+  padding: 2px 8px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: background 150ms ease;
+}
+.space-favorites[data-over] {
+  background: var(--accent-primary-soft);
+}
+.document-tree-remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: var(--document-rail-muted);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.document-tree-row:hover .document-tree-remove,
+.document-tree-row:focus-within .document-tree-remove,
+.document-tree-remove:focus-visible {
+  opacity: 1;
+}
+.document-tree-remove:hover {
+  background: var(--document-rail-active);
+  color: var(--document-rail-text);
+}
+.folder-appearance-trigger {
+  width: 26px;
+  height: 26px;
+}
+.folder-glyph {
+  flex: none;
+}
+.folder-appearance-dialog {
+  max-width: 380px;
+}
+.folder-appearance-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  margin-bottom: 22px;
+  border-radius: 12px;
   background: var(--surface-hover);
 }
-.space-menu button span {
-  color: var(--text-muted);
-  font-size: 10.5px;
+.folder-appearance-preview span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 550;
+}
+.folder-appearance-field + .folder-appearance-field {
+  margin-top: 22px;
+}
+.folder-appearance-field legend {
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+}
+.folder-color-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.folder-color-option,
+.folder-style-options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.folder-color-option:hover,
+.folder-style-options button:hover {
+  background: var(--surface-hover);
+}
+.folder-color-option[aria-pressed='true'],
+.folder-style-options button[aria-pressed='true'] {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-primary);
+}
+.folder-custom-color {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.folder-color-value {
+  margin-left: auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.folder-custom-color input {
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+.folder-style-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (hover: none) {
+  .document-tree-remove {
+    opacity: 1;
+  }
+}
+.space-favorites-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  padding: 10px;
+  border: 1px dashed var(--document-rail-line);
+  border-radius: var(--radius-sm);
+  color: var(--document-rail-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.space-favorites-empty svg {
+  flex: none;
+}
+.space-favorites[data-receiving] .space-favorites-empty {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 /* ILIAS space ------------------------------------------------------------- */
@@ -2250,11 +2336,6 @@ button.document-tree-disclosure:hover {
 .ilias-offline li + li {
   border-top: 1px solid var(--border-soft);
 }
-.space-dock-button.is-drop-target {
-  border-color: var(--accent-primary);
-  background: var(--accent-primary-soft);
-  color: var(--accent-primary);
-}
 .document-tree-name.is-remote {
   color: var(--document-rail-muted);
 }
@@ -2360,28 +2441,6 @@ button.document-tree-disclosure:hover {
   color: var(--accent-primary);
   font-size: 12px;
 }
-@media (max-width: 750px) {
-  .document-tree {
-    width: 182px;
-  }
-  .document-tree-name {
-    font-size: 11px;
-  }
-}
-@media (max-width: 560px) {
-  .document-tree {
-    width: 155px;
-  }
-  .document-tree-search {
-    margin-inline: 8px;
-  }
-  .document-tree-heading {
-    margin-left: 5px;
-  }
-  .document-tree-row {
-    padding-left: 4px !important;
-  }
-}
 .note-workspace {
   /* Text measure of the page body; the sheet adds its padding around it. */
   --page-measure: 700px;
@@ -2472,15 +2531,16 @@ button.document-tree-disclosure:hover {
   background: var(--notebook-desk);
 }
 
-/* Top bar: no border, no fill — it sits on the backdrop like Craft's. */
+/* Top bar: a quiet row of tools on the card itself, no fill and at most a hairline below. */
 .note-topbar {
   position: relative;
   z-index: 3;
   display: flex;
-  min-height: 50px;
+  min-height: 44px;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
   transition: opacity 400ms ease;
 }
 .note-workspace:has(.study-editor.is-notebook) .note-topbar {
@@ -2490,7 +2550,44 @@ button.document-tree-disclosure:hover {
   --text-primary: var(--notebook-desk-text);
   --text-secondary: var(--notebook-desk-muted);
   --text-muted: var(--notebook-desk-muted);
+  --border-soft: color-mix(in srgb, var(--notebook-desk-muted) 24%, transparent);
   color: var(--text-primary);
+}
+/* Where you are and what you see on the left; what is saved and which workspace on the right. */
+.note-topbar-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.note-topbar-group.is-start {
+  flex: 1;
+}
+.note-topbar-group.is-end {
+  flex: none;
+  gap: 10px;
+}
+/* Compact ghost icon buttons: muted until they are pointed at. */
+.note-topbar .note-topbar-button {
+  display: grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+}
+.note-topbar .note-topbar-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.note-topbar .note-topbar-button[aria-pressed='true'] {
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+}
+.note-topbar .note-topbar-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 .note-crumbs {
   display: flex;
@@ -2498,9 +2595,9 @@ button.document-tree-disclosure:hover {
   min-width: 0;
   align-items: center;
   gap: 6px;
-  margin-left: 4px;
-  color: var(--text-secondary);
-  font-size: 12.5px;
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
   white-space: nowrap;
 }
 .note-crumb {
@@ -2513,14 +2610,9 @@ button.document-tree-disclosure:hover {
   color: var(--text-muted);
 }
 .note-crumb.is-current {
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: inherit;
   font-weight: 500;
-}
-.note-topbar .study-editor-modes {
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-  box-shadow: inset 0 0 0 1px var(--border-soft);
-  backdrop-filter: blur(12px);
 }
 
 .note-toolbar {
@@ -2799,7 +2891,12 @@ button.document-tree-disclosure:hover {
 .note-workspace.is-focus .note-page .tiptap.ProseMirror-focused > :not(.has-focus) {
   opacity: 0.26;
 }
-.note-workspace.is-focus :is(.note-topbar, .editor-dock):not(:hover, :focus-within) {
+.note-workspace.is-focus
+  :is(.note-topbar, .drawing-insert-palette.is-canvas):not(
+    :hover,
+    :focus-within,
+    :has([aria-expanded='true'])
+  ) {
   opacity: 0.12;
 }
 .note-workspace.is-focus .note-sidebar {
@@ -3105,161 +3202,103 @@ button.document-tree-disclosure:hover {
   }
 }
 
-/* Editor dock: the page's tools in one bar that floats at the bottom, like a
-   design tool's. One popover at a time opens above it (EditorDock.tsx). */
+/* Note tools: the notes' tools as a quiet row of icons in the top bar, like a
+   writing app's. One popover at a time hangs below it (NoteTools.tsx). */
 .note-frame {
   position: relative;
   display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  container: note-frame / size;
 }
-.editor-dock-area {
-  position: absolute;
-  right: 0;
-  bottom: 16px;
-  left: 0;
-  z-index: 6;
+.note-tools {
   display: flex;
-  justify-content: center;
-  padding-inline: 12px;
-  pointer-events: none;
-}
-.editor-dock {
-  display: flex;
+  min-width: 0;
   align-items: center;
   gap: 2px;
-  max-width: 100%;
-  padding: 6px;
+  margin-left: 4px;
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  box-shadow: var(--shadow-float);
-  pointer-events: auto;
   scrollbar-width: none;
-  backdrop-filter: blur(16px) saturate(1.2);
-  transition: opacity 400ms ease;
-  animation: editor-dock-in 260ms var(--ease-shell);
 }
-.editor-dock-button {
+.note-tool {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-width: 42px;
-  height: 42px;
-  padding: 0 9px;
-  border-radius: var(--radius-md);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   transition:
     background-color 150ms ease,
     color 150ms ease;
 }
-.editor-dock-button:hover:not(:disabled),
-.editor-dock-button[aria-expanded='true'] {
+.note-tool:hover:not(:disabled),
+.note-tool[aria-expanded='true'] {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
-.editor-dock-button[aria-pressed='true'] {
+.note-tool[aria-pressed='true'] {
   background: var(--accent-primary-soft);
   color: var(--accent-primary);
 }
-.editor-dock-button:disabled {
+.note-tool:disabled {
   opacity: 0.35;
   cursor: default;
 }
-.editor-dock-button:focus-visible {
+.note-tool:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
-.editor-dock-button.has-value {
-  padding: 0 12px 0 8px;
-}
-/* A setting's name over its value, like "Pages / A4". */
-.editor-dock-value {
-  display: grid;
-  line-height: 1.2;
-  text-align: left;
-}
-.editor-dock-value > span {
-  max-width: 92px;
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-weight: 550;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.editor-dock-value > small {
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.editor-dock-aa {
-  font-size: 16px;
+.note-tool-aa {
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
-.editor-dock-ag {
-  color: var(--text-primary);
+/* The face the notes are set in. */
+.note-tool-ag {
   font-family: var(--page-font);
-  font-size: 20px;
+  font-size: 15px;
   line-height: 1;
 }
-.editor-dock-divider {
+.note-tool .note-layout-glyph {
+  width: 20px;
+  height: 17px;
+}
+.note-tools-divider {
   flex: none;
   width: 1px;
-  height: 24px;
-  margin: 0 6px;
-  background: var(--border);
+  height: 16px;
+  margin: 0 5px;
+  background: var(--border-soft);
 }
-/* The page in miniature: its backdrop, its sheet and cover. */
-.editor-dock-page {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 32px;
-  height: 30px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--page-backdrop);
+/* The tools keep their room: on a narrower card the right of the bar gets quieter
+   first — the saved words (the check stays), the page count, then the zoom, whose
+   ⌘+ and ⌘− keep working. */
+@container note-workspace (max-width: 1000px) {
+  .note-topbar .save-status.is-saved {
+    gap: 0;
+    font-size: 0;
+  }
 }
-.editor-dock-page[data-backdrop='paper'] {
-  background: color-mix(in srgb, var(--page-paper) 42%, var(--page-backdrop));
+@container note-workspace (max-width: 900px) {
+  .note-topbar :is(.note-zoom-page, .note-zoom-divider) {
+    display: none;
+  }
 }
-.editor-dock-page[data-backdrop='dots'] {
-  background:
-    radial-gradient(var(--border-strong) 1px, transparent 1.2px) 0 0 / 5px 5px,
-    var(--page-backdrop);
+@container note-workspace (max-width: 780px) {
+  .note-topbar .note-zoom-bar {
+    display: none;
+  }
 }
-.editor-dock-page[data-backdrop='calm'] {
-  background: linear-gradient(145deg, var(--accent-teal-soft), var(--page-backdrop));
-}
-.editor-dock-page .note-tone-swatch {
-  display: block;
-  width: 18px;
-  height: 21px;
-  overflow: hidden;
-  border-radius: 3px 3px 0 0;
-  box-shadow: 0 0 0 1px var(--border-soft);
-}
-.editor-dock-page .note-cover-swatch {
-  height: 7px;
-  border: 0;
-  border-radius: 0;
-}
-/* The highlighter on the dock sits on a swipe of every ink while it is on. */
-.editor-dock-marker {
+/* The highlighter sits on a swipe of every ink while it is on. */
+.note-tool-marker {
   display: inline-flex;
-  padding: 3px 5px;
+  padding: 2px 4px;
   border-radius: 0.3em 0.5em 0.35em 0.45em;
   transition: background-color 150ms ease;
 }
-.editor-dock-marker.is-on {
+.note-tool-marker.is-on {
   background: linear-gradient(
     100deg,
     var(--marker-definition),
@@ -3286,37 +3325,39 @@ button.document-tree-disclosure:hover {
 
 .editor-popover {
   --popover-width: 400px;
+  /* The page panel below stacks its preview when the popover is squeezed. */
+  container: editor-popover / inline-size;
   position: absolute;
-  bottom: calc(100% + 12px);
+  top: 52px;
   left: 12px;
+  z-index: 8;
   display: flex;
   width: min(var(--popover-width), calc(100cqw - 24px));
-  max-height: calc(100cqh - 100px);
+  max-height: calc(100% - 64px);
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow-raised);
   color: var(--text-primary);
-  pointer-events: auto;
-  transform-origin: var(--popover-arrow, 50%) 100%;
+  transform-origin: var(--popover-arrow, 50%) 0;
   animation: editor-popover-in 160ms var(--ease-shell);
 }
 .editor-popover:focus {
   outline: none;
 }
-/* The arrow under the popover points at the button that opened it. */
+/* The arrow above the popover points at the button that opened it. */
 .editor-popover::after {
   content: '';
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   left: var(--popover-arrow, 50%);
   width: 14px;
   height: 14px;
-  margin: -7px 0 0 -7px;
+  margin: 0 0 -7px -7px;
   border: solid var(--border);
-  border-width: 0 1px 1px 0;
-  border-bottom-right-radius: 3px;
+  border-width: 1px 0 0 1px;
+  border-top-left-radius: 3px;
   background: var(--surface);
   transform: rotate(45deg);
 }
@@ -3582,7 +3623,7 @@ button.document-tree-disclosure:hover {
 .note-page-preview .note-style-preview-sheet {
   width: 132px;
 }
-@container note-frame (max-width: 620px) {
+@container editor-popover (max-width: 540px) {
   .note-page-panel {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3590,21 +3631,6 @@ button.document-tree-disclosure:hover {
     padding: 16px 0 0;
     border-top: 1px solid var(--border-soft);
     border-left: 0;
-  }
-  .editor-dock-value {
-    display: none;
-  }
-  .editor-dock-button.has-value {
-    padding: 0 9px;
-  }
-}
-/* Undo and redo keep their shortcuts; the rest of the dock keeps its place. */
-@container note-frame (max-width: 480px) {
-  .editor-dock-button.is-history {
-    display: none;
-  }
-  .editor-dock-button {
-    min-width: 38px;
   }
 }
 
@@ -3723,55 +3749,10 @@ button.document-tree-disclosure:hover {
   gap: 18px;
 }
 
-/* On the desk the notebook's dock owns the middle: this one lines up beside it
-   (EditorDock.tsx measures where), or above its end when there is no room. */
-.study-editor.is-notebook .editor-dock-area {
-  bottom: 12px;
-  justify-content: flex-start;
-  padding-inline: 0;
-}
-.study-editor.is-notebook .editor-dock-area.is-stacked {
-  bottom: 62px;
-}
-.study-editor.is-notebook:has(.notebook-desk.is-calm) .editor-dock:not(:hover, :focus-within) {
-  opacity: 0.14;
-}
-/* As tall as the notebook's dock beside it. */
-.editor-dock.is-compact {
-  padding: 4px 5px;
-  border-radius: 999px;
-}
-.editor-dock.is-compact .editor-dock-button {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 6px;
-  border-radius: 999px;
-}
-.editor-dock.is-compact .editor-dock-value {
-  display: none;
-}
-.editor-dock.is-compact .editor-dock-ag {
-  font-size: 16px;
-}
-.editor-dock.is-compact .note-layout-glyph {
-  width: 22px;
-  height: 19px;
-}
-.editor-dock.is-compact .editor-dock-divider {
-  height: 18px;
-  margin: 0 3px;
-}
-
-@keyframes editor-dock-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
 @keyframes editor-popover-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
+    transform: translateY(-6px) scale(0.98);
   }
 }
 
@@ -4289,7 +4270,6 @@ button.document-tree-disclosure:hover {
 @media (prefers-reduced-motion: reduce) {
   .note-page,
   .note-page .tiptap > *,
-  .editor-dock,
   .editor-popover,
   .note-slash {
     transition: none;
@@ -4305,6 +4285,13 @@ button.document-tree-disclosure:hover {
   font-size: 11px;
 }
 .save-status.is-saved {
+  color: var(--accent-green);
+}
+/* In the quiet toolbar only the check is green; the words stay muted. */
+.note-topbar .save-status.is-saved {
+  color: var(--text-muted);
+}
+.note-topbar .save-status.is-saved svg {
   color: var(--accent-green);
 }
 .save-status.is-problem {
@@ -4344,21 +4331,26 @@ button.document-tree-disclosure:hover {
   background: var(--accent-primary-soft);
 }
 
+/* The Notes / Canvas switch: a compact segmented control that rests in the toolbar. */
 .study-editor-modes {
   display: flex;
-  gap: 4px;
-  padding: 3px;
+  gap: 2px;
+  padding: 2px;
   border-radius: var(--radius-sm);
   background: var(--surface-secondary);
 }
 .study-editor-modes button {
   display: inline-flex;
+  height: 24px;
   align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
+  gap: 6px;
+  padding: 0 10px;
   border-radius: var(--radius-xs);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 12px;
+}
+.study-editor-modes button:hover:not([aria-selected='true']) {
+  color: var(--text-primary);
 }
 .study-editor-modes button[aria-selected='true'] {
   background: var(--surface);
@@ -4902,6 +4894,102 @@ button.document-tree-disclosure:hover {
 .drawing-insert-palette.is-note {
   padding: 8px 16px;
 }
+/* Canvas dock: what to add to the drawing, floating at the bottom of the board
+   between Excalidraw's own zoom and help, like a design tool's. */
+.drawing-insert-palette.is-canvas {
+  position: absolute;
+  right: 0;
+  /* Centred on the line of Excalidraw's own islands beside it. */
+  bottom: 11px;
+  left: 0;
+  z-index: 5;
+  flex-wrap: nowrap;
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  min-height: 0;
+  margin-inline: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(16px) saturate(1.2);
+  transition: opacity 400ms ease;
+  animation: drawing-dock-in 260ms var(--ease-shell);
+}
+.drawing-insert-palette.is-canvas .drawing-insert-categories {
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+.drawing-insert-palette.is-canvas .drawing-insert-trigger {
+  height: 36px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
+  font-size: 12.5px;
+  font-weight: 550;
+}
+.drawing-insert-palette.is-canvas .drawing-insert-trigger > svg:first-child {
+  color: inherit;
+}
+.drawing-insert-palette.is-canvas .drawing-insert-trigger:hover:not(:disabled),
+.drawing-insert-palette.is-canvas .drawing-insert-trigger[aria-expanded='true'] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.drawing-insert-palette.is-canvas .drawing-insert-chevron {
+  display: none;
+}
+.drawing-dock-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border);
+}
+.drawing-dock-button {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.drawing-dock-button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.drawing-dock-button[aria-pressed='true'] {
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+}
+/* A narrower board keeps the icons, their names in the tooltips. */
+@container drawing-board (max-width: 900px) {
+  .drawing-insert-palette.is-canvas .drawing-insert-trigger {
+    width: 36px;
+    padding: 0;
+  }
+  .drawing-insert-palette.is-canvas .drawing-insert-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@keyframes drawing-dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 .drawing-insert-popover {
   position: fixed;
   z-index: 90;
@@ -4999,7 +5087,8 @@ button.document-tree-disclosure:hover {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .drawing-insert-popover {
+  .drawing-insert-popover,
+  .drawing-insert-palette.is-canvas {
     animation: none;
   }
   .drawing-insert-trigger,
@@ -5270,6 +5359,8 @@ button.document-tree-disclosure:hover {
   font-size: 12px;
 }
 .study-drawing-board {
+  container: drawing-board / inline-size;
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -5366,6 +5457,12 @@ button.document-tree-disclosure:hover {
   .note-topbar {
     flex-wrap: wrap;
     padding-inline: 10px;
+  }
+  /* The study tools take a row of their own, above the save state and the switch. */
+  .note-topbar-group.is-end {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .note-banner {
     margin-inline: 16px;
@@ -6682,7 +6779,6 @@ button.document-tree-disclosure:hover {
   .notebook-overview,
   .notebook-thumb,
   .notebook-paper-menu,
-  .study-editor.is-notebook .editor-dock,
   .notebook-flow .tiptap input[type='checkbox']:checked {
     animation: none;
   }
@@ -6715,10 +6811,8 @@ button.document-tree-disclosure:hover {
   );
 }
 .note-topbar {
-  min-height: 58px;
-  padding-inline: 18px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-  background: color-mix(in srgb, var(--surface) 48%, transparent);
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
 }
 .note-workspace {
   container: note-workspace / inline-size;
@@ -7673,31 +7767,6 @@ button.document-tree-disclosure:hover {
   }
 }
 
-/* Flexoki carries the workspace palette into the file rail and drawing desk. */
-[data-theme^='flexoki'] .document-explorer {
-  --document-rail: var(--surface-secondary);
-  --document-rail-line: var(--border);
-  --document-rail-text: var(--text-primary);
-  --document-rail-muted: var(--text-secondary);
-  --document-rail-hover: var(--surface-hover);
-  --document-rail-active: var(--accent-primary-soft);
-}
-[data-theme^='flexoki'] .document-canvas {
-  background: var(--page-backdrop);
-}
-[data-theme^='flexoki'] .canvas-card-caption {
-  color: var(--text-primary);
-}
-[data-theme^='flexoki'] .canvas-floating-button {
-  background: var(--surface);
-  color: var(--text-secondary);
-  border-color: var(--border);
-}
-[data-theme^='flexoki'] .canvas-floating-button:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
 /* Pages: A4 sheets with a visible end, like a word processor's print layout.
    The stack itself is transparent; the sheets are drawn behind one text layer,
    and a float at every boundary moves crossing lines on (lib/pageSheets.ts). */
@@ -7823,15 +7892,13 @@ button.document-tree-disclosure:hover {
   flex: none;
   align-items: center;
   gap: 2px;
-  height: 30px;
-  padding: 0 3px 0 11px;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  height: 28px;
+  padding: 0 2px 0 9px;
+  border-radius: var(--radius-xs);
   box-shadow: inset 0 0 0 1px var(--border-soft);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
-  backdrop-filter: blur(12px);
 }
 .note-zoom-page {
   white-space: nowrap;
@@ -7845,17 +7912,17 @@ button.document-tree-disclosure:hover {
 .note-zoom-button {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--text-secondary);
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
 }
 .note-zoom-value {
-  min-width: 44px;
-  height: 24px;
+  min-width: 42px;
+  height: 22px;
   padding: 0 4px;
-  border-radius: 99px;
-  color: var(--text-primary);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
   font-weight: 600;
   text-align: center;
 }
@@ -7877,6 +7944,117 @@ button.document-tree-disclosure:hover {
   .note-zoom-page,
   .note-zoom-divider {
     display: none;
+  }
+}
+
+/* Properties: when the note was last written, where it lives and how long it is
+   (NoteProperties.tsx). Read-only and outside the text layer. On sheets it follows the
+   last sheet, as wide as the page and centred under it; on a card or the full width it
+   sits inside the page and takes its text column. */
+.note-properties {
+  box-sizing: border-box;
+  margin-top: clamp(28px, 6vh, 56px);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+.note-stage > .note-properties {
+  width: min(100%, calc(var(--page-measure) + 2 * var(--page-margin)));
+  margin-inline: auto;
+  padding-inline: var(--page-margin);
+}
+.note-properties-divider {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.note-properties-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--border-soft);
+}
+.note-properties-toggle {
+  position: relative;
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.note-properties-toggle:hover {
+  color: var(--text-primary);
+}
+.note-properties-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.note-properties-list {
+  display: grid;
+  gap: 2px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.note-properties-list[hidden] {
+  display: none;
+}
+.note-properties-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9.5rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+}
+.note-properties-row dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.note-properties-row dt svg {
+  flex: none;
+}
+.note-properties-row dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+/* The figures lead, their units follow quietly. */
+.note-properties-count,
+.note-properties-figure {
+  color: var(--text-muted);
+}
+.note-properties-figure strong {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.note-workspace.is-focus .note-properties {
+  transition: opacity 250ms ease;
+}
+.note-workspace.is-focus .note-properties:not(:hover, :focus-within) {
+  opacity: 0.25;
+}
+@container note-stage (max-width: 460px) {
+  .note-properties-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-block: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-workspace.is-focus .note-properties {
+    transition: none;
   }
 }
 
@@ -8220,6 +8398,12 @@ button.document-tree-disclosure:hover {
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
+}
+.note-topbar .study-document-controls button {
+  height: 28px;
+  padding-inline: 10px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
 }
 .study-source-block,
 .study-note-block {

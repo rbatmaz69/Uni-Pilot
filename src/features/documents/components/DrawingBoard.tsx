@@ -12,6 +12,7 @@ import {
 import { documentRequest } from '@/features/documents/lib/files';
 import { createDrawingPreset, type DrawingPresetId } from '@/features/documents/lib/drawingPresets';
 import { DrawingInsertPalette } from './DrawingInsertPalette';
+import { FocusModeButton } from './FocusModeButton';
 import { SaveStatus } from './SaveStatus';
 import '@excalidraw/excalidraw/index.css';
 
@@ -237,7 +238,6 @@ export function DrawingBoard({ notePath, ref }: DrawingBoardProps) {
           onRetry={() => void autosaver.current?.flush()}
         />
       </div>
-      <DrawingInsertPalette disabled={!canvasReady} onInsert={(id) => void insert(id)} />
       {insertError ? (
         <p className="study-drawing-error" role="alert">
           {insertError}
@@ -264,6 +264,11 @@ export function DrawingBoard({ notePath, ref }: DrawingBoardProps) {
             />
           </Suspense>
         )}
+        {/* The canvas's dock: what to add, then focus mode, floating at the bottom of the board. */}
+        <DrawingInsertPalette disabled={!canvasReady} onInsert={(id) => void insert(id)}>
+          <span className="drawing-dock-divider" aria-hidden />
+          <FocusModeButton className="drawing-dock-button" />
+        </DrawingInsertPalette>
       </div>
     </section>
   );

@@ -13,6 +13,8 @@ import { clearPreviewCache } from '@/features/documents/lib/previewCache';
 import { useSpaceStore } from '@/features/documents/store/spaceStore';
 import { useNoteStyleStore } from '@/features/documents/store/noteStyleStore';
 import { isDesktopRuntime } from '@/lib/icsFetch';
+import { currentPlace } from '@/lib/tabs';
+import { selectActiveTab, useTabStore } from '@/store/tabStore';
 
 vi.mock('@/features/documents/lib/files', async (original) => ({
   ...(await original<object>()),
@@ -24,6 +26,8 @@ vi.mock('@/features/documents/components/PdfPreview', () => ({
   default: () => <div aria-label="PDF viewer" />,
 }));
 const request = vi.mocked(documentRequest);
+/** Where the open tab of the title bar is: the explorer reports every place it shows there. */
+const openPlace = () => currentPlace(selectActiveTab(useTabStore.getState()));
 const upload = vi.mocked(uploadDocument);
 const saves = () =>
   request.mock.calls
@@ -79,16 +83,27 @@ async function openNotes() {
 }
 
 describe('Document explorer', () => {
-  it('opens folders from the space sidebar and keeps them in the top tab strip', async () => {
+  it('opens folders from the space sidebar and tells the open tab where it is', async () => {
     const user = userEvent.setup();
     render(<DocumentExplorer />);
     const tree = screen.getByLabelText('Document spaces');
-    await within(tree).findByRole('button', { name: 'Biology' });
-    await user.click(within(tree).getByRole('button', { name: 'Biology' }));
-    expect(screen.getByRole('tab', { name: 'Biology' })).toHaveAttribute('aria-selected', 'true');
-    await user.click(screen.getByRole('tab', { name: 'Documents' }));
-    expect(screen.getByRole('tab', { name: 'Documents' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Biology' })).toBeInTheDocument();
+    await user.click(await within(tree).findByRole('button', { name: 'Biology' }));
+    await waitFor(() =>
+      expect(openPlace()).toEqual({
+        location: '/documents?path=Biology',
+        title: 'Biology',
+        kind: 'folder',
+      }),
+    );
+    await user.click(within(tree).getByRole('button', { name: 'Notes' }));
+    await screen.findByRole('textbox', { name: 'Document content' });
+    await waitFor(() =>
+      expect(openPlace()).toEqual({
+        location: '/documents?file=Notes.md',
+        title: 'Notes',
+        kind: 'file',
+      }),
+    );
   });
 
   it('searches documents in folders that have not been expanded', async () => {
@@ -109,6 +124,8 @@ describe('Document explorer', () => {
     );
     const user = userEvent.setup();
     render(<DocumentExplorer />);
+    // The field opens from the tree's toolbar.
+    await user.click(screen.getByRole('button', { name: 'Search all documents' }));
     await user.type(screen.getByRole('textbox', { name: 'Search all documents' }), 'deep');
     expect(
       await within(screen.getByLabelText('Document spaces')).findByRole('button', {
@@ -118,18 +135,12 @@ describe('Document explorer', () => {
     expect(request).toHaveBeenCalledWith({ action: 'search', query: 'deep' });
   });
 
-  it('saves an open note before changing to another document tab', async () => {
-    const user = userEvent.setup();
+  it('leaves the app pages and settings to the icon rail beside it', () => {
     render(<DocumentExplorer />);
-    const tree = screen.getByLabelText('Document spaces');
-    await user.click(await within(tree).findByRole('button', { name: 'Notes' }));
-    expect(screen.getByRole('tab', { name: 'Notes.md' })).toHaveAttribute('aria-selected', 'true');
-    await user.type(await screen.findByRole('textbox', { name: 'Document content' }), ' draft');
-    await user.click(screen.getByRole('tab', { name: 'Documents' }));
-    await waitFor(() => expect(saves().at(-1)).toMatchObject({ content: '# Lecture draft' }));
-    expect(screen.getByRole('tab', { name: 'Documents' })).toHaveAttribute('aria-selected', 'true');
-    await user.click(screen.getByRole('tab', { name: 'Notes.md' }));
-    expect(await screen.findByRole('textbox', { name: 'Document content' })).toBeInTheDocument();
+    const sidebar = screen.getByLabelText('Document spaces');
+    expect(within(sidebar).queryByRole('navigation')).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pages$/i })).not.toBeInTheDocument();
   });
 
   it('explains desktop storage without pretending browser files are saved', async () => {
@@ -166,7 +177,13 @@ describe('Document explorer', () => {
     render(<DocumentExplorer />);
     await screen.findByRole('button', { name: 'Select Notes.md' });
     await user.click(screen.getByRole('button', { name: 'Add to canvas' }));
-    await user.click(screen.getByRole('button', { name: 'New folder' }));
+    // The sidebar has a "New folder" of its own, for the folder of its space.
+    const sidebar = screen.getByLabelText('Document spaces');
+    await user.click(
+      screen
+        .getAllByRole('button', { name: 'New folder' })
+        .find((button) => !sidebar.contains(button))!,
+    );
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Chemistry');
     request.mockRejectedValueOnce('An item with this name already exists.');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -241,6 +258,7 @@ describe('Document explorer', () => {
     const paper = within(notebook).getByRole('textbox', { name: 'Document content' });
     expect(paper).toHaveValue('# Lecture');
     expect(within(notebook).getByText('Pages 1–2 of 2')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Note properties' })).not.toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('uni-pilot.note-style')!)).toMatchObject({
       state: { style: 'notebook' },
     });
@@ -288,7 +306,10 @@ describe('Document explorer', () => {
     expect(within(type).getByText(/Google Play Books/)).toBeInTheDocument();
     await user.click(within(type).getByRole('radio', { name: 'Large' }));
     await user.click(within(type).getByRole('radio', { name: 'Compact' }));
-    expect(screen.getByRole('button', { name: 'Typography' })).toHaveTextContent('LiterataLarge');
+    expect(screen.getByRole('button', { name: 'Typography' })).toHaveAttribute(
+      'title',
+      'Typography: Literata, Large',
+    );
 
     // Width shapes a page that grows with the text; A4 sheets keep theirs.
     await user.click(screen.getByRole('button', { name: 'Layout' }));
@@ -322,6 +343,40 @@ describe('Document explorer', () => {
     expect(within(info).getByText('Notes.md')).toBeInTheDocument();
   });
 
+  it("shows the note's properties below the page, counts as you type and never saves them", async () => {
+    const { user, editor } = await openNotes();
+    const properties = screen.getByRole('region', { name: 'Note properties' });
+    const row = (label: string) =>
+      within(properties).getByText(label, { selector: 'dt' }).nextElementSibling as HTMLElement;
+    expect(row('Location')).toHaveTextContent('Documents');
+    expect(row('Count')).toHaveTextContent('1 word');
+    // Opened from disk: the file's own date, not a save of ours.
+    expect(row('Last update').querySelector('time')).toHaveAttribute(
+      'datetime',
+      new Date(notes.modified).toISOString(),
+    );
+
+    await user.type(editor, ' on standard deviation');
+    await waitFor(() => expect(row('Count')).toHaveTextContent('4 words'));
+
+    await user.keyboard('{Meta>}s{/Meta}');
+    await waitFor(() =>
+      expect(
+        new Date(row('Last update').querySelector('time')!.dateTime).getTime(),
+      ).toBeGreaterThan(Date.now() - 60_000),
+    );
+    expect(saves().at(-1)).toMatchObject({ content: '# Lecture on standard deviation' });
+
+    await user.click(within(properties).getByRole('button', { name: 'Collapse' }));
+    expect(within(properties).getByRole('button', { name: 'Properties' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(row('Count')).not.toBeVisible();
+    expect(useNoteStyleStore.getState().properties).toBe(false);
+    useNoteStyleStore.setState({ properties: true });
+  });
+
   it('keeps the bold color when switching layouts and reopening a note without saving edits', async () => {
     const { user } = await openNotes();
     await user.click(screen.getByRole('button', { name: 'Typography' }));
@@ -348,7 +403,7 @@ describe('Document explorer', () => {
     expect(saves()).toEqual([]);
   });
 
-  it('toggles focus mode from the dock and with ⌘⇧F', async () => {
+  it('toggles focus mode from the top bar and with ⌘⇧F', async () => {
     const { user } = await openNotes();
     const workspace = screen.getByRole('region', { name: 'Edit Notes.md' });
     const focus = screen.getByRole('button', { name: 'Focus mode' });
@@ -411,6 +466,8 @@ describe('Document explorer', () => {
     expect(within(workspace).queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument();
     expect(workspace.querySelector('.note-page-cover')).toBeNull();
     expect(workspace.querySelector('.note-page-eyebrow')).toBeNull();
+    // Imported sheets keep their own pages; the note's properties belong to ordinary notes.
+    expect(within(workspace).queryByRole('region', { name: 'Note properties' })).toBeNull();
     expect(screen.getByRole('textbox', { name: 'Document content' })).toHaveValue(body);
 
     imported = false;
@@ -1100,7 +1157,13 @@ describe('Document spaces', () => {
     const user = userEvent.setup();
     render(<DocumentExplorer />);
     const sidebar = screen.getByLabelText('Document spaces');
-    const dock = screen.getByRole('navigation', { name: 'Spaces' });
+    // The spaces are the menu behind the sidebar's name.
+    const menu = async () => {
+      await user.click(
+        within(within(sidebar).getByRole('heading', { level: 2 })).getByRole('button'),
+      );
+      return within(sidebar).getByRole('menu', { name: 'Spaces' });
+    };
     expect(await within(sidebar).findByRole('heading', { name: 'Documents' })).toBeVisible();
 
     await user.click(within(sidebar).getByRole('button', { name: 'New note' }));
@@ -1116,7 +1179,7 @@ describe('Document spaces', () => {
     );
 
     // A space for a new folder.
-    await user.click(within(dock).getByRole('button', { name: 'New space' }));
+    await user.click(within(await menu()).getByRole('menuitem', { name: 'New space…' }));
     expect(screen.getByRole('dialog', { name: 'New space' })).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Personal');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -1128,32 +1191,75 @@ describe('Document spaces', () => {
         folder: true,
       }),
     );
-    expect(await screen.findByRole('tab', { name: 'Personal' })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    await waitFor(() =>
+      expect(openPlace()).toMatchObject({
+        location: '/documents?path=Personal',
+        title: 'Personal',
+      }),
     );
-    expect(within(dock).getByRole('button', { name: 'Personal space' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(within(sidebar).getByRole('heading', { name: 'Personal' })).toBeVisible();
+    expect(
+      within(await menu()).getByRole('menuitemradio', { name: 'Personal space' }),
+    ).toBeChecked();
 
     // A space for a folder that is already there: nothing is created.
     request.mockClear();
-    await user.click(within(dock).getByRole('button', { name: 'New space' }));
+    await user.click(
+      within(within(sidebar).getByRole('menu')).getByRole('menuitem', { name: 'New space…' }),
+    );
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Bio');
     const choice = screen.getByRole('combobox', { name: /Folder/ });
     await within(choice).findByRole('option', { name: 'Biology' });
     await user.selectOptions(choice, 'Biology');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await within(dock).findByRole('button', { name: 'Bio space' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(await within(sidebar).findByRole('heading', { name: 'Bio' })).toBeVisible();
+    expect(within(await menu()).getByRole('menuitemradio', { name: 'Bio space' })).toBeChecked();
     expect(request).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'create' }));
     expect(useSpaceStore.getState().spaces.map((space) => space.folder)).toEqual([
       'Personal',
       'Biology',
     ]);
+  });
+
+  it('starts a folder in the folder of the open space', async () => {
+    useSpaceStore.setState({
+      spaces: [{ id: 'personal', name: 'Personal', folder: 'Personal' }],
+      picked: 'personal',
+    });
+    const user = userEvent.setup();
+    render(<DocumentExplorer initialPath="Personal" />);
+    const sidebar = screen.getByLabelText('Document spaces');
+    expect(within(sidebar).getByRole('heading', { name: 'Personal' })).toBeVisible();
+
+    await user.click(within(sidebar).getByRole('button', { name: 'New folder' }));
+    expect(screen.getByRole('dialog', { name: 'New folder' })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Exams');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith({
+        action: 'create',
+        path: 'Personal',
+        name: 'Exams',
+        folder: true,
+      }),
+    );
+  });
+
+  it('starts a folder in the whole workspace from Documents', async () => {
+    const user = userEvent.setup();
+    render(<DocumentExplorer />);
+    const sidebar = screen.getByLabelText('Document spaces');
+    await user.click(within(sidebar).getByRole('button', { name: 'New folder' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Exams');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith({
+        action: 'create',
+        path: '',
+        name: 'Exams',
+        folder: true,
+      }),
+    );
   });
 });
 
@@ -1208,10 +1314,20 @@ describe('ILIAS space', () => {
         <DocumentExplorer />
       </MemoryRouter>,
     );
-    const dock = screen.getByRole('navigation', { name: 'Spaces' });
-    await user.click(await within(dock).findByRole('button', { name: 'ILIAS, 1 new' }));
+    const sidebar = screen.getByLabelText('Document spaces');
+    const spaces = async () => {
+      await user.click(
+        within(within(sidebar).getByRole('heading', { level: 2 })).getByRole('button'),
+      );
+      return within(sidebar).getByRole('menu', { name: 'Spaces' });
+    };
+    await user.click(
+      await within(await spaces()).findByRole('menuitemradio', { name: 'ILIAS, 1 new' }),
+    );
 
-    expect(screen.getByRole('tab', { name: 'ILIAS' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() =>
+      expect(openPlace()).toMatchObject({ location: '/documents?path=%3Ailias', title: 'ILIAS' }),
+    );
     const overview = screen.getByRole('region', { name: 'ILIAS' });
     expect(screen.queryByRole('button', { name: 'Add to canvas' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Search all documents' })).not.toBeInTheDocument();
@@ -1227,16 +1343,15 @@ describe('ILIAS space', () => {
       }),
     );
     expect(request).toHaveBeenCalledWith({ action: 'open', path: sheet });
-    expect(await within(dock).findByRole('button', { name: 'ILIAS' })).toBeInTheDocument();
+    expect(await within(sidebar).findByRole('heading', { name: 'ILIAS' })).toBeInTheDocument();
 
     // Every course is there, by its title in ILIAS.
-    const sidebar = screen.getByLabelText('Document spaces');
     expect(
       within(sidebar).getByRole('button', { name: 'Datenbanken 1 - WS26' }),
     ).toBeInTheDocument();
 
     // Back in Documents, the student's own things are on the canvas again.
-    await user.click(within(dock).getByRole('button', { name: 'Documents' }));
+    await user.click(within(await spaces()).getByRole('menuitemradio', { name: 'Documents' }));
     expect(await screen.findByRole('button', { name: 'Add to canvas' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Go to parent folder' })).not.toBeInTheDocument();
   });

@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, LayoutDashboard, Shapes, StickyNote, X, type LucideIcon } from 'lucide-react';
 import type { DrawingPresetId } from '@/features/documents/lib/drawingPresets';
@@ -54,15 +54,24 @@ const CATEGORIES: {
   },
 ];
 
+/**
+ * Components to add, behind one button per kind. On the canvas they are its
+ * dock, floating at the bottom of the board with `children` after them; in the
+ * notebook a strip above the pages.
+ */
 export function DrawingInsertPalette({
   disabled,
   onInsert,
   target = 'canvas',
+  children,
 }: {
   disabled: boolean;
   onInsert: (id: DrawingPresetId) => void;
   target?: 'canvas' | 'note';
+  /** Further canvas tools, at the end of the dock. */
+  children?: ReactNode;
 }) {
+  const dock = target === 'canvas';
   const [open, setOpen] = useState<Category | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -135,11 +144,9 @@ export function DrawingInsertPalette({
         ref={root}
         className={`drawing-insert-palette is-${target}`}
         role="toolbar"
-        aria-label={target === 'note' ? 'Add to note' : 'Add to drawing'}
+        aria-label={dock ? 'Canvas tools' : 'Add to note'}
       >
-        <span className="drawing-insert-intro">
-          {target === 'note' ? 'Add to note' : 'Add to canvas'}
-        </span>
+        {dock ? null : <span className="drawing-insert-intro">Add to note</span>}
         <div className="drawing-insert-categories">
           {CATEGORIES.map(({ id, label, Icon }) => (
             <button
@@ -147,6 +154,7 @@ export function DrawingInsertPalette({
               type="button"
               className="drawing-insert-trigger"
               data-insert-category={id}
+              title={dock ? label : undefined}
               aria-expanded={category?.id === id}
               aria-haspopup="dialog"
               aria-controls={category?.id === id ? panelId : undefined}
@@ -161,16 +169,18 @@ export function DrawingInsertPalette({
               }}
             >
               <Icon size={17} aria-hidden />
-              <span>{label}</span>
+              <span className="drawing-insert-label">{label}</span>
               <ChevronDown size={12} className="drawing-insert-chevron" aria-hidden />
             </button>
           ))}
         </div>
-        <span className="drawing-insert-help">
-          {target === 'note'
-            ? 'Click a card to write · ⌘/Ctrl + Enter to continue below'
-            : 'Double-click text to edit · Drag to arrange'}
-        </span>
+        {dock ? (
+          children
+        ) : (
+          <span className="drawing-insert-help">
+            Click a card to write · ⌘/Ctrl + Enter to continue below
+          </span>
+        )}
       </div>
       {category &&
         createPortal(
